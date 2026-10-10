@@ -4,7 +4,7 @@ A standalone, interactive learning playground for young children: an animated al
 
 It is built **separately from the main Edurance app** (React + TypeScript + Vite + Tailwind CSS + Framer Motion) so it can be tested and demonstrated on its own, then handed over as a self-contained component. Nothing in this repository imports from, or modifies, the main application.
 
-> **Status:** feature-complete for the scope below, tested (see [docs/TESTING.md](docs/TESTING.md)), **not yet merged into the main app**. Please read [docs/INTEGRATION.md](docs/INTEGRATION.md) (including the *merge checklist*) before integrating.
+> **Status:** feature-complete for the scope below, tested (see [docs/TESTING.md](docs/TESTING.md), which lists the known pre-existing flaky/failing tests), **not yet merged into the main app**. Please read [docs/INTEGRATION.md](docs/INTEGRATION.md) (including the *merge checklist*) before integrating.
 
 ---
 
@@ -23,8 +23,8 @@ npm run dev          # http://localhost:5173
 | `npm run build` | Type-check (`tsc -b`) + production build into `dist/` (works from any URL sub-path) |
 | `npm run preview` | Serve the production build at http://localhost:4173 |
 | `npm run typecheck` | TypeScript only |
-| `npm test` | Unit + component tests (Vitest, jsdom) |
-| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically) |
+| `npm test` | Unit + component tests (Vitest, jsdom). 116 tests; **not fully green**, see docs/TESTING.md |
+| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically). 60 tests |
 | `npm run build:lib` | **Integration package**: builds `dist-lib/` (ESM + precompiled CSS + `.d.ts` + `package.json`) for the main app |
 
 Handy URLs while developing:
@@ -48,10 +48,37 @@ Playwright uses its own Chromium. If your machine already has one, set `PW_CHROM
 | **Home** | Welcome, tappable "PLAY" letters, progress summary, five activity cards |
 | **Letter Playground** | Tap any of A–Z. The tile and the big stage letter react immediately with one of six hand-tuned animations (bounce, wobble, spin, jelly, float, pop), a ripple, and a small particle burst. Shows uppercase + lowercase, an example word and illustration, "Say it", "Hear the word", "Play again". Big letters can optionally be dragged (they spring back). Find 5 letters to earn stars. |
 | **Sound Discovery** | *Discover*: for each letter the **name** ("ay") and the **sound** (/ă/ as in apple) are shown and played separately. *Listen & choose*: hear a sound, tap the matching letter (kind feedback, "Try again", hint after two misses). |
-| **Word Builder** | Picture + clue; build the word from tiles by **tapping or dragging**. Tap a placed tile to take it back. Handles repeated letters (APPLE). "Check" is disabled until every slot is filled. Gentle hint after two unsuccessful checks. 18 words (the 10 required: cat, sun, dog, bat, pen, cup, fish, book, apple, mango, plus 8 more). |
+| **Word Builder** | Two modes behind a **Classic / Magic Letters** switch at the top of the screen (Classic is the default). *Classic*: picture + clue; build the word from tiles by **tapping or dragging**, tap a placed tile to take it back, "Check" is disabled until every slot is filled, hint after two unsuccessful checks; handles repeated letters (APPLE). *Magic Letters*: see [below](#magic-letters-word-builder-mode). 18 words (the 10 required: cat, sun, dog, bat, pen, cup, fish, book, apple, mango, plus 8 more), shared by both modes. |
 | **Sentence Fun** | Arrange the words *or* drag/tap the missing word. Read-aloud, wrong-order feedback that shows which words are already right, a "wave" celebration. 11 sentences (the 5 required plus 6 more). |
 | **Match & Play** | Three complete games: **Letter ↔ Picture**, **Sound ↔ Letter**, **Missing Letter** (word completion). Tap-tap or drag to match. |
 | **My Stars** | Session and all-time stats, per-activity progress, 7 badges, recently finished rounds, "Start over". |
+
+### Magic Letters (Word Builder mode)
+
+A redesigned, more playful drag-and-drop mode that lives **inside Word Builder**: open Word Builder and choose **Magic Letters** in the switch above the header. It is not a separate activity: it reports as `word-builder` (same progress, stars, badges, and `onAnswerSubmit` / `onActivityComplete` callbacks as Classic), the public API is unchanged, and Classic and every other activity are untouched.
+
+How it plays:
+
+* **Outline letter slots.** A picture and clue sit beside a row of slots. Each slot shows a *faint outline* of its letter (stroke only, never filled), like the ghost letters in the reference reel.
+* **Loose letters below.** Colourful rounded letter bubbles pop in with a staggered spring. They squash under a finger, lift and tilt while dragged, and the slot under the pointer highlights.
+* **Each drop is judged immediately** (there is no "Check" button). A letter only lands if it belongs in that slot; repeated letters work, so either P in APPLE fills either P slot.
+* **Correct drop:** the letter snaps into the slot, bounces (one of the existing bounce / jelly / pop moves, varied per slot), glows briefly, and throws a small 8-star burst. Finishing the word makes the letters hop in a wave, fires a larger burst, reads the word aloud, and shows a success message with **Next word**.
+* **Wrong drop:** the letter springs back with a soft wobble and a kind message ("That letter goes in a different spot. Try another!"). Nothing is penalised and the word is never blocked. **Start this word again** reshuffles the letters. After two misses a hint pulses the next outline and puts a star on the matching letter.
+* **Tap-to-select fallback.** Dragging is never required: tap a letter (it lifts and glows), then tap a slot. Tapping the letter again puts it down.
+* **Keyboard and assistive tech.** Letters and slots are real buttons (Enter on a letter, then Enter on a slot). Typing a letter places it in the first matching empty slot. Every placement, miss and hint is announced through a polite live region.
+* **Reduced motion.** With the OS setting (or `theme.motion: 'reduce'`) nothing moves: letters land instantly, the star burst is omitted, the glow becomes an opacity fade, and the slot's filled colour plus the announcement still make the result clear.
+
+Difficulty levels (same three bands as the rest of PlayLab; the words come from the shared Word Builder list):
+
+| Level | Words | Decoy letters in the tray |
+| --- | --- | --- |
+| Starter | 3-letter words | **0** (easiest) |
+| Explorer | 3- and 4-letter words | **1** |
+| Adventurer (default) | all words | **2** |
+
+**Decoy letters** are extra loose letters that are *not* in the word, so they fit no slot and dropping one just gives the gentle "different spot" feedback. They are chosen only from letters absent from the word, so a decoy can never stand in for a needed letter and **every word stays completable** at every level (checked by a unit test that solves all 18 words at all 3 levels).
+
+Code lives in `src/playlab/features/word-builder/magic/`; it reuses existing shared pieces by import only and does not modify `TileBoard`, `lib/tiles`, `useRound`, `CelebrationEffect`, routing, activity registration, or `progressService`.
 
 Design rules followed everywhere: no timers, no penalties, no "wrong" wording, always a way to retry, always a way home, large touch targets (≥ 44 px), visible keyboard focus.
 
@@ -151,6 +178,8 @@ Everything runs in the browser: no network calls, no analytics, no accounts. Onl
 * **Browsers/devices:** automated tests ran in Chromium only (desktop, with phone/tablet viewports and *emulated* touch). **Not tested:** real iOS/Android devices, Safari, Firefox, real finger drags, assistive-technology users, low-end-device performance.
 * **Voices:** see Audio above. iOS/Safari additionally need a prior user gesture before speech.
 * **Languages:** only English content ships. Content (letters/words/sentences) is pluggable via `registerContentPack`; **UI strings are English-only**, and the letter model assumes a bicameral alphabet (upper/lower case), so Hindi will need a small model extension (see INTEGRATION.md → *Adding a language*).
+* **Magic Letters on small screens:** on a 375 × 740 phone the second row of loose letters can sit slightly below the fold (all slots and the first row stay visible; tap-to-select covers the rest). Magic Letters rounds are not distinguishable from Classic rounds in *Recently finished* (they share the `word-builder` activity and the progress service is deliberately unchanged).
+* **Test suite status:** the unit suite is **not fully green**: a few older timing-sensitive tests fail on the unmodified baseline too. See [docs/TESTING.md](docs/TESTING.md) for exactly which.
 * **Content size:** 26 letters, 18 words, 11 sentences. Enough to demo and test; a real curriculum needs more and curriculum review of the phonics choices (e.g. x → *fox*, q → *quilt*, y → *yo-yo*).
 * **Progress model** is deliberately simple (stars, rounds, badges, last 8 rounds). There is no spaced repetition or adaptive difficulty yet; the `AnswerResult` stream is designed so the main app can build that.
 * **Hostile CSS:** isolation handles normal global/legacy CSS. Rules using `!important` against bare elements can't be overridden by a scoped stylesheet; embed in an `<iframe>` in that case.
