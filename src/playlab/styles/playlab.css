@@ -1,0 +1,265 @@
+/*
+ * Edurance PlayLab styles.
+ * - Tailwind preflight is OFF and every utility is scoped under .pl-root (see tailwind.config.ts),
+ *   so nothing here restyles the host application.
+ * - Custom classes use the `pl-` prefix.
+ */
+@import '@fontsource/andika/latin-400.css';
+@import '@fontsource/andika/latin-700.css';
+@import '@fontsource-variable/fredoka/wght.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.pl-root {
+  /* default brand scale: hand-tuned around #16a286 (brand-500) */
+  --pl-brand-50: 239 250 247;
+  --pl-brand-100: 212 243 234;
+  --pl-brand-200: 169 230 213;
+  --pl-brand-300: 116 211 187;
+  --pl-brand-400: 61 187 159;
+  --pl-brand-500: 22 162 134;
+  --pl-brand-600: 15 138 114;
+  --pl-brand-700: 12 114 96;
+  --pl-brand-800: 11 92 78;
+  --pl-brand-900: 10 74 64;
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  background: #fffaf0;
+  color: #12312c;
+  font-family: Andika, ui-rounded, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+  overflow: clip;
+}
+
+/* ---- scoped reset (zero specificity, so utilities always win) ---- */
+.pl-root,
+.pl-root *,
+.pl-root *::before,
+.pl-root *::after {
+  box-sizing: border-box;
+}
+.pl-root :where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+.pl-root :where(button) {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  text-align: center;
+}
+.pl-root :where(button:disabled) {
+  cursor: default;
+}
+.pl-root :where(h1, h2, h3, h4, p, figure, ul, ol, dl, dd) {
+  margin: 0;
+}
+.pl-root :where(ul, ol) {
+  list-style: none;
+  padding: 0;
+}
+.pl-root :where(svg, img) {
+  display: block;
+  max-width: 100%;
+}
+.pl-root :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---- visible keyboard focus everywhere ---- */
+.pl-root :focus {
+  outline: none;
+}
+.pl-root :focus-visible:not([tabindex='-1']) {
+  outline: 4px solid #12312c;
+  outline-offset: 3px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 7px #fff;
+}
+.pl-root [data-focus-ring='inset']:focus-visible {
+  outline-offset: -6px;
+  box-shadow: none;
+}
+
+/* ---- ambient backdrop: soft shapes, no gradients ---- */
+.pl-backdrop::before,
+.pl-backdrop::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.pl-backdrop::before {
+  width: 38rem;
+  height: 38rem;
+  top: -18rem;
+  right: -12rem;
+  background: rgb(var(--pl-brand-100) / 0.55);
+}
+.pl-backdrop::after {
+  width: 26rem;
+  height: 26rem;
+  bottom: -10rem;
+  left: -9rem;
+  background: #fff1c9;
+  opacity: 0.6;
+}
+
+/* ---- chunky 3D-ish button/tile look ---- */
+.pl-chunk {
+  box-shadow: 0 5px 0 rgba(18, 49, 44, 0.16);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+.pl-chunk:active:not(:disabled) {
+  box-shadow: 0 1px 0 rgba(18, 49, 44, 0.16);
+  transform: translateY(4px);
+}
+
+/* ---- ripple (CSS, transform + opacity only) ---- */
+@keyframes pl-ripple {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.45;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+.pl-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: pl-ripple 0.55s ease-out forwards;
+}
+
+/* ---- reduced-motion flash: opacity-only feedback ---- */
+@keyframes pl-flash {
+  0% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.pl-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: pl-flash 0.4s ease-out forwards;
+}
+
+/* ---- gentle idle float (used sparingly: mascot, stage letter) ---- */
+@keyframes pl-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.pl-float {
+  animation: pl-float 3.6s ease-in-out infinite;
+}
+
+@keyframes pl-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+.pl-blink {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: pl-blink 5s infinite;
+}
+
+/* ---- reduced motion: respect the OS setting AND the host's forced setting ---- */
+@media (prefers-reduced-motion: reduce) {
+  .pl-root *,
+  .pl-root *::before,
+  .pl-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pl-float,
+  .pl-blink {
+    animation: none !important;
+  }
+  .pl-ripple {
+    display: none;
+  }
+  /* opacity-only feedback is still allowed under reduced motion */
+  .pl-root .pl-flash {
+    animation-duration: 0.4s !important;
+  }
+}
+.pl-root[data-motion='reduce'] *,
+.pl-root[data-motion='reduce'] *::before,
+.pl-root[data-motion='reduce'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+.pl-root[data-motion='reduce'] .pl-float,
+.pl-root[data-motion='reduce'] .pl-blink {
+  animation: none !important;
+}
+.pl-root[data-motion='reduce'] .pl-ripple {
+  display: none;
+}
+.pl-root[data-motion='reduce'] .pl-flash {
+  animation-duration: 0.4s !important;
+}
+
+/* dragging should never select text or scroll the page on touch */
+.pl-draggable {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pl-nosel {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* speaking indicator bars */
+@keyframes pl-bars {
+  from {
+    transform: scaleY(0.45);
+  }
+  to {
+    transform: scaleY(1.15);
+  }
+}
+.pl-bar {
+  transform-origin: bottom;
+  animation: pl-bars 0.5s ease-in-out infinite alternate;
+}
+.pl-bar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.pl-bar:nth-child(3) {
+  animation-delay: 0.3s;
+}
