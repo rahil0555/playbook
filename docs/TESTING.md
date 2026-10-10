@@ -35,9 +35,9 @@ Everything under **Executed** was actually run, in this repository, on the final
 | Reduced motion | e2e with `prefers-reduced-motion: reduce` emulated: root flagged, tile `transform` never leaves identity, selection still shown; unit: host `theme.motion='reduce'` |
 | Layouts on mobile, tablet, desktop | e2e at 320, 375, 768, 1024, 1440 px on all 7 screens |
 | No horizontal overflow | e2e: `scrollWidth <= innerWidth` for those 35 combinations |
-| Touch | e2e: touch-emulated context, tap selects/builds; **CDP touch events** drag a tile into a slot and a letter onto a picture without scrolling the page; all buttons ≥ 44 × 44 px on a 375 px phone |
+| Touch | e2e: touch-emulated context, tap selects/builds; **CDP touch events** drag a tile into a slot and a letter onto a picture without scrolling the page; every visible button is ≥ 44 × 44 px on a 375 px phone (checked on home, alphabet, word builder and sentences) |
 | No console errors | every e2e test fails on any `console.error` or uncaught exception |
-| Accessibility (automated) | axe-core WCAG 2.1 A/AA on all 7 screens and 12 interactive states (selected letter, quiz, game board, partly filled word, after a check, settings, …): **0 violations** (including colour contrast) |
+| Accessibility (automated) | axe-core WCAG 2.1 A/AA on all 7 screens and 8 interactive states (alphabet with a letter selected, phonics quiz before/after a pick, matching board before/after selecting a card, word builder partly filled and after a check, settings open): **0 violations** (including colour contrast) |
 | Integration contract | e2e on the example host: callbacks received, `onExit`, host-controlled level hides picker, learner id (not name) in storage key, **hostile global CSS leaves PlayLab's computed styles unchanged**; unit: controlled navigation, `onExit`, throwing callback, async/throwing adapters, StrictMode (start counted once, goal completes once, no focus steal) |
 
 ### Bugs the testing found (all fixed)
