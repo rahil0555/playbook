@@ -6,3 +6,9 @@ test-results
 playwright-report
 .vite
 .DS_Store
+
+# voice audition tooling: secrets and generated samples never go to Git
+.env
+.env.*
+!.env.example
+voice-audition/
