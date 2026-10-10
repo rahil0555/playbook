@@ -366,7 +366,7 @@ test.describe('responsive layout', () => {
   });
 
   test('touch screen: a finger can DRAG a tile into a slot and a letter onto a picture (CDP touch events)', async ({ browser }) => {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 1100 }, hasTouch: true, isMobile: true });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 1250 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
     const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
