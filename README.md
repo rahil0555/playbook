@@ -23,8 +23,8 @@ npm run dev          # http://localhost:5173
 | `npm run build` | Type-check (`tsc -b`) + production build into `dist/` (works from any URL sub-path) |
 | `npm run preview` | Serve the production build at http://localhost:4173 |
 | `npm run typecheck` | TypeScript only |
-| `npm test` | Unit + component tests (Vitest, jsdom). 116 tests; **not fully green**, see docs/TESTING.md |
-| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically). 60 tests |
+| `npm test` | Unit + component tests (Vitest, jsdom). 154 tests; **not fully green**, see docs/TESTING.md |
+| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically). 72 tests |
 | `npm run build:lib` | **Integration package**: builds `dist-lib/` (ESM + precompiled CSS + `.d.ts` + `package.json`) for the main app |
 
 Handy URLs while developing:
@@ -153,6 +153,7 @@ Deviation from the suggested layout: everything lives under `src/playlab/` (inst
 
 ### Audio: what is and isn't there
 
+* **Choosing a voice (free, browser-only).** Open **Settings → Voice**: a dropdown of the English voices on the device (American English first; accents and *online* voices are labelled), **Preview voice** to hear a sample in the highlighted voice *without saving it*, and **Use this voice** to save it. The choice is stored locally with the other settings (per learner id, if one is given) and applies everywhere: Classic Word Builder, Magic Letters and every other activity. "Automatic (best American English)" is the default and prefers on-device `en-US` voices. If the saved voice is not on the device, PlayLab falls back to automatic silently; with no American voice the closest English voice is used (and Settings says so); with no English voice or no speech support Settings explains and the activities still work. No novelty-voice filtering is applied. Speech style is conservative and lives in one constants block (`SPEECH_STYLE` in `services/audioService.ts`: rate 0.9, pitch 1.05, isolated sounds at rate 0.8); no paid service, API key, or network call is involved. The Web Speech API offers no emotion control, so the "friendly teacher" feel comes from the voice you pick plus these small tweaks.
 * **No recorded voice files are bundled** and none are claimed. By default PlayLab uses the browser's built-in speech synthesis, so **pronunciation depends on the browser, the operating system and the installed voice**. Isolated sounds ("buh", "aah") are only approximations with TTS; the exact strings are in `data/en/alphabet.ts` (`sound.speech`) and can be tuned.
 * To use real recordings, set `audio: { name, sound, word }` URLs on letter entries (via a content pack). A clip is tried first; speech is the fallback.
 * If speech is missing, blocked, silent (no voices) or throws, the UI keeps working, a kind notice appears, and buttons explain what happened. Audio never blocks an animation: every call is fire-and-forget.

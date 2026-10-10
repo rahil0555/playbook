@@ -21,6 +21,9 @@ export interface PlayLabContextValue {
   setLevel: (level: DifficultyLevel) => void;
   soundEnabled: boolean;
   setSoundEnabled: (on: boolean) => void;
+  /** Saved browser voice id (null = automatic) */
+  voice: string | null;
+  setVoice: (voiceId: string | null) => void;
   /** OS preference OR host-forced */
   reducedMotion: boolean;
   audio: AudioService;

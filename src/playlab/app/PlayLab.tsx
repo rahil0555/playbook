@@ -52,9 +52,11 @@ export function PlayLab({
   }, [learnerId]);
   useEffect(() => saveSettings(settings, learnerId), [settings, learnerId]);
   useEffect(() => audio.setMuted(!settings.sound), [audio, settings.sound]);
+  useEffect(() => audio.setVoice(settings.voice), [audio, settings.voice]);
   const level: DifficultyLevel = levelProp ?? settings.level;
   const setLevel = useCallback((l: DifficultyLevel) => setSettings((s) => ({ ...s, level: l })), []);
   const setSoundEnabled = useCallback((on: boolean) => setSettings((s) => ({ ...s, sound: on })), []);
+  const setVoice = useCallback((voice: string | null) => setSettings((s) => ({ ...s, voice })), []);
 
   /* ---- motion preference: OS setting OR host override ---- */
   const systemReduced = useReducedMotion();
@@ -114,6 +116,8 @@ export function PlayLab({
       setLevel,
       soundEnabled: settings.sound,
       setSoundEnabled,
+      voice: settings.voice,
+      setVoice,
       reducedMotion,
       audio,
       store,
@@ -129,7 +133,7 @@ export function PlayLab({
       badgeToast: badgeQueue[0] ?? null,
       dismissBadgeToast,
     }),
-    [content, level, levelProp, setLevel, settings.sound, setSoundEnabled, reducedMotion, audio, store, view, navigate, learner, onExit, exit, recordStart, recordAnswer, recordCompletion, exploreLetter, badgeQueue, dismissBadgeToast],
+    [content, level, levelProp, setLevel, settings.sound, setSoundEnabled, settings.voice, setVoice, reducedMotion, audio, store, view, navigate, learner, onExit, exit, recordStart, recordAnswer, recordCompletion, exploreLetter, badgeQueue, dismissBadgeToast],
   );
 
   const style = brandCssVars(theme?.brandColor) as CSSProperties;

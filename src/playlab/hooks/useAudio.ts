@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
-import type { PlayRequest, SfxName, SpeakOutcome } from '../services/audioService';
+import { SPEECH_STYLE, type PlayRequest, type SfxName, type SpeakOutcome } from '../services/audioService';
 import type { AudioClipSet, LetterEntry } from '../types/learning';
 
 /** Live audio status (speaking / unavailable / voice name). */
@@ -22,15 +22,19 @@ export function useSpeech() {
     [audio, lang],
   );
   const speakSequence = useCallback(
-    (items: { text: string; src?: string }[]): Promise<SpeakOutcome> =>
-      audio.playSequence(items.map<PlayRequest>((i) => ({ text: i.text, lang, src: i.src }))),
+    (items: { text: string; src?: string; rate?: number }[]): Promise<SpeakOutcome> =>
+      audio.playSequence(items.map<PlayRequest>((i) => ({ text: i.text, lang, src: i.src, rate: i.rate }))),
     [audio, lang],
   );
   const sfx = useCallback((name: SfxName) => audio.sfx(name), [audio]);
   const stop = useCallback(() => audio.stop(), [audio]);
 
   const sayLetterName = useCallback((l: LetterEntry) => speak(l.nameSpeech, clip(l.audio, 'name')), [speak]);
-  const sayLetterSound = useCallback((l: LetterEntry) => speak(l.sound.speech, clip(l.audio, 'sound')), [speak]);
+  // isolated sounds are spoken a little slower so each stays clean
+  const sayLetterSound = useCallback(
+    (l: LetterEntry) => audio.play({ text: l.sound.speech, lang, src: clip(l.audio, 'sound'), rate: SPEECH_STYLE.soundRate }),
+    [audio, lang],
+  );
   const sayWord = useCallback((text: string, src?: string) => speak(text, src), [speak]);
 
   return { speak, speakSequence, sfx, stop, sayLetterName, sayLetterSound, sayWord };

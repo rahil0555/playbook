@@ -9,10 +9,10 @@ Everything under **Executed** was actually run, in this repository (Node 22, Chr
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **116 tests in 13 files. 3 consecutive full runs: 115, 114 and 115 passed** (1-2 failures each time; see below). All 29 Magic Letters tests passed in all three runs. |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **154 tests in 16 files. After the voice-selector change, 3 consecutive full runs: 153 passed and 1 failed each time** (the known alphabet "26 letters" test; see below). Before it (116 tests), runs showed 114-115 passing with the same pre-existing failures. All Magic Letters and voice tests passed in every run. |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **60 tests; the latest full run passed 60 of 60**. Earlier full runs on the same code saw one failure each from the flaky tests listed below. |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **72 tests; the latest full run passed 72 of 72**. Immediately before the voice-selector change the baseline run was 59 of 60 passing, the one failure being the known intermittent sentences test below. Earlier full runs have also seen one failure each from the flaky tests listed below. |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 
@@ -35,6 +35,18 @@ Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 ne
 * `magicBoard.test.ts` (10, pure logic): decoy counts (Starter 0 / Explorer 1 / Adventurer 2); decoys never contain a letter from the word; **all 18 words are completable at all 3 levels**; tiles never start in the solved order; right/wrong/occupied/ignored drops; the repeated P in APPLE; a decoy never fits any slot; typed-letter slot lookup; hint selection.
 * `magicMode.test.tsx` (19, component): Classic is the default and unchanged; switching modes both ways; tap-to-select then tap a slot; wrong slot is turned down kindly and recorded as an incorrect answer; tapping a slot first asks for a letter; putting a letter down; APPLE's two P tiles; decoys per level (and that a decoy never lands); hint after two misses; "Start this word again"; typed letters (including a miss); keyboard (Enter on letter then slot); live-region announcements; accessible names; the 8-star burst on a correct landing; **reduced motion (no burst, still lands and is announced)**; a whole round (5 words, one answer per word, progress recorded under Word Builder, next-step buttons); a round with a miss (4/5 first try, still finishes, never says "wrong").
 * `e2e/magic-word-builder.spec.ts` (21, real Chromium): mode switch; **mouse drag** snaps into the slot, with burst present then gone; wrong-slot drop springs back to its origin with kind feedback; empty-space release is not a miss; **touch drag via CDP touch events** (no page scroll); tap-tap with mouse and touch emulation; keyboard-only; a full round plus My Stars counting it as Word Builder; **every one of the 18 words finished** in Magic mode; retry + hint; finished state; decoy counts at each level via Settings; reduced motion (letter lands, no burst); **axe WCAG 2.1 A/AA clean** in initial, picked-up, after-a-miss and finished states; no horizontal overflow at 320 / 375 / 768 / 1440 px.
+
+### Voice selector (free browser voices): what the tests cover
+
+Baseline for this change (commit `c465297`, before any edit): `tsc` clean; unit 114-115 of 116 passing (the known alphabet test always, "Word completion" intermittently); e2e 59 of 60 (the known sentences flake). After: **no regressions**, only new tests added.
+
+* `voiceCatalog.test.ts` (14): language normalisation (`en_US`, case), English-only filtering, American-first and on-device-first ordering, accent and "online" labels, de-duplication, **no novelty-name filtering**, automatic selection (existing behaviour preserved, incl. other languages), saved-voice resolution with stale/non-English ids falling back silently.
+* `audioService.test.ts` (+8 added; the 8 existing cases are unchanged): English voice list and labels, no-speech support, late-arriving voices (`voiceschanged`) with a **stable snapshot** when nothing changed, speaking with the saved voice, stale saved voice → automatic, **preview override that changes neither the saved voice nor the displayed name**, shared rate/pitch constants (0.9 / 1.05 / 0.8), mute still wins.
+* `settingsService.test.ts` (3): settings saved before this change still load (`voice` → null), per-learner round trip, corrupt values ignored.
+* `settingsVoice.test.tsx` (13): options, Preview plays the sample in the highlighted voice and **does not save**, Use this voice saves (button disabled when unchanged), back to Automatic, stale saved voice shows Automatic, saved voice applied at start, Sound-off message, level picker and sound switch still work, host-locked level, no-American note, no-English and no-speech messages, labelled select and status announcement.
+* `e2e/voice-settings.spec.ts` (12, real Chromium with a fake synthesizer): English-only labelled list; Preview not saved (even after reload); Use saves and persists across refresh and is used by letters; **Classic Word Builder and Magic Letters speak with the chosen voice**; stale saved voice; default rate/pitch and slower isolated sounds; Sound-off preview; late-loading voices; no American / no English / no speech; axe WCAG 2.1 A/AA clean with the selector, plus keyboard use.
+
+**Not tested for the voice selector:** how real voices actually sound. Headless Chromium has none, so everything above uses fakes. Real-device behaviour (Chrome, Android, iOS Safari, macOS Safari: which voices are listed, whether `localService`/`voiceURI` are accurate, rate/pitch feel) needs the manual listening checklist.
 
 ### One existing test was edited
 
@@ -96,7 +108,7 @@ Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 ne
 
 ```bash
 npm install
-npx tsc -b && npm test          # types + 116 unit/component tests (expect the known pre-existing failures listed above)
-npm run test:e2e                # builds, serves the production build, runs 60 Chromium tests (first run: npx playwright install chromium if needed)
+npx tsc -b && npm test          # types + 154 unit/component tests (expect the known pre-existing failures listed above)
+npm run test:e2e                # builds, serves the production build, runs 72 Chromium tests (first run: npx playwright install chromium if needed)
 npm run build:lib               # integration package
 ```

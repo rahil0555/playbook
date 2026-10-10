@@ -1,17 +1,40 @@
-import type { AudioService, PlayRequest } from '../services/audioService';
+import type { AudioService, AudioSnapshot, PlayRequest } from '../services/audioService';
+import { listEnglishVoices, type VoiceLike } from '../services/voiceCatalog';
 
 /** Every request that reached the (fake) audio service, in order. */
 export const audioLog: PlayRequest[] = [];
 export const sfxLog: string[] = [];
+/** Ids passed to setVoice, in order. */
+export const voiceLog: (string | null)[] = [];
+
+/** Tests set these BEFORE rendering PlayLab (the fake reads them when it is created). */
+export const fakeDevice: { voices: VoiceLike[]; speechSupported: boolean } = { voices: [], speechSupported: true };
+export const resetFakeDevice = () => {
+  fakeDevice.voices = [];
+  fakeDevice.speechSupported = true;
+  voiceLog.length = 0;
+};
 
 export function createFakeAudio(): AudioService {
-  let muted = false;
+  const listeners = new Set<() => void>();
   // useSyncExternalStore requires a referentially stable snapshot between changes
-  let snapshot = { speaking: false, unavailable: false, voiceName: null as string | null, muted };
+  let snapshot: AudioSnapshot = {
+    speaking: false,
+    unavailable: false,
+    voiceName: null,
+    muted: false,
+    voices: listEnglishVoices(fakeDevice.voices),
+    voiceId: null,
+    speechSupported: fakeDevice.speechSupported,
+  };
+  const set = (patch: Partial<AudioSnapshot>) => {
+    snapshot = { ...snapshot, ...patch };
+    listeners.forEach((l) => l());
+  };
   return {
     play: async (req) => {
       audioLog.push(req);
-      return muted ? 'muted' : 'played';
+      return snapshot.muted ? 'muted' : 'played';
     },
     playSequence: async (reqs) => {
       audioLog.push(...reqs);
@@ -21,11 +44,16 @@ export function createFakeAudio(): AudioService {
     sfx: (name) => {
       sfxLog.push(name);
     },
-    setMuted: (m) => {
-      muted = m;
-      snapshot = { ...snapshot, muted: m };
+    setMuted: (m) => set({ muted: m }),
+    setVoice: (id) => {
+      voiceLog.push(id);
+      set({ voiceId: id });
     },
+    refreshVoices: () => undefined,
     getSnapshot: () => snapshot,
-    subscribe: () => () => undefined,
+    subscribe: (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
   };
 }

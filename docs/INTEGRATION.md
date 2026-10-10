@@ -269,6 +269,7 @@ Natural next steps that fit the current contract: assign a specific activity via
 
 * No recorded voice is bundled. By default the browser's speech synthesis is used (voice quality varies by device; some devices have no voice). PlayLab detects "no voice / blocked / unsupported", shows a kind notice and keeps working.
 * To supply recordings, register a content pack whose letters carry `audio: { name?: string; sound?: string; word?: string }` URLs (served by your app). A clip is tried first; speech is the fallback if the file cannot be played.
+* **Voice choice (internal, no prop).** Settings has a Voice dropdown (English voices on the device only), a Preview button that never saves, and a Use this voice button. The choice is saved with the other local settings (`edurance.playlab.settings.v1[:learnerId]`, new optional `voice` field; older saved settings still load). Hosts do not configure it and `PlayLabProps` is unchanged. Speech rate/pitch defaults are in `SPEECH_STYLE` (`services/audioService.ts`).
 * Sound effects are synthesized (Web Audio); no files to ship. The header speaker button mutes everything and is remembered per learner.
 
 ## 9. Adding a language (e.g. Hindi)

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The global test setup replaces createAudioService with a fake; here we want the real one.
-const { createAudioService } = await vi.importActual<typeof import('./audioService')>('./audioService');
+const { createAudioService, SPEECH_STYLE } = await vi.importActual<typeof import('./audioService')>('./audioService');
 
 type Handlers = { onstart?: () => void; onend?: () => void; onerror?: (e: { error: string }) => void };
 
@@ -133,5 +133,144 @@ describe('audioService', () => {
     await vi.advanceTimersByTimeAsync(100);
     await p2;
     expect(env.spoken.slice(3)).not.toContain('3');
+  });
+});
+
+/* ---------------------- voice selection (browser voices only) ---------------------- */
+
+type Rec = { text: string; rate: number; pitch: number; voice: { name: string } | null };
+
+function voiceSynth(voices: { name: string; lang: string; voiceURI?: string; localService?: boolean }[]) {
+  const spoken: Rec[] = [];
+  const handlers: Record<string, () => void> = {};
+  let list = voices;
+  const synth = {
+    cancel: vi.fn(),
+    getVoices: () => list,
+    addEventListener: (type: string, fn: () => void) => {
+      handlers[type] = fn;
+    },
+    speak: (u: Rec & { onstart?: () => void; onend?: () => void }) => {
+      spoken.push({ text: u.text, rate: u.rate, pitch: u.pitch, voice: u.voice });
+      setTimeout(() => (u.onstart?.(), u.onend?.()), 1);
+    },
+  };
+  class Utterance {
+    text: string;
+    lang = '';
+    rate = 1;
+    pitch = 1;
+    voice: { name: string } | null = null;
+    onstart?: () => void;
+    onend?: () => void;
+    constructor(text: string) {
+      this.text = text;
+    }
+  }
+  return {
+    env: { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance },
+    spoken,
+    setVoices: (v: typeof voices) => {
+      list = v;
+      handlers.voiceschanged?.();
+    },
+  };
+}
+
+const DEVICE = [
+  { name: 'Local US', lang: 'en-US', voiceURI: 'local-us', localService: true },
+  { name: 'Daisy', lang: 'en_GB', voiceURI: 'daisy', localService: false },
+  { name: 'Español', lang: 'es-ES', voiceURI: 'es', localService: true },
+];
+
+describe('audioService: voice selection', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  it('exposes English voices only, labelled, and reports speech support', () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    const snap = audio.getSnapshot();
+    expect(snap.speechSupported).toBe(true);
+    expect(snap.voices.map((v) => v.label)).toEqual(['Local US (American English)', 'Daisy (British English, online)']);
+    expect(snap.voiceName).toBe('Local US');
+  });
+
+  it('without speech synthesis: unsupported and no voices', () => {
+    const snap = createAudioService({ synth: null }).getSnapshot();
+    expect(snap.speechSupported).toBe(false);
+    expect(snap.voices).toEqual([]);
+  });
+
+  it('picks up voices that arrive late (voiceschanged), and keeps the snapshot stable when nothing changed', () => {
+    const d = voiceSynth([]);
+    const audio = createAudioService(d.env);
+    expect(audio.getSnapshot().voices).toEqual([]);
+    d.setVoices(DEVICE);
+    const first = audio.getSnapshot();
+    expect(first.voices).toHaveLength(2);
+    d.setVoices(DEVICE); // same list again
+    expect(audio.getSnapshot()).toBe(first); // same object: no pointless re-render
+    audio.refreshVoices();
+    expect(audio.getSnapshot()).toBe(first);
+  });
+
+  it('speaks with the saved voice, and updates the displayed voice name', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    audio.setVoice('daisy');
+    expect(audio.getSnapshot()).toMatchObject({ voiceId: 'daisy', voiceName: 'Daisy' });
+    const p = audio.play({ text: 'hello', lang: 'en-US' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+    expect(d.spoken.at(-1)?.voice?.name).toBe('Daisy');
+  });
+
+  it('a stale saved voice silently falls back to automatic (and nothing breaks)', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    audio.setVoice('voice-from-another-device');
+    const p = audio.play({ text: 'hello', lang: 'en-US' });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(p).resolves.toBe('played');
+    expect(d.spoken.at(-1)?.voice?.name).toBe('Local US');
+    expect(audio.getSnapshot().unavailable).toBe(false);
+  });
+
+  it('a preview override uses that voice for one request and does NOT change the saved voice or displayed name', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    audio.setVoice(null);
+    const p = audio.play({ text: 'preview', lang: 'en-US', voice: 'daisy' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+    expect(d.spoken.at(-1)?.voice?.name).toBe('Daisy');
+    expect(audio.getSnapshot()).toMatchObject({ voiceId: null, voiceName: 'Local US' });
+    const q = audio.play({ text: 'normal', lang: 'en-US' });
+    await vi.advanceTimersByTimeAsync(10);
+    await q;
+    expect(d.spoken.at(-1)?.voice?.name).toBe('Local US');
+  });
+
+  it('uses the shared speech style by default, and a request can override rate (isolated sounds)', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    const a = audio.play({ text: 'cat' });
+    await vi.advanceTimersByTimeAsync(10);
+    await a;
+    expect(d.spoken.at(-1)).toMatchObject({ rate: SPEECH_STYLE.rate, pitch: SPEECH_STYLE.pitch });
+    const b = audio.play({ text: 'buh', rate: SPEECH_STYLE.soundRate });
+    await vi.advanceTimersByTimeAsync(10);
+    await b;
+    expect(d.spoken.at(-1)).toMatchObject({ rate: SPEECH_STYLE.soundRate, pitch: SPEECH_STYLE.pitch });
+    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch, SPEECH_STYLE.soundRate]).toEqual([0.9, 1.05, 0.8]);
+  });
+
+  it('mute still wins over a chosen voice', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    audio.setVoice('daisy');
+    audio.setMuted(true);
+    await expect(audio.play({ text: 'x' })).resolves.toBe('muted');
+    expect(d.spoken).toEqual([]);
   });
 });

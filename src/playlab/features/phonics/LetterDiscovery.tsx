@@ -6,6 +6,7 @@ import { LetterGrid } from '../../components/LetterGrid';
 import { PronunciationControl } from '../../components/PronunciationControl';
 import { Illustration } from '../../illustrations/Illustration';
 import { useSpeech } from '../../hooks/useAudio';
+import { SPEECH_STYLE } from '../../services/audioService';
 import { letterColor } from '../../lib/accents';
 import { animationFor } from '../../motion/variants';
 import type { LetterEntry } from '../../types/learning';
@@ -37,7 +38,7 @@ export function LetterDiscovery() {
   const sayAll = () =>
     speakSequence([
       { text: letter.nameSpeech, src: letter.audio?.name },
-      { text: letter.sound.speech, src: letter.audio?.sound },
+      { text: letter.sound.speech, src: letter.audio?.sound, rate: SPEECH_STYLE.soundRate },
       { text: letter.word.text, src: letter.audio?.word },
     ]);
 

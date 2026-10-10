@@ -12,6 +12,20 @@
  *    fire-and-forget safe and resolves with an outcome string.
  */
 
+import { listEnglishVoices, resolveVoice, type VoiceOption } from './voiceCatalog';
+
+/**
+ * Speech style, in ONE place for easy tuning. Browser voices differ a lot, so keep these conservative:
+ * a little slower than normal for young listeners, with only a slight lift in pitch.
+ * Isolated phonics sounds are slower still so each sound stays clean.
+ */
+export const SPEECH_STYLE = {
+  rate: 0.9,
+  pitch: 1.05,
+  /** isolated letter sounds ("buh", "sss") */
+  soundRate: 0.8,
+} as const;
+
 export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error';
 export type SfxName = 'tap' | 'pop' | 'place' | 'correct' | 'oops' | 'celebrate';
 
@@ -23,14 +37,26 @@ export interface PlayRequest {
   src?: string;
   rate?: number;
   pitch?: number;
+  /**
+   * Use this English voice id for this request only (used by the Settings preview, so previewing never saves).
+   * `undefined` = the saved preference; `null` = automatic.
+   */
+  voice?: string | null;
 }
 
 export interface AudioSnapshot {
   speaking: boolean;
   /** true once speech was tried and nothing could be played (no voice, blocked, unsupported) */
   unavailable: boolean;
+  /** Name of the voice that will be used (saved choice or automatic). */
   voiceName: string | null;
   muted: boolean;
+  /** English voices on this device (may be empty at first: browsers load them asynchronously). */
+  voices: VoiceOption[];
+  /** The saved voice id, or null for automatic. */
+  voiceId: string | null;
+  /** false when this browser has no speech synthesis at all */
+  speechSupported: boolean;
 }
 
 export interface AudioService {
@@ -39,6 +65,10 @@ export interface AudioService {
   stop(): void;
   sfx(name: SfxName): void;
   setMuted(muted: boolean): void;
+  /** Choose the voice for future speech (null = automatic). Unknown/stale ids fall back to automatic. */
+  setVoice(voiceId: string | null): void;
+  /** Re-read the device's voice list (e.g. when Settings opens). */
+  refreshVoices(): void;
   getSnapshot(): AudioSnapshot;
   subscribe(listener: () => void): () => void;
 }
@@ -83,7 +113,15 @@ const NOTES: Record<SfxName, { freq: number; at: number; dur: number; type?: Osc
 };
 
 export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
-  let snapshot: AudioSnapshot = { speaking: false, unavailable: false, voiceName: null, muted: false };
+  let snapshot: AudioSnapshot = {
+    speaking: false,
+    unavailable: false,
+    voiceName: null,
+    muted: false,
+    voices: [],
+    voiceId: null,
+    speechSupported: !!(env.synth && env.Utterance),
+  };
   const listeners = new Set<() => void>();
   let ctx: AudioContext | null = null;
   let currentClip: HTMLAudioElement | null = null;
@@ -96,18 +134,42 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     listeners.forEach((l) => l());
   };
 
-  const pickVoice = (lang: string): SpeechSynthesisVoice | null => {
+  const rawVoices = (): SpeechSynthesisVoice[] => {
     try {
-      const voices = env.synth?.getVoices() ?? [];
-      const prefix = lang.split('-')[0]?.toLowerCase();
-      const exact = voices.filter((v) => v.lang.toLowerCase() === lang.toLowerCase());
-      const loose = voices.filter((v) => v.lang.toLowerCase().startsWith(`${prefix}`));
-      const pool = exact.length ? exact : loose;
-      return pool.find((v) => v.localService) ?? pool[0] ?? null;
+      return env.synth?.getVoices() ?? [];
     } catch {
-      return null;
+      return [];
     }
   };
+
+  /** The voice to use for `lang`. `override` (a request's own choice) beats the saved preference. */
+  const pickVoice = (lang: string, override?: string | null): SpeechSynthesisVoice | null =>
+    resolveVoice(rawVoices(), lang, override === undefined ? snapshot.voiceId : override);
+
+  const speakingLang = 'en-US';
+  const refreshName = () => {
+    const v = pickVoice(speakingLang);
+    if (v && v.name !== snapshot.voiceName) set({ voiceName: v.name });
+  };
+
+  /** Re-read the English voice list; the snapshot only changes when the list really changed (stable for React). */
+  const refreshVoices = () => {
+    const next = listEnglishVoices(rawVoices());
+    const same = next.length === snapshot.voices.length && next.every((o, i) => o.id === snapshot.voices[i]?.id && o.label === snapshot.voices[i]?.label);
+    if (!same) set({ voices: next });
+    refreshName();
+  };
+
+  // Browsers (notably Chrome) load voices asynchronously and announce it with `voiceschanged`.
+  try {
+    env.synth?.addEventListener?.('voiceschanged', refreshVoices);
+  } catch {
+    /* older browsers: the retries below still pick the list up */
+  }
+  refreshVoices();
+  if (env.synth && snapshot.voices.length === 0 && typeof setTimeout === 'function') {
+    [300, 1200, 3000].forEach((ms) => setTimeout(refreshVoices, ms));
+  }
 
   const speak = (req: PlayRequest): Promise<SpeakOutcome> => {
     const { synth, Utterance } = env;
@@ -131,12 +193,13 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
         synth.cancel();
         const u = new Utterance(req.text);
         u.lang = lang;
-        u.rate = req.rate ?? 0.85;
-        u.pitch = req.pitch ?? 1.1;
-        const voice = pickVoice(lang);
+        u.rate = req.rate ?? SPEECH_STYLE.rate;
+        u.pitch = req.pitch ?? SPEECH_STYLE.pitch;
+        const voice = pickVoice(lang, req.voice);
         if (voice) {
           u.voice = voice;
-          set({ voiceName: voice.name });
+          // "current voice" shows the saved/automatic voice; a one-off preview must not change it
+          if (req.voice === undefined) set({ voiceName: voice.name });
         }
         u.onstart = () => {
           started = true;
@@ -262,6 +325,11 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       if (muted) stop();
       set({ muted });
     },
+    setVoice(id) {
+      set({ voiceId: id });
+      refreshName();
+    },
+    refreshVoices,
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);
