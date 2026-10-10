@@ -6,7 +6,10 @@ import { resolve } from 'node:path';
 // React, ReactDOM and Framer Motion are peer dependencies and are NOT bundled.
 export default defineConfig({
   plugins: [react()],
+  publicDir: false,
   build: {
+    // keep fonts as separate files (referenced relatively from the CSS) instead of base64 in the stylesheet
+    assetsInlineLimit: 0,
     outDir: 'dist-lib',
     emptyOutDir: false,
     lib: {

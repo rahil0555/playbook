@@ -30,7 +30,7 @@ export function ActivityCard({ activity, progress, onOpen }: ActivityCardProps) 
           <Illustration name={activity.illustration} className="h-14 w-14" />
         </span>
         {progress.bestStars > 0 ? (
-          <span className="flex items-center gap-0.5 rounded-full bg-white/80 px-2 py-1 text-sun-700" aria-label={`Best: ${progress.bestStars} of 3 stars`}>
+          <span role="img" className="flex items-center gap-0.5 rounded-full bg-white/80 px-2 py-1 text-sun-700" aria-label={`Best: ${progress.bestStars} of 3 stars`}>
             {[1, 2, 3].map((n) => (
               <Icon key={n} name="star" size={16} filled={n <= progress.bestStars} className={n <= progress.bestStars ? 'text-sun-500' : 'text-black/20'} />
             ))}

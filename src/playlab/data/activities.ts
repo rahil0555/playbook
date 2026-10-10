@@ -1,4 +1,4 @@
-import type { ActivityDefinition, ActivityId } from '../types/learning';
+import type { ActivityDefinition, ActivityId, PlayLabView } from '../types/learning';
 
 export const ACTIVITIES: ActivityDefinition[] = [
   {
@@ -49,6 +49,11 @@ export const ACTIVITIES: ActivityDefinition[] = [
 ];
 
 export const ACTIVITY_IDS: ActivityId[] = ACTIVITIES.map((a) => a.id);
+
+/** Every screen PlayLab can show; handy for validating a route param in the host app. */
+export const PLAYLAB_VIEWS: readonly PlayLabView[] = ['home', 'progress', ...ACTIVITY_IDS];
+
+export const isPlayLabView = (value: unknown): value is PlayLabView => typeof value === 'string' && (PLAYLAB_VIEWS as readonly string[]).includes(value);
 
 export function getActivity(id: ActivityId): ActivityDefinition {
   const found = ACTIVITIES.find((a) => a.id === id);

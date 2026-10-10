@@ -104,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [view]);
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-4 pb-10 sm:px-6">
+    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-4 pb-10 sm:px-6">
       <header className="relative z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2 sm:py-4">
         <button type="button" onClick={() => navigate('home')} aria-label="Edurance PlayLab, go to home" className="rounded-2xl p-1">
           <Logo compact />
@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="relative flex items-center gap-2">
           {session.stars > 0 ? (
-            <span className="hidden items-center gap-1 rounded-full bg-sun-100 px-3 py-2 font-display font-semibold text-sun-700 min-[400px]:flex" aria-label={`${session.stars} stars this visit`}>
+            <span role="img" className="hidden items-center gap-1 rounded-full bg-sun-100 px-3 py-2 font-display font-semibold text-sun-700 min-[400px]:flex" aria-label={`${session.stars} stars this visit`}>
               <Icon name="star" size={18} filled className="text-sun-500" />
               {session.stars}
             </span>

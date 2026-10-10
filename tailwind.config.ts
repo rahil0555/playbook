@@ -3,13 +3,15 @@ import type { Config } from 'tailwindcss';
 /**
  * Tailwind is scoped to PlayLab so it can live next to another Tailwind (or
  * non-Tailwind) app without collisions:
- *  - `important: '.pl-root'` scopes every utility under the PlayLab root element
+ *  - `important: '.pl-root.pl-root'` scopes every utility under the PlayLab root element. The class is doubled on
+ *    purpose: it raises specificity to (0,3,0) so utilities beat PlayLab's own reset (0,2,1), which in turn
+ *    beats ordinary host rules such as `button {}` or `.app button {}`.
  *  - `preflight: false` means no global reset leaks out; a scoped reset lives in
  *    src/playlab/styles/playlab.css
  */
 export default {
   content: ['./src/playlab/**/*.{ts,tsx}', './src/standalone/**/*.{ts,tsx}', './index.html'],
-  important: '.pl-root',
+  important: '.pl-root.pl-root',
   corePlugins: { preflight: false },
   theme: {
     extend: {

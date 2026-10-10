@@ -44,6 +44,8 @@ export default function AlphabetActivity() {
   const upperRef = useRef<AnimatedLetterHandle>(null);
   const lowerRef = useRef<AnimatedLetterHandle>(null);
   const startedOnce = useRef(false);
+  const visitedRef = useRef<ReadonlySet<string>>(new Set());
+  const goalDoneRef = useRef(false);
 
   useEffect(() => {
     if (startedOnce.current) return;
@@ -74,17 +76,20 @@ export default function AlphabetActivity() {
       // 2. progress + audio are fire-and-forget
       exploreLetter(letter.id);
       void sayLetterName(letter);
-      setVisited((prev) => {
-        if (prev.has(letter.id) || goalDone) return prev;
-        const next = new Set(prev).add(letter.id);
+      // Plain reads/writes via refs: state updater functions must stay pure (StrictMode runs them twice).
+      const seen = visitedRef.current;
+      if (!seen.has(letter.id) && !goalDoneRef.current) {
+        const next = new Set(seen).add(letter.id);
+        visitedRef.current = next;
+        setVisited(next);
         if (next.size >= GOAL) {
+          goalDoneRef.current = true;
           setGoalDone(true);
           recordCompletion({ activityId: 'alphabet', score: GOAL, total: GOAL, stars: 3, durationMs: 0 });
         }
-        return next;
-      });
+      }
     },
-    [exploreLetter, fire, goalDone, recordCompletion, sayLetterName, selectedId, sfx],
+    [exploreLetter, fire, recordCompletion, sayLetterName, selectedId, sfx],
   );
 
   // celebrate when the goal is reached (separate from the letter burst so it reads clearly)
@@ -100,6 +105,8 @@ export default function AlphabetActivity() {
   };
 
   const keepExploring = () => {
+    visitedRef.current = new Set();
+    goalDoneRef.current = false;
     setVisited(new Set());
     setGoalDone(false);
     recordStart('alphabet');

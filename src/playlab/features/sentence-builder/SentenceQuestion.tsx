@@ -25,7 +25,7 @@ const fullText = (s: SentenceEntry) => `${s.words.join(' ')}${s.punctuation}`;
 /** Finished sentence: each word hops in turn (a small "wave"), a positive completion moment. */
 function SolvedSentence({ sentence }: { sentence: SentenceEntry }) {
   return (
-    <motion.p initial="idle" animate="go" aria-label={fullText(sentence)} className="flex flex-wrap items-baseline justify-center gap-x-3 font-display text-3xl font-bold text-brand-800 sm:text-4xl">
+    <motion.p initial="idle" animate="go" role="img" aria-label={fullText(sentence)} className="flex flex-wrap items-baseline justify-center gap-x-3 font-display text-3xl font-bold text-brand-800 sm:text-4xl">
       {sentence.words.map((w, i) => (
         <motion.span key={i} custom={i} variants={wave} aria-hidden="true">
           {w}
@@ -158,7 +158,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
           slotStates={states}
           kind="word"
           noun="word"
-          trailing={<span aria-label={sentence.punctuation === '.' ? 'full stop' : sentence.punctuation} className="px-1 font-display text-4xl font-bold text-ink-soft">{sentence.punctuation}</span>}
+          trailing={<span role="img" aria-label={sentence.punctuation === '.' ? 'full stop' : sentence.punctuation} className="px-1 font-display text-4xl font-bold text-ink-soft">{sentence.punctuation}</span>}
         />
       </motion.div>
       <div className="flex flex-wrap items-center justify-center gap-3">
@@ -224,7 +224,7 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
       >
         {sentence.words.map((w, i) =>
           i === blank ? (
-            <span key={i} data-blank="true" aria-label="missing word" className="inline-block h-14 min-w-[6.5rem] rounded-3xl border-[3px] border-dashed border-sun-500 bg-sun-100 align-middle sm:h-16" />
+            <span key={i} data-blank="true" role="img" aria-label="missing word" className="inline-block h-14 min-w-[6.5rem] rounded-3xl border-[3px] border-dashed border-sun-500 bg-sun-100 align-middle sm:h-16" />
           ) : (
             <span key={i}>{w}</span>
           ),

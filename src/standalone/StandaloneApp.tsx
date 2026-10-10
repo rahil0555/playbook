@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { PlayLab } from '../playlab';
-import { ACTIVITY_IDS } from '../playlab/data/activities';
+import { PlayLab, isPlayLabView } from '../playlab';
 import type { PlayLabView } from '../playlab';
 
 /**
@@ -9,11 +8,9 @@ import type { PlayLabView } from '../playlab';
  * with no server rewrite rules. This is also a reference for how the main app
  * can mount <PlayLab /> with controlled navigation.
  */
-const VIEWS = new Set<string>(['home', 'progress', ...ACTIVITY_IDS]);
-
 const readHash = (): PlayLabView => {
   const raw = window.location.hash.replace(/^#\/?/, '');
-  return VIEWS.has(raw) ? (raw as PlayLabView) : 'home';
+  return isPlayLabView(raw) ? raw : 'home';
 };
 
 export function StandaloneApp() {

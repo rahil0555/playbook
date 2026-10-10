@@ -365,6 +365,35 @@ test.describe('responsive layout', () => {
     await ctx.close();
   });
 
+  test('touch screen: a finger can DRAG a tile into a slot and a letter onto a picture (CDP touch events)', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 1100 }, hasTouch: true, isMobile: true });
+    const page = await ctx.newPage();
+    const cdp = await ctx.newCDPSession(page);
+    const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
+      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      await touch('touchStart', from.x, from.y);
+      for (let i = 1; i <= 12; i++) await touch('touchMove', from.x + ((to.x - from.x) * i) / 12, from.y + ((to.y - from.y) * i) / 12);
+      await touch('touchEnd', to.x, to.y);
+    };
+    const center = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+
+    await page.goto('/#/word-builder');
+    const tile = page.locator('[data-tile][data-placed="false"]').first();
+    const value = (await tile.getAttribute('data-value'))!;
+    await drag(center((await tile.boundingBox())!), center((await page.locator('[data-slot="2"]').boundingBox())!));
+    await expect(page.locator('[data-slot="2"]')).toHaveAttribute('aria-label', `Slot 3: ${value.toUpperCase()}`);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0); // dragging did not scroll the page
+
+    await page.goto('/#/matching');
+    await page.locator('[data-game="letter-picture"]').click();
+    const left = page.locator('[data-side="left"]').first();
+    const id = (await left.getAttribute('data-pair-id'))!;
+    await drag(center((await left.boundingBox())!), center((await page.locator(`[data-side="right"][data-pair-id="${id}"]`).boundingBox())!));
+    await expect(page.getByText('Pairs matched: 1 of 5')).toBeVisible();
+    await ctx.close();
+  });
+
   test('touch screen: tap selects letters and builds words', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
@@ -401,5 +430,59 @@ test.describe('accessibility basics', () => {
     await page.locator('button', { hasText: 'Word Builder' }).first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Word Builder' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('pl-main');
+  });
+});
+
+test.describe('host integration (example host app at /?host)', () => {
+  test('embeds inside a host page, forwards callbacks, exits back to the host and uses host-provided config', async ({ page }) => {
+    await page.goto('/?host');
+    await page.getByTestId('open-playlab').click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Letter Playground' })).toBeVisible();
+    for (const l of 'abcde') await page.locator(`[data-letter="${l}"]`).click();
+    await page.getByRole('button', { name: 'Back to Edurance' }).click(); // onExit
+    await expect(page.getByRole('heading', { name: 'Student dashboard' })).toBeVisible();
+    const log = await page.getByTestId('host-log').innerText();
+    expect(log).toMatch(/complete → alphabet 5\/5 ★3/);
+    expect(log).toMatch(/track → letter_explored/);
+    expect(log).toMatch(/save → /);
+    // the namespaced storage key uses the opaque learner id, not a name
+    const keys = await page.evaluate(() => Object.keys(localStorage));
+    expect(keys.some((k) => k.endsWith(':host-demo-student'))).toBe(true);
+    expect(keys.join()).not.toMatch(/Maya/);
+  });
+
+  test('host-controlled level hides the in-app level picker', async ({ page }) => {
+    await page.goto('/?host');
+    await page.getByTestId('host-level').selectOption('starter');
+    await page.getByTestId('open-playlab').click();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Starter/ })).toHaveCount(0);
+  });
+
+  test('aggressive global host CSS does not change how PlayLab looks', async ({ page }) => {
+    await page.goto('/?host');
+    await page.getByTestId('open-playlab').click();
+    await page.locator('[data-letter="a"]').waitFor();
+    const probe = () =>
+      page.evaluate(() => {
+        const pick = (el: Element | null, props: string[]) => {
+          const cs = getComputedStyle(el as Element);
+          return Object.fromEntries(props.map((p) => [p, cs.getPropertyValue(p)]));
+        };
+        const root = document.querySelector('[data-playlab]') as HTMLElement;
+        return {
+          h1: pick(root.querySelector('h1'), ['font-size', 'font-family', 'color']),
+          primary: pick(root.querySelector('button.pl-chunk, button[aria-label="Play again"]') ?? root.querySelector('button'), ['background-color', 'border-top-width', 'padding-top', 'border-radius', 'font-family']),
+          tile: pick(root.querySelector('[data-letter="a"]'), ['border-top-width', 'border-radius', 'font-family', 'box-sizing']),
+          list: pick(root.querySelector('ul'), ['margin-top', 'padding-left']),
+          gridTile: root.querySelector('[data-letter="a"]')!.getBoundingClientRect().width,
+        };
+      });
+    const clean = await probe();
+    await page.getByTestId('legacy-toggle').check();
+    await page.waitForTimeout(200);
+    const hostile = await probe();
+    expect(hostile).toEqual(clean);
   });
 });

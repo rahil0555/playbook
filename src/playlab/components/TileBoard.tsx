@@ -108,6 +108,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
             <div
               key={i}
               data-slot={i}
+              role="group"
               data-state={state ?? (tile ? 'filled' : 'empty')}
               aria-label={tile ? `Slot ${i + 1}: ${format(tile.value)}` : `Slot ${i + 1}: empty`}
               className={`relative flex items-center justify-center rounded-3xl border-[3px] border-dashed transition-colors ${size.box} ${
@@ -129,6 +130,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
         {trailing}
       </div>
 
+      {locked && slots.every((id) => id !== null) ? null : (
       <ul aria-label={`Available ${noun}s`} className="mt-6 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
         {tiles.map((tile) => (
           <li key={tile.id}>
@@ -136,6 +138,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
           </li>
         ))}
       </ul>
+      )}
     </LayoutGroup>
   );
 }

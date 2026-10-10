@@ -52,6 +52,7 @@ function Question({ round, q }: { round: Round<BlankQuestion>; q: BlankQuestion 
         <motion.p
           variants={{ ...incorrectVariants, ...correctVariants }}
           animate={round.solved ? 'correct' : 'idle'}
+          role="img"
           aria-label={round.solved ? word : `Word with a missing letter: ${word.split('').map((c, i) => (i === q.blankIndex ? 'blank' : c)).join(' ')}`}
           className="flex items-center justify-center gap-2 font-display text-5xl font-bold uppercase sm:text-6xl"
         >

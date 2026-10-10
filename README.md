@@ -1,0 +1,162 @@
+# Edurance PlayLab
+
+A standalone, interactive learning playground for young children: an animated alphabet, phonics (letter *name* vs letter *sound*), a word-building game, sentence activities, matching mini-games, and a gentle stars-and-badges progress system.
+
+It is built **separately from the main Edurance app** (React + TypeScript + Vite + Tailwind CSS + Framer Motion) so it can be tested and demonstrated on its own, then handed over as a self-contained component. Nothing in this repository imports from, or modifies, the main application.
+
+> **Status:** feature-complete for the scope below, tested (see [docs/TESTING.md](docs/TESTING.md)), **not yet merged into the main app**. Please read [docs/INTEGRATION.md](docs/INTEGRATION.md) (including the *merge checklist*) before integrating.
+
+---
+
+## Quick start
+
+Requirements: Node.js 18+ (developed and tested on Node 22) and npm.
+
+```bash
+npm install          # exact dependency ranges are in package.json (React 18.3, Vite 6, Tailwind 3.4, Framer Motion 12, Vitest 3, Playwright 1.56)
+npm run dev          # http://localhost:5173
+```
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Type-check (`tsc -b`) + production build into `dist/` (works from any URL sub-path) |
+| `npm run preview` | Serve the production build at http://localhost:4173 |
+| `npm run typecheck` | TypeScript only |
+| `npm test` | Unit + component tests (Vitest, jsdom) |
+| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically) |
+| `npm run build:lib` | **Integration package**: builds `dist-lib/` (ESM + precompiled CSS + `.d.ts` + `package.json`) for the main app |
+
+Handy URLs while developing:
+
+* `/` standalone app (screens are mirrored in the hash: `#/alphabet`, `#/phonics`, `#/word-builder`, `#/sentences`, `#/matching`, `#/progress`)
+* `/?host` an **example host app** that embeds `<PlayLab />` the way the main app would (callbacks, own progress adapter, exit button, hostile-CSS toggle)
+* `/?gallery` every bundled illustration, for design review
+
+Playwright uses its own Chromium. If your machine already has one, set `PW_CHROMIUM=/path/to/chromium`.
+
+### Deploying under a sub-path
+
+`vite.config.ts` uses `base: './'` and navigation uses the URL **hash**, so the contents of `dist/` can be hosted at `/`, `/playlab/`, or `/any/deep/path/` with no rebuild and no server rewrite rules. (Verified by serving the build from `/deep/er/playlab/`: all assets load, refresh keeps the screen.)
+
+---
+
+## What's in it
+
+| Area | What the child can do |
+| --- | --- |
+| **Home** | Welcome, tappable "PLAY" letters, progress summary, five activity cards |
+| **Letter Playground** | Tap any of A–Z. The tile and the big stage letter react immediately with one of six hand-tuned animations (bounce, wobble, spin, jelly, float, pop), a ripple, and a small particle burst. Shows uppercase + lowercase, an example word and illustration, "Say it", "Hear the word", "Play again". Big letters can optionally be dragged (they spring back). Find 5 letters to earn stars. |
+| **Sound Discovery** | *Discover*: for each letter the **name** ("ay") and the **sound** (/ă/ as in apple) are shown and played separately. *Listen & choose*: hear a sound, tap the matching letter (kind feedback, "Try again", hint after two misses). |
+| **Word Builder** | Picture + clue; build the word from tiles by **tapping or dragging**. Tap a placed tile to take it back. Handles repeated letters (APPLE). "Check" is disabled until every slot is filled. Gentle hint after two unsuccessful checks. 18 words (the 10 required: cat, sun, dog, bat, pen, cup, fish, book, apple, mango, plus 8 more). |
+| **Sentence Fun** | Arrange the words *or* drag/tap the missing word. Read-aloud, wrong-order feedback that shows which words are already right, a "wave" celebration. 11 sentences (the 5 required plus 6 more). |
+| **Match & Play** | Three complete games: **Letter ↔ Picture**, **Sound ↔ Letter**, **Missing Letter** (word completion). Tap-tap or drag to match. |
+| **My Stars** | Session and all-time stats, per-activity progress, 7 badges, recently finished rounds, "Start over". |
+
+Design rules followed everywhere: no timers, no penalties, no "wrong" wording, always a way to retry, always a way home, large touch targets (≥ 44 px), visible keyboard focus.
+
+### Difficulty levels
+
+`starter` (Pre-K): 3-letter words, 5 short sentences, 3 answer choices, 3 pairs, faint **guide letters** in the answer slots (as in the reference reel) ·
+`explorer` (K): adds 4-letter words and sentences ·
+`adventurer` (Grade 1, default): all content, 5 pairs, 4 choices.
+The host app can lock the level with the `level` prop; otherwise it is a setting (gear icon).
+
+---
+
+## The reference reel: what was observed, what was designed
+
+I studied the attached video by extracting frames (88 s, 530×550, sampled at 2–5 fps; **audio was not analysed**).
+
+**Observed in the frames**
+
+* Loose lowercase letters (e, r, a) in different colours, plus a faint outlined "are" as the target.
+* A finger **drags** a letter; it follows the touch; it looks slightly distorted while held.
+* Dropped letters **snap** into the outline slots and take a new colour.
+* Completing the word: a **burst of yellow stars**, the letters re-colour to a textured orange, and a small character peeks in over the word.
+* A sentence screen follows. Tapped words pop out large; completing it triggers another star burst and a full illustrated scene (monsters with tennis rackets).
+
+**Not observable** (so not claimed): exact easing curves, durations, particle counts, any sound, or the app's code. All timings in PlayLab are my own design (see `src/playlab/motion/variants.ts`).
+
+**How it shaped the product**
+
+* Direct manipulation is the core: letters respond *under the finger* (tap squash, drag with spring-back) → Alphabet and Word Builder.
+* Ghost outlines + snapping → Word Builder slots, with faint guide letters at `starter` level.
+* Star-burst on success, colour change as reward → `CelebrationEffect` + success states.
+* Sentences made of touchable words → Sentence Fun.
+
+---
+
+## Architecture
+
+```
+src/
+  main.tsx                       standalone entry (/, /?host, /?gallery)
+  standalone/                    NOT part of the integration: hash-sync host, example host app, illustration gallery
+  playlab/                       <- the portable feature module (public entry: index.ts)
+    index.ts                     public API: PlayLab, registerContentPack, adapters, types
+    app/                         PlayLab.tsx (root + providers), PlayLabContext, routes (lazy screens)
+    components/                  AppShell, ActivityHeader, ActivityCard, ProgressIndicator, FeedbackMessage,
+                                 PronunciationControl, AnimatedLetter, LetterGrid, CelebrationEffect,
+                                 TileBoard, PairingBoard, RoundSummary, Button, Mascot, Logo, Icon, SettingsPanel
+    features/                    alphabet/ phonics/ word-builder/ sentence-builder/ matching/ home/ progress/
+    data/                        en/{alphabet,words,sentences}.ts, activities.ts, badges.ts, registry.ts (language packs)
+    hooks/                       useRound (shared question state machine), useAudio, useRipple
+    services/                    audioService, progressService (pure reducer + adapters), progressStore, settingsService
+    motion/variants.ts           the reusable animation vocabulary
+    lib/                         tiles (slot logic), questions, level, random, accents, theme, dom, messages
+    illustrations/               32 original inline-SVG illustrations
+    styles/                      playlab.css + vendored Latin fonts
+    types/                       learning.ts (domain), api.ts (public props)
+    test/                        test setup, fake audio
+e2e/                             Playwright tests (functional, responsive, a11y/axe, host integration)
+docs/                            INTEGRATION.md, TESTING.md
+scripts/finalize-lib.mjs         writes dist-lib/package.json
+```
+
+Separation of concerns: **content** (`data/`), **presentation** (`components/`, `features/`), **animation** (`motion/`), **progress** (`services/progress*`), and **learning logic** (`lib/tiles.ts`, `lib/questions.ts`) never import each other sideways: logic is pure and unit-tested.
+
+Deviation from the suggested layout: everything lives under `src/playlab/` (instead of `src/app`, `src/components`, ...) so the feature is one folder that cannot collide with the host's folders.
+
+### Motion
+
+`src/playlab/motion/variants.ts` exports the named vocabulary: tap response, spring bounce, gentle rotation, wobble, float, ripple, selection, drag-and-drop, correct, incorrect, completion, celebration. All animate **transform and opacity only**, finish in under ~1 s, and return to rest so input stays responsive. A new burst replaces the previous one, so rapid answers never pile up. Continuous animation is limited to the mascot's idle float/blink.
+
+**Reduced motion** is respected two ways: the OS `prefers-reduced-motion` setting (CSS + Framer `MotionConfig`), and the host's `theme.motion = 'reduce'`. Under reduced motion no transforms run; selection is still unmistakable (colour fill + ring), ripples become a short opacity flash, and confetti becomes a soft glow.
+
+### Audio: what is and isn't there
+
+* **No recorded voice files are bundled** and none are claimed. By default PlayLab uses the browser's built-in speech synthesis, so **pronunciation depends on the browser, the operating system and the installed voice**. Isolated sounds ("buh", "aah") are only approximations with TTS; the exact strings are in `data/en/alphabet.ts` (`sound.speech`) and can be tuned.
+* To use real recordings, set `audio: { name, sound, word }` URLs on letter entries (via a content pack). A clip is tried first; speech is the fallback.
+* If speech is missing, blocked, silent (no voices) or throws, the UI keeps working, a kind notice appears, and buttons explain what happened. Audio never blocks an animation: every call is fire-and-forget.
+* Sound effects are tiny tones **synthesized with Web Audio** (no files). The speaker button in the header mutes everything.
+
+### Assets that may need replacing
+
+| Asset | State | Replace by |
+| --- | --- | --- |
+| Illustrations (32) | Original simple SVGs, `src/playlab/illustrations/art.tsx` | Edit/replace the entry for an id (view all at `/?gallery`) |
+| Logo mark, mascot "Pip" | Stand-ins drawn for this project (`components/Logo.tsx`, `Mascot.tsx`) | Official Edurance logo / character |
+| Voice recordings | None | `audio` URLs in the content pack |
+| Fonts | Andika + Fredoka (SIL OFL), Latin only, vendored in `styles/fonts/` | Add a Devanagari font when adding Hindi |
+
+### Privacy
+
+Everything runs in the browser: no network calls, no analytics, no accounts. Only non-sensitive demo data is stored in `localStorage` (counts, stars, badges, last results, sound/level setting), under `edurance.playlab.*` keys, optionally namespaced by an opaque learner id.
+
+---
+
+## Known limitations and future improvements
+
+* **Browsers/devices:** automated tests ran in Chromium only (desktop, with phone/tablet viewports and *emulated* touch). **Not tested:** real iOS/Android devices, Safari, Firefox, real finger drags, assistive-technology users, low-end-device performance.
+* **Voices:** see Audio above. iOS/Safari additionally need a prior user gesture before speech.
+* **Languages:** only English content ships. Content (letters/words/sentences) is pluggable via `registerContentPack`; **UI strings are English-only**, and the letter model assumes a bicameral alphabet (upper/lower case), so Hindi will need a small model extension (see INTEGRATION.md → *Adding a language*).
+* **Content size:** 26 letters, 18 words, 11 sentences. Enough to demo and test; a real curriculum needs more and curriculum review of the phonics choices (e.g. x → *fox*, q → *quilt*, y → *yo-yo*).
+* **Progress model** is deliberately simple (stars, rounds, badges, last 8 rounds). There is no spaced repetition or adaptive difficulty yet; the `AnswerResult` stream is designed so the main app can build that.
+* **Hostile CSS:** isolation handles normal global/legacy CSS. Rules using `!important` against bare elements can't be overridden by a scoped stylesheet; embed in an `<iframe>` in that case.
+* No ESLint/Prettier configuration is included (TypeScript strict mode, including `noUncheckedIndexedAccess`, is on).
+* Bundle: main chunk ≈ 339 kB (≈ 111 kB gzip; React + Framer Motion + shell), each activity is a separate lazy chunk (2–5 kB gzip each), CSS ≈ 6.7 kB gzip, fonts ≈ 68 kB. Not profiled on low-cost hardware.
+
+## Licence notes
+
+Application code: owned by the Edurance team (no licence file added). Bundled fonts are under the SIL Open Font License 1.1 (see `src/playlab/styles/fonts/`).

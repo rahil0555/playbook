@@ -4,6 +4,7 @@
  */
 export { PlayLab } from './app/PlayLab';
 export { registerContentPack } from './data/registry';
+export { PLAYLAB_VIEWS, isPlayLabView } from './data/activities';
 export { createLocalStorageAdapter, createMemoryAdapter } from './services/progressService';
 export type { PlayLabProps, PlayLabTheme, PlayLabLearner } from './types/api';
 export type {

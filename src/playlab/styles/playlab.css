@@ -4,9 +4,28 @@
  *   so nothing here restyles the host application.
  * - Custom classes use the `pl-` prefix.
  */
-@import '@fontsource/andika/latin-400.css';
-@import '@fontsource/andika/latin-700.css';
-@import '@fontsource-variable/fredoka/wght.css';
+/* Latin-only WOFF2 files vendored in ./fonts (SIL Open Font License, see fonts/README.md) */
+@font-face {
+  font-family: 'Andika';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/andika-latin-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Andika';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/andika-latin-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fredoka Variable';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('./fonts/fredoka-latin-wght.woff2') format('woff2');
+}
 
 @tailwind base;
 @tailwind components;
@@ -38,42 +57,82 @@
   overflow: clip;
 }
 
-/* ---- scoped reset (zero specificity, so utilities always win) ---- */
-.pl-root,
-.pl-root *,
+/* ---- scoped reset ----
+ * Specificity (0,2,1): beats unscoped host element rules (`button {}`) and wrapper-scoped host rules
+ * (`.app button {}`), while PlayLab's own utility classes (0,3,0, see tailwind.config.ts) still override it. */
+.pl-root :where(*) {
+  /* Tailwind preflight is off, so give borders a default style/width (otherwise `border-2` draws nothing). */
+  border-width: 0;
+  border-style: solid;
+  border-color: currentColor;
+}
 .pl-root *::before,
 .pl-root *::after {
+  border-width: 0;
+  border-style: solid;
+  border-color: currentColor;
+}
+.pl-root.pl-root,
+.pl-root.pl-root *,
+.pl-root.pl-root *::before,
+.pl-root.pl-root *::after {
   box-sizing: border-box;
 }
-.pl-root :where(button, input, select, textarea) {
+.pl-root.pl-root button,
+.pl-root.pl-root input,
+.pl-root.pl-root select,
+.pl-root.pl-root textarea {
   font: inherit;
   color: inherit;
   margin: 0;
+  letter-spacing: normal;
+  text-transform: none;
 }
-.pl-root :where(button) {
+.pl-root.pl-root button {
   background: none;
-  border: 0;
+  border: 0 solid currentColor;
+  border-radius: 0;
   padding: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   text-align: center;
 }
-.pl-root :where(button:disabled) {
+.pl-root.pl-root button:disabled {
   cursor: default;
 }
-.pl-root :where(h1, h2, h3, h4, p, figure, ul, ol, dl, dd) {
+.pl-root.pl-root h1,
+.pl-root.pl-root h2,
+.pl-root.pl-root h3,
+.pl-root.pl-root h4,
+.pl-root.pl-root p,
+.pl-root.pl-root figure,
+.pl-root.pl-root ul,
+.pl-root.pl-root ol,
+.pl-root.pl-root dl,
+.pl-root.pl-root dd,
+.pl-root.pl-root dt {
   margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
 }
-.pl-root :where(ul, ol) {
+.pl-root.pl-root ul,
+.pl-root.pl-root ol {
   list-style: none;
   padding: 0;
 }
-.pl-root :where(svg, img) {
+.pl-root.pl-root li {
+  margin: 0;
+  padding: 0;
+}
+.pl-root.pl-root svg,
+.pl-root.pl-root img {
   display: block;
   max-width: 100%;
 }
-.pl-root :where(a) {
+.pl-root.pl-root a {
   color: inherit;
   text-decoration: none;
 }
@@ -234,12 +293,12 @@
 }
 
 /* dragging should never select text or scroll the page on touch */
-.pl-draggable {
+.pl-root.pl-root .pl-draggable {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
-.pl-nosel {
+.pl-root.pl-root .pl-nosel {
   user-select: none;
   -webkit-user-select: none;
 }

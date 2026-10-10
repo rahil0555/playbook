@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { PlayLab } from './PlayLab';
 import { createMemoryAdapter, createEmptySnapshot } from '../services/progressService';
@@ -178,5 +178,47 @@ describe('Progress', () => {
     await user.click(screen.getByRole('button', { name: 'Start over' }));
     await user.click(screen.getByRole('button', { name: 'Yes, start over' }));
     expect(adapter.load()).toBeNull();
+  });
+});
+
+describe('React StrictMode (dev double-mount)', () => {
+  it('counts an activity start once, not twice', async () => {
+    const adapter = createMemoryAdapter();
+    render(
+      <StrictMode>
+        <PlayLab initialActivity="word-builder" progressAdapter={adapter} />
+      </StrictMode>,
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Word Builder' });
+    await vi.waitFor(() => {
+      const saved = adapter.load() as { activitiesStarted: number } | null;
+      expect(saved?.activitiesStarted).toBe(1);
+    });
+  });
+
+  it('alphabet goal completes exactly once under StrictMode (no side effects inside state updaters)', async () => {
+    const onActivityComplete = vi.fn();
+    const user = userEvent.setup();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <StrictMode>
+        <PlayLab initialActivity="alphabet" progressAdapter={createMemoryAdapter()} onActivityComplete={onActivityComplete} />
+      </StrictMode>,
+    );
+    for (const l of 'abcde') await user.click(await screen.findByRole('button', { name: new RegExp(`^Letter ${l.toUpperCase()},`) }));
+    expect(onActivityComplete).toHaveBeenCalledTimes(1);
+    // React warns "Cannot update a component while rendering a different component" when side effects leak into updaters
+    expect(err.mock.calls.flat().join(' ')).not.toMatch(/Cannot update a component/);
+    err.mockRestore();
+  });
+
+  it('does not steal focus on first mount', async () => {
+    render(
+      <StrictMode>
+        <PlayLab progressAdapter={createMemoryAdapter()} />
+      </StrictMode>,
+    );
+    await screen.findByRole('heading', { level: 1, name: /Hello/ });
+    expect(document.activeElement).toBe(document.body);
   });
 });
