@@ -13,6 +13,7 @@ import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
 import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
 import { FlyingLetter, type Flight } from './FlyingLetter';
+import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
 import type { Pose } from './flightPath';
 import { OutlineSlot } from './OutlineSlot';
@@ -304,6 +305,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
               <Button variant="secondary" accent="brand" icon="refresh" onClick={startAgain} className="shrink-0 self-end sm:mb-1">
                 Shuffle letters
               </Button>
+            ) : complete ? (
+              <LikeButton kind="word" id={word.id} label={word.text} className="shrink-0 self-end sm:mb-1" />
             ) : null}
           </div>
         </div>

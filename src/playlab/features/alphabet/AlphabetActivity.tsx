@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { FeedbackMessage } from '../../components/FeedbackMessage';
 import { LetterGrid } from '../../components/LetterGrid';
+import { LikeButton } from '../../components/LikeButton';
 import { ProgressIndicator } from '../../components/ProgressIndicator';
 import { PronunciationControl } from '../../components/PronunciationControl';
 import { Companion } from '../../components/Companion';
@@ -179,6 +180,7 @@ export default function AlphabetActivity() {
                     <Button variant="primary" accent="coral" icon="replay" onClick={replay} aria-label="Play again">
                       <span className="sr-only sm:not-sr-only">Play again</span>
                     </Button>
+                    <LikeButton kind="letter" id={selected.id} label={`${selected.upper}${selected.lower}`} />
                   </div>
                   <p className="sr-only" role="status">
                     Selected uppercase {selected.upper} and lowercase {selected.lower}. {selected.upper} is for {selected.word.text}.

@@ -214,9 +214,19 @@ test.describe('matching', () => {
     for (let i = 0; i < 5; i++) {
       const label = (await page.getByLabel(/Word with a missing letter/).getAttribute('aria-label'))!;
       const tokens = label.split(': ')[1]!.split(' ');
+      const blank = tokens.indexOf('blank');
       const re = new RegExp(`^${tokens.map((t) => (t === 'blank' ? '.' : t)).join('')}$`);
-      const word = englishWords.find((w) => re.test(w.text))!;
-      await page.locator(`[data-choice="${word.text[tokens.indexOf('blank')]}"]`).click();
+      // several words can share this pattern (cat, bat and hat all look like "_at"), so try each possible letter
+      // until the right one is accepted; a wrong pick is turned down and "Try again" reopens the choices
+      const letters = [...new Set(englishWords.filter((w) => re.test(w.text)).map((w) => w.text[blank]!))];
+      for (const letter of letters) {
+        const choice = page.locator(`[data-choice="${letter}"]:not([disabled])`);
+        if ((await choice.count()) === 0) continue;
+        await choice.click();
+        const accepted = await page.getByRole('button', { name: /^(Next word|Finish)$/ }).waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false);
+        if (accepted) break;
+        await page.getByRole('button', { name: 'Try again' }).click();
+      }
       await nextOrFinish(page);
     }
     await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();

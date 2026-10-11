@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Button } from '../../components/Button';
+import { LikeButton } from '../../components/LikeButton';
 import { StoryBook } from '../../components/StoryBook';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { FeedbackMessage } from '../../components/FeedbackMessage';
@@ -28,6 +29,7 @@ const GEMS = ['#e8573f', '#16a286', '#2f8fd8', '#8a5cc7', '#d9741c'] as const;
 /** Finished sentence: each word is a glossy tile that hops in turn (a small "wave"). */
 function SolvedSentence({ sentence }: { sentence: SentenceEntry }) {
   return (
+    <div className="flex flex-col items-center gap-4">
     <motion.p initial="idle" animate="go" role="img" aria-label={fullText(sentence)} className="pl-paper flex flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 py-5 font-display sm:gap-3.5">
       {sentence.words.map((w, i) => (
         <motion.span
@@ -43,6 +45,8 @@ function SolvedSentence({ sentence }: { sentence: SentenceEntry }) {
       ))}
       <span aria-hidden="true" className="font-display text-4xl font-bold text-brand-800">{sentence.punctuation}</span>
     </motion.p>
+    <LikeButton kind="sentence" id={sentence.id} label={fullText(sentence)} />
+    </div>
   );
 }
 

@@ -6,6 +6,9 @@ import { Illustration } from '../../illustrations/Illustration';
 import { ACTIVITIES, getActivity } from '../../data/activities';
 import { BADGES } from '../../data/badges';
 import { ACCENTS } from '../../lib/accents';
+import { STICKERS, STICKER_SLOTS, stickerSummary } from '../../data/stickers';
+import { StickerArt } from '../../components/StickerArt';
+import { useLikes } from '../../hooks/useLikes';
 
 function Tile({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
@@ -32,6 +35,8 @@ const when = (t: number) => new Date(t).toLocaleString(undefined, { month: 'shor
 export default function ProgressScreen() {
   const { store, navigate, content } = usePlayLab();
   const { lifetime, session, hydrated } = useProgressState();
+  const { likes, toggle } = useLikes();
+  const { unlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -62,6 +67,22 @@ export default function ProgressScreen() {
           ))}
         </dl>
         {session.bestStreak >= 2 ? <p className="mt-3 font-semibold text-brand-900">Best streak this visit: {session.bestStreak} in a row on the first try!</p> : null}
+      </section>
+
+      <section aria-labelledby="pl-p-stickers">
+        <h2 id="pl-p-stickers" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">Sticker book</h2>
+        <div className="pl-board rounded-[2.2rem] p-5 sm:p-6">
+          <ul className="grid grid-cols-4 justify-items-center gap-3 sm:grid-cols-6" aria-label="Sticker book">
+            {STICKERS.map((s, i) => (
+              <li key={s.id} data-sticker={i < unlocked ? 'earned' : 'locked'}>
+                <StickerArt sticker={s} slot={i + 1} locked={i >= unlocked} size="h-16 w-16 sm:h-20 sm:w-20" />
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-center font-display text-lg font-semibold" data-testid="sticker-count">
+            {unlocked} of {STICKER_SLOTS} stickers{extra > 0 ? `, and ${extra} extra` : ''}. Finish a round to earn the next one!
+          </p>
+        </div>
       </section>
 
       <section aria-labelledby="pl-p-total">
@@ -116,6 +137,28 @@ export default function ProgressScreen() {
             );
           })}
         </ul>
+      </section>
+
+      <section aria-labelledby="pl-p-love">
+        <h2 id="pl-p-love" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">Things you love</h2>
+        {likes.length === 0 ? (
+          <p className="pl-paper rounded-[1.8rem] p-5 text-ink-soft">Nothing yet. Tap “Love it” on a letter, word or sentence you enjoy, and it will wait for you here!</p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2" aria-label="Things you love">
+            {likes.map((l) => (
+              <li key={`${l.kind}-${l.id}`} className="pl-paper flex items-center justify-between gap-3 rounded-[1.8rem] px-4 py-2">
+                <span className="flex min-w-0 items-center gap-2 font-display text-xl font-bold">
+                  <Icon name="heart" size={22} filled className="shrink-0 text-coral-500" />
+                  <span className="truncate">{l.label}</span>
+                  <span className="shrink-0 text-sm font-normal text-ink-soft">({l.kind})</span>
+                </span>
+                <Button variant="ghost" accent="coral" onClick={() => toggle(l)} aria-label={`Take ${l.label} out of things you love`}>
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section aria-labelledby="pl-p-recent">

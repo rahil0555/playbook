@@ -11,6 +11,8 @@ interface ActivityCardProps {
   onOpen: () => void;
   /** position on the home screen, used to stagger the entrance */
   index?: number;
+  /** the station number on the adventure trail (1-based) */
+  station?: number;
 }
 
 /** Each activity has its own little world on its card: a coloured sky with a glowing picture frame. */
@@ -23,7 +25,7 @@ const WORLD: Record<string, { sky: string; gem: string }> = {
 };
 
 /** A real button: the whole card opens the activity. */
-export function ActivityCard({ activity, progress, onOpen, index = 0 }: ActivityCardProps) {
+export function ActivityCard({ activity, progress, onOpen, index = 0, station }: ActivityCardProps) {
   const w = WORLD[activity.accent] ?? WORLD.brand!;
   const played = progress.started > 0;
   return (
@@ -39,7 +41,12 @@ export function ActivityCard({ activity, progress, onOpen, index = 0 }: Activity
       className="pl-paper group flex h-full w-full flex-col overflow-hidden rounded-[2rem] text-left"
     >
       <span className="relative flex h-36 items-center justify-center" style={{ background: w.sky }}>
-        <span aria-hidden="true" className="pl-twinkle absolute left-5 top-4 text-xl text-white">✦</span>
+        {station ? (
+          <span aria-hidden="true" className="absolute left-3 top-3 grid h-10 w-10 place-items-center rounded-full border-[3px] border-sun-500 bg-white font-display text-xl font-bold text-ink shadow-soft">
+            {station}
+          </span>
+        ) : null}
+        <span aria-hidden="true" className="pl-twinkle absolute left-16 top-5 text-xl text-white">✦</span>
         <span aria-hidden="true" className="pl-twinkle absolute right-8 top-8 text-base text-white" style={{ animationDelay: '1.3s' }}>✦</span>
         <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-8 rounded-t-[100%] bg-white/45" />
         <span className="pl-frame relative grid h-24 w-24 place-items-center rounded-[1.6rem] transition-transform group-hover:-rotate-3">

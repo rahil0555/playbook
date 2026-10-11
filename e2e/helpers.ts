@@ -65,6 +65,8 @@ export async function solveWord(page: Page) {
   const clue = await page.locator('[data-magic-clue]').innerText();
   const word = englishWords.find((w) => w.clue === clue);
   if (!word) throw new Error(`Unknown clue: ${clue}`);
+  // let React attach the keyboard listener for the new question before the first key (two frames + a tick)
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 0)))));
   for (const ch of word.text) await page.keyboard.press(ch);
   await expect(page.getByText(/You spelled/)).toBeVisible();
   return word;

@@ -91,9 +91,20 @@ The host app can lock the level with the `level` prop; otherwise it is a setting
 
 ---
 
+## Rewards and "things you love" (for children)
+
+Built for children aged about 4–10, so nothing needs reading to be understood: pictures, sounds and big tap targets come first.
+
+* **Sticker book.** Every finished round earns the next sticker (a picture from the set: apple, cat, sun, fish, kite, dog, moon, whale, zebra, lion, tree, nest). Round 1 gives the first one. The book has twelve slots; locked slots show their number, and after twelve rounds the stickers repeat (the book shows the extra count). The round summary reveals the new sticker with a bounce, and the sticker book shows on **Home** and in **My Stars**. Stickers are not stored separately: they come from the rounds-finished count that progress already keeps, so there is no new data to lose or sync.
+* **Love it (hearts).** A big "Love it" button appears on the letter you are looking at in Letter Playground, on a word once you have spelled it in Magic Letters, and on a sentence once you have built it. Tap it to keep it, tap again to take it out. Loved things wait in **Things you love** on Home (tap one to hear it again) and in My Stars (with a Remove button). They are saved on this device, per learner, and contain no personal data. If the device blocks storage, the hearts still work for the visit.
+* **Pip, the teacher.** Pip's speech bubble on Home reacts to progress ("Hi! I’m Pip, let’s learn together!" for a new child, then the sticker count). Pip also reacts with a hop after a right answer and a kind smile after a miss.
+* **Numbered stations.** The five activities on Home are numbered 1–5 like stops on an adventure trail, so a child can see the route.
+
+Reduced motion keeps all of this: stickers and hearts still appear and change; only the bounces, wobbles and hops are removed.
+
 ## Visual system (storybook world)
 
-Every screen is a small painted world, built only from SVG, CSS and the animation library already installed (no image files, no new dependencies, no network):
+Every screen is a small painted world (and a child-friendly set of rewards is described above), built only from SVG, CSS and the animation library already installed (no image files, no new dependencies, no network):
 
 * **Scenery** (`components/Scene.tsx`): a sky, drifting clouds, layered hills, swaying trees, flowers, twinkles and (on some screens) fireflies, a rainbow or mushrooms. Each activity has its own palette: Home and Word Builder = sunny meadow, Sentence Fun = golden storybook, Matching = forest, Letter Playground = rainbow garden, Sound Discovery = dusk. Ambient motion is slow transform/opacity loops only, and is switched off by reduced motion.
 * **Surfaces** (`styles/playlab.css`): `pl-wood` (wooden signs, tray shelves), `pl-paper` (parchment strips), `pl-board` (wood-framed learning board), `pl-frame` (picture frame), `pl-gem` / `pl-gem-soft` (glossy candy tiles in any colour via `--gem`). Brand green `#16a286` stays the identity colour, with sky blue, sun yellow, orange, coral and purple around it.

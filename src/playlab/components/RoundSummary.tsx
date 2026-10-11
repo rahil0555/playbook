@@ -1,14 +1,16 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { usePlayLab } from '../app/PlayLabContext';
+import { usePlayLab, useProgressState } from '../app/PlayLabContext';
+import { STICKER_SLOTS, stickerForRound } from '../data/stickers';
 import { getActivity, nextActivityId } from '../data/activities';
 import { useSpeech } from '../hooks/useAudio';
-import { completionContainer, completionItem, starPop } from '../motion/variants';
+import { completionContainer, completionItem, springs, starPop } from '../motion/variants';
 import type { ActivityCompletion } from '../types/learning';
 import { Button } from './Button';
 import { CelebrationEffect, useBurst } from './CelebrationEffect';
 import { Icon } from './Icon';
 import { Companion } from './Companion';
+import { StickerArt } from './StickerArt';
 
 interface RoundSummaryProps {
   completion: ActivityCompletion;
@@ -21,8 +23,13 @@ const HEADLINES = { 3: 'Amazing!', 2: 'Great work!', 1: 'You did it!' } as const
 
 /** Round finished: stars, kind message, and clear next steps (play again / next activity / home). */
 export function RoundSummary({ completion, onPlayAgain, extra }: RoundSummaryProps) {
-  const { navigate } = usePlayLab();
+  const { navigate, reducedMotion } = usePlayLab();
   const { sfx } = useSpeech();
+  const { lifetime } = useProgressState();
+  // the round that just finished has already been counted, so its sticker is the newest one
+  const rounds = Math.max(1, lifetime.activitiesCompleted);
+  const sticker = stickerForRound(rounds);
+  const slot = ((rounds - 1) % STICKER_SLOTS) + 1;
   const { burst, fire, clear } = useBurst();
   const next = getActivity(nextActivityId(completion.activityId));
 
@@ -53,6 +60,15 @@ export function RoundSummary({ completion, onPlayAgain, extra }: RoundSummaryPro
           </motion.span>
         ))}
       </div>
+      <motion.div variants={completionItem} data-testid="sticker-reveal" className="mt-4 flex items-center gap-3 rounded-[1.8rem] bg-sun-100 px-4 py-2 text-left">
+        <motion.span initial={reducedMotion ? false : { scale: 0, rotate: -25 }} animate={{ scale: 1, rotate: 0 }} transition={springs.bouncy} className="shrink-0">
+          <StickerArt sticker={sticker} slot={slot} size="h-16 w-16" />
+        </motion.span>
+        <p className="font-display text-lg font-semibold leading-tight">
+          New sticker: {sticker.title}!
+          <span className="block text-sm font-normal text-ink-soft">Find it in your sticker book.</span>
+        </p>
+      </motion.div>
       <motion.p variants={completionItem} className="mt-3 text-lg text-ink-soft">
         {completion.score} of {completion.total} right on the first try. Every try helps you learn!
       </motion.p>
