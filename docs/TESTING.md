@@ -2,17 +2,17 @@
 
 Everything under **Executed** was actually run, in this repository (Node 22, Chromium from Playwright 1.56). Everything under **Not tested** was not, and no claim is made about it.
 
-> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The e2e suite passed 60 of 60 in the most recent full run, but contains two tests that have flaked. Numbers below are from specific runs and are labelled as such.
+> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The e2e suite passed 84 of 84 in the most recent full run, but contains two tests that have flaked. Numbers below are from specific runs and are labelled as such.
 
 ## Executed
 
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **154 tests in 16 files. After the voice-selector change, 3 consecutive full runs: 153 passed and 1 failed each time** (the known alphabet "26 letters" test; see below). Before it (116 tests), runs showed 114-115 passing with the same pre-existing failures. All Magic Letters and voice tests passed in every run. |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **159 tests in 17 files. After the flying-letter change, 3 consecutive full runs on an otherwise idle machine: 159 of 159 passed each time** (the known timing-dependent alphabet "26 letters" test happened to pass in all three). Two extra runs executed *while the e2e suite was using the CPU* failed 1-3 tests each, different ones each time (e.g. the Magic "opens in Classic by default" test and unrelated timing-sensitive ones), and none in a repeatable way; I treat those as load-induced timeouts, not proven pre-existing. Earlier (before this change) runs showed 153 of 154 with the known alphabet failure. |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **72 tests; the latest full run passed 72 of 72**. Immediately before the voice-selector change the baseline run was 59 of 60 passing, the one failure being the known intermittent sentences test below. Earlier full runs have also seen one failure each from the flaky tests listed below. |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **84 tests; the latest full run passed 84 of 84** (this run was executed alongside a Vitest run, so the machine was under load). Before the flying-letter change it was 72 of 72. Immediately before the voice-selector change the baseline run was 59 of 60 passing, the one failure being the known intermittent sentences test below. Earlier full runs have also seen one failure each from the flaky tests listed below. |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 
@@ -30,11 +30,20 @@ One further e2e failure was seen **once** and could **not** be classified: `matc
 
 ### Magic Letters: what the new tests cover
 
-Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 new tests all passed in the runs above, apart from noted fixes during development).
+Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 new tests all passed in the runs above, apart from noted fixes during development). The flying-letter animation later added 5 unit tests (`flightPath.test.ts`) and 12 e2e tests (`magic-animation.spec.ts`), described below.
 
 * `magicBoard.test.ts` (10, pure logic): decoy counts (Starter 0 / Explorer 1 / Adventurer 2); decoys never contain a letter from the word; **all 18 words are completable at all 3 levels**; tiles never start in the solved order; right/wrong/occupied/ignored drops; the repeated P in APPLE; a decoy never fits any slot; typed-letter slot lookup; hint selection.
 * `magicMode.test.tsx` (19, component): Classic is the default and unchanged; switching modes both ways; tap-to-select then tap a slot; wrong slot is turned down kindly and recorded as an incorrect answer; tapping a slot first asks for a letter; putting a letter down; APPLE's two P tiles; decoys per level (and that a decoy never lands); hint after two misses; "Start this word again"; typed letters (including a miss); keyboard (Enter on letter then slot); live-region announcements; accessible names; the 8-star burst on a correct landing; **reduced motion (no burst, still lands and is announced)**; a whole round (5 words, one answer per word, progress recorded under Word Builder, next-step buttons); a round with a miss (4/5 first try, still finishes, never says "wrong").
 * `e2e/magic-word-builder.spec.ts` (21, real Chromium): mode switch; **mouse drag** snaps into the slot, with burst present then gone; wrong-slot drop springs back to its origin with kind feedback; empty-space release is not a miss; **touch drag via CDP touch events** (no page scroll); tap-tap with mouse and touch emulation; keyboard-only; a full round plus My Stars counting it as Word Builder; **every one of the 18 words finished** in Magic mode; retry + hint; finished state; decoy counts at each level via Settings; reduced motion (letter lands, no burst); **axe WCAG 2.1 A/AA clean** in initial, picked-up, after-a-miss and finished states; no horizontal overflow at 320 / 375 / 768 / 1440 px.
+
+### Magic Letters flying letter: what the tests cover
+
+Baseline before this change (commit `e967a7c`): measured with a per-frame sampler, the tray bubble vanished in one frame and the slot's letter appeared already at its final position (only a ±6 px bounce afterwards): no travel at all. After: the bubble is visible and moving for about 0.4-0.5 s on every placement, from its true start to the slot centre. Existing tests: no regressions (all 21 existing Magic e2e tests and all 29 Magic unit tests pass unmodified).
+
+* `flightPath.test.ts` (5, pure maths): duration clamped to 340-520 ms; the curve starts and ends exactly at the endpoints and bows upward; scale and rotation easing; CSS-matrix parsing.
+* `e2e/magic-animation.spec.ts` (12, real Chromium, per-animation-frame sampling): **tap**: the bubble starts at the tray tile's real position, ends within 5 px of the slot centre, never jumps (no frame covers most of the trip), follows a curve, grows slightly, has a trail, lasts 300-950 ms, and no flyer is left behind; selection **jiggle** changes the bubble's transform over several frames and sets `aria-pressed`; a **wrong slot** never gets a flight and gives kind feedback; **fast tapping** with several letters in flight lands them all; success appears only **after the last letter lands**; **no layout shift** of other letters or slots during flight; **drag** continues from the release point (not from the tray) into the slot, and a **wrong drop** springs back with no flight; the completion **wave is staggered**; **reduced motion** has no flying bubble at all; axe WCAG 2.1 A/AA clean *during* a flight; no horizontal overflow at 320 px mid-flight.
+* **A pre-existing bug found and fixed on the way:** the Magic scene box (`overflow-hidden`) could be scrolled programmatically by up to 40 × 56 px because of its decorative corner shapes, so focusing or scrolling a letter into view could shift the whole board. Reproduced on the old build (6 of 8 runs shifted), fixed by `overflow-clip`; the layout-shift test then passed 10 of 10.
+* Not covered: how the motion *feels* (that needs people), real phones, Safari/Firefox, and frame rate on low-end devices. The sampler ran in headless Chromium, which renders slower than a real browser.
 
 ### Voice selector (free browser voices): what the tests cover
 
@@ -98,7 +107,7 @@ Baseline for this change (commit `c465297`, before any edit): `tsc` clean; unit 
 * **Assistive technology.** No screen-reader (VoiceOver, TalkBack, NVDA) or switch-control session was run. axe-core automation does not replace it.
 * **Performance on low-cost hardware.** Bundle sizes are measured; frame rate, memory, and load time on a low-end phone/tablet were not profiled, and no Lighthouse run was made.
 * **Visual review coverage.** I reviewed screenshots of home, alphabet (desktop and 375 px), phonics, word builder (including success and summary), sentences, matching (375 px), progress and the example host. I did not individually inspect every screen at every width, and there are no automated visual-regression tests.
-* **Magic Letters feel.** The snap / bounce / glow / star-burst timing was checked by screenshots and by tests that the effects appear and disappear, not by children or by frame-rate measurement. On a 375 × 740 phone the second row of loose letters can sit below the fold (documented in the README).
+* **Magic Letters feel.** The jiggle / flight / snap / glow / star-burst timing was checked with per-frame position sampling and filmstrips from a headless Chromium video, not by children, real devices or real frame-rate measurement. On a 375 × 740 phone the second row of loose letters can sit below the fold (documented in the README).
 * **Animation *feel*.** Tests prove animations run, stop, and respect reduced motion; whether the timing feels right to a child needs human play-testing.
 * **Versions.** Only React 18.3.1, Framer Motion 12.43, Vite 6, Node 22 were used. React 19, Framer Motion 11, Node 18 and Next.js are untested.
 * **Long sessions / many rounds** (memory growth), very large `localStorage` data, and multiple PlayLab instances on one page were not exercised.
@@ -108,7 +117,7 @@ Baseline for this change (commit `c465297`, before any edit): `tsc` clean; unit 
 
 ```bash
 npm install
-npx tsc -b && npm test          # types + 154 unit/component tests (expect the known pre-existing failures listed above)
-npm run test:e2e                # builds, serves the production build, runs 72 Chromium tests (first run: npx playwright install chromium if needed)
+npx tsc -b && npm test          # types + 159 unit/component tests (the known timing-dependent alphabet test may fail; see above)
+npm run test:e2e                # builds, serves the production build, runs 84 Chromium tests (first run: npx playwright install chromium if needed)
 npm run build:lib               # integration package
 ```

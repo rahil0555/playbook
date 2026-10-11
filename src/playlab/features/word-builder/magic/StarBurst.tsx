@@ -3,13 +3,13 @@ import { usePlayLab } from '../../../app/PlayLabContext';
 import { burstParticles } from '../../../motion/variants';
 
 /**
- * A small, subtle star burst (8 particles) centred on its parent. Parent must be `relative`.
+ * A small, subtle star burst (8 particles; a few more for the last letter) centred on its parent. Parent must be `relative`.
  * Under reduced motion it renders nothing; the slot's opacity glow carries the feedback instead.
  */
-export function StarBurst({ seed = 1 }: { seed?: number }) {
+export function StarBurst({ seed = 1, count = 8, spread = 54 }: { seed?: number; count?: number; spread?: number }) {
   const { reducedMotion } = usePlayLab();
   if (reducedMotion) return null;
-  const particles = burstParticles(8, 54, seed);
+  const particles = burstParticles(count, spread, seed);
   return (
     <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-20">
       {particles.map((p) => (
