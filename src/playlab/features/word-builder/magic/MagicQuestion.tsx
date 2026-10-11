@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { Button } from '../../../components/Button';
 import { CelebrationEffect, useBurst } from '../../../components/CelebrationEffect';
@@ -10,6 +10,7 @@ import type { Round } from '../../../hooks/useRound';
 import { Illustration } from '../../../illustrations/Illustration';
 import { letterColor } from '../../../lib/accents';
 import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
+import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
 import { FlyingLetter, type Flight } from './FlyingLetter';
 import { measureTile, LooseLetter } from './LooseLetter';
@@ -76,7 +77,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       if (last) {
         fire('burst', { x: 50, y: 42 });
         sfx('correct');
-        void speak(word.text);
+        void speak(`Hooray! You spelled ${word.text}!`);
       } else {
         sfx('place');
       }
@@ -94,7 +95,10 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
   /** Where the bubble is now and where its slot is, relative to the scene; null when nothing can be measured. */
   const planFlight = (tile: MagicTile, slotIndex: number, pose: Pose | null): Flight | null => {
-    const box = scene.current?.getBoundingClientRect();
+    // absolutely-positioned children are placed from the PADDING box (inside the board's wooden border)
+    const el = scene.current;
+    const rect = el?.getBoundingClientRect();
+    const box = rect && el ? { left: rect.left + el.clientLeft, top: rect.top + el.clientTop } : null;
     const slotEl = scene.current?.querySelector(`[data-magic-slot="${slotIndex}"]`);
     const from = pose ?? measureTile(scene.current?.querySelector(`[data-magic-tile="${tile.id}"]`) ?? null);
     if (!box || !slotEl || !from) return null;
@@ -185,30 +189,37 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     setAnnounce('Fresh start. Letters shuffled.');
   };
 
+  const nextSlot = slots.findIndex((x) => x === null);
+  const mood = complete ? 'cheer' : missed ? 'oops' : selected ? 'think' : 'happy';
+
   return (
-    <div ref={scene} className="relative overflow-clip rounded-5xl bg-brand-50 p-4 shadow-soft sm:p-7">
-      <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-100" />
-      <span aria-hidden="true" className="pointer-events-none absolute -bottom-14 -left-10 h-44 w-44 rounded-full bg-sun-100" />
+    <div ref={scene} className="pl-board relative overflow-clip rounded-[2.4rem] p-3 sm:p-6">
       <CelebrationEffect burst={burst} onDone={clear} />
       {flights.map((f) => (
         <FlyingLetter key={`${f.generation}-${f.id}`} flight={f} onLand={onFlightLand} onDone={onFlightDone} />
       ))}
 
-      <div className="relative grid items-center gap-4 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-8">
-        <div className="flex items-center gap-4 md:flex-col md:gap-2 md:text-center">
-          <span className="relative grid h-24 w-24 shrink-0 place-items-center rounded-[1.8rem] bg-white shadow-soft sm:h-32 sm:w-32 md:h-44 md:w-44 md:rounded-[2.4rem]">
+      <div className="relative grid items-center gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8">
+        <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+          <motion.span
+            initial={{ scale: 0.85, rotate: -4, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={springs.bouncy}
+            className="pl-frame relative grid h-24 w-24 shrink-0 place-items-center rounded-[1.8rem] sm:h-32 sm:w-32 md:h-44 md:w-44 md:rounded-[2.2rem]"
+          >
             <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
-            <span aria-hidden="true" className="absolute -right-2 -top-2 text-2xl text-sun-500">✦</span>
-            <span aria-hidden="true" className="absolute -bottom-1 -left-2 text-xl text-brand-400">✦</span>
-          </span>
+            <span aria-hidden="true" className="pl-twinkle absolute -right-3 -top-3 text-2xl text-sun-500">✦</span>
+            <span aria-hidden="true" className="pl-twinkle absolute -bottom-2 -left-3 text-xl text-brand-400" style={{ animationDelay: '1.2s' }}>✦</span>
+          </motion.span>
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1 md:items-center">
-            <p className="max-w-xs text-[1.02rem] leading-snug text-ink-soft">{word.clue}</p>
+            <p data-magic-clue className="max-w-xs rounded-2xl bg-white/80 px-3 py-1.5 text-[1.02rem] leading-snug text-ink shadow-soft">{word.clue}</p>
             <PronunciationControl label="Hear the clue" accent="brand" onPlay={() => speak(word.clue)} />
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col items-center gap-5">
-          <div role="group" aria-label="Word slots. Drop each letter on its outline" className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-col items-center gap-4">
+          {/* the target word: glowing outlines on a parchment strip */}
+          <div role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper flex w-full flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 py-4 sm:gap-3.5 sm:px-5 sm:py-5">
             {target.map((letter, i) => (
               <OutlineSlot
                 key={i}
@@ -221,6 +232,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
                 grand={grand === i}
                 over={over === i}
                 hinted={hint?.slotIndex === i}
+                next={nextSlot === i && !done}
                 done={complete}
                 armed={selected !== null}
                 onActivate={tapSlot}
@@ -229,11 +241,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
           </div>
 
           {!complete ? (
-            <ul aria-label="Loose letters" className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <ul aria-label="Loose letters" className="pl-wood flex w-full flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
               {tiles.map((tile, i) => (
                 <li key={tile.id}>
                   {isTilePlaced(slots, tile.id) ? (
-                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.6rem] bg-black/[0.045] sm:h-[5.4rem] sm:w-[5.4rem]" />
+                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.6rem] bg-black/20 shadow-[inset_0_4px_8px_rgba(60,25,5,0.45)] sm:h-[5.4rem] sm:w-[5.4rem]" />
                   ) : (
                     <LooseLetter
                       tile={tile}
@@ -253,41 +265,47 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             </ul>
           ) : null}
 
-        <p role="status" className="sr-only">
-          {announce}
-        </p>
+          <p role="status" className="sr-only">
+            {announce}
+          </p>
 
-        <div className="min-h-[5.5rem] w-full max-w-xl">
-          <AnimatePresence mode="wait">
-            {complete ? (
-              <FeedbackMessage
-                key="ok"
-                tone="success"
-                title={pickLine(PRAISE, round.index)}
-                action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-              >
-                You spelled <strong>{word.text}</strong>!
-              </FeedbackMessage>
-            ) : missed ? (
-              <FeedbackMessage key="retry" tone="retry" title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
-                That letter goes in a different spot. Try another!
-              </FeedbackMessage>
-            ) : hint ? (
-              <FeedbackMessage key="hint" tone="hint" title="Need a hint?">
-                Look for the glowing spot and the letter with a star.
-              </FeedbackMessage>
-            ) : (
-              <p key="idle" className="text-center text-[0.98rem] text-ink-soft">
-                Drag each letter onto its outline, or tap a letter and then tap a spot.
-              </p>
-            )}
-          </AnimatePresence>
-        </div>
-        {!done ? (
-          <Button variant="ghost" accent="brand" icon="refresh" onClick={startAgain} className="-mt-2">
-            Shuffle letters
-          </Button>
-        ) : null}
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <div className="min-h-[6rem] min-w-0 flex-1">
+              <AnimatePresence mode="wait">
+                {complete ? (
+                  <FeedbackMessage
+                    key="ok"
+                    tone="success"
+                    title={`${pickLine(PRAISE, round.index)} Hooray!`}
+                    action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
+                  >
+                    You spelled <strong>{word.text}</strong>!
+                  </FeedbackMessage>
+                ) : missed ? (
+                  <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
+                    That letter goes in a different spot. Try another!
+                  </FeedbackMessage>
+                ) : hint ? (
+                  <FeedbackMessage key="hint" tone="hint" title="Need a hint?">
+                    Look for the glowing spot and the letter with a star.
+                  </FeedbackMessage>
+                ) : selected ? (
+                  <FeedbackMessage key="picked" tone="info" mood="think" title="Nice pick!">
+                    Now tap its glowing spot, or drag it there.
+                  </FeedbackMessage>
+                ) : (
+                  <FeedbackMessage key="idle" tone="info" mood={mood} title="Spell the word!">
+                    Drag each letter onto its outline, or tap a letter and then tap a spot.
+                  </FeedbackMessage>
+                )}
+              </AnimatePresence>
+            </div>
+            {!done ? (
+              <Button variant="secondary" accent="brand" icon="refresh" onClick={startAgain} className="shrink-0 self-end sm:mb-1">
+                Shuffle letters
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

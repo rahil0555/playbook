@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Button } from '../../components/Button';
+import { StoryBook } from '../../components/StoryBook';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { FeedbackMessage } from '../../components/FeedbackMessage';
 import { PronunciationControl } from '../../components/PronunciationControl';
@@ -22,16 +23,25 @@ type Status = 'building' | 'wrong' | 'solved';
 
 const fullText = (s: SentenceEntry) => `${s.words.join(' ')}${s.punctuation}`;
 
-/** Finished sentence: each word hops in turn (a small "wave"), a positive completion moment. */
+const GEMS = ['#e8573f', '#16a286', '#2f8fd8', '#8a5cc7', '#d9741c'] as const;
+
+/** Finished sentence: each word is a glossy tile that hops in turn (a small "wave"). */
 function SolvedSentence({ sentence }: { sentence: SentenceEntry }) {
   return (
-    <motion.p initial="idle" animate="go" role="img" aria-label={fullText(sentence)} className="flex flex-wrap items-baseline justify-center gap-x-3 font-display text-3xl font-bold text-brand-800 sm:text-4xl">
+    <motion.p initial="idle" animate="go" role="img" aria-label={fullText(sentence)} className="pl-paper flex flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 py-5 font-display sm:gap-3.5">
       {sentence.words.map((w, i) => (
-        <motion.span key={i} custom={i} variants={wave} aria-hidden="true">
+        <motion.span
+          key={i}
+          custom={i}
+          variants={wave}
+          aria-hidden="true"
+          className="pl-gem rounded-[1.5rem] px-5 py-2 text-[1.7rem] font-bold leading-tight sm:px-6 sm:text-[2.1rem]"
+          style={{ '--gem': GEMS[i % GEMS.length] } as CSSProperties}
+        >
           {w}
         </motion.span>
       ))}
-      <span aria-hidden="true">{sentence.punctuation}</span>
+      <span aria-hidden="true" className="font-display text-4xl font-bold text-brand-800">{sentence.punctuation}</span>
     </motion.p>
   );
 }
@@ -58,36 +68,40 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
   }, [controls, sfx]);
 
   return (
-    <div className="relative grid gap-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)] md:gap-8">
+    <div className="pl-board relative rounded-[2.4rem] p-3 sm:p-6">
       <CelebrationEffect burst={burst} onDone={clear} />
-      <section aria-label="Picture" className="flex flex-col items-center gap-3 self-start rounded-5xl bg-white p-5 text-center shadow-soft">
-        <span className="grid aspect-square w-full max-w-[12rem] place-items-center rounded-4xl bg-cream">
-          <Illustration name={sentence.illustration} className="h-[78%] w-[78%]" />
-        </span>
-        <PronunciationControl label="Read it to me" accent="sun" onPlay={() => speak(sentence.mode === 'fill' && !solved ? `${sentence.words.slice(0, sentence.blankIndex).join(' ')}... what? ${sentence.words.slice((sentence.blankIndex ?? 0) + 1).join(' ')}` : text)} />
-      </section>
+      <div className="relative grid items-center gap-5 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-8">
+        <section aria-label="Picture" className="flex flex-col items-center gap-3 text-center">
+          <StoryBook className="w-full max-w-[13rem]">
+            <span className="grid aspect-square w-full place-items-center">
+              <Illustration name={sentence.illustration} className="h-[78%] w-[78%]" />
+            </span>
+          </StoryBook>
+          <PronunciationControl label="Read it to me" accent="sun" onPlay={() => speak(sentence.mode === 'fill' && !solved ? `${sentence.words.slice(0, sentence.blankIndex).join(' ')}... what? ${sentence.words.slice((sentence.blankIndex ?? 0) + 1).join(' ')}` : text)} />
+        </section>
 
-      <section aria-label="Build the sentence" className="flex flex-col gap-5 rounded-5xl bg-white p-5 shadow-soft sm:p-7">
-        {sentence.mode === 'fill' ? (
-          <FillQuestion sentence={sentence} round={round} solved={solved} onSolved={succeed} onWrong={fail} controls={controls} />
-        ) : (
-          <ArrangeQuestion sentence={sentence} round={round} solved={solved} status={status} setStatus={setStatus} onSolved={succeed} onWrong={fail} controls={controls} />
-        )}
-        <div className="min-h-[5.5rem]">
-          <AnimatePresence mode="wait">
-            {solved ? (
-              <FeedbackMessage
-                key="ok"
-                tone="success"
-                title={pickLine(PRAISE, round.index)}
-                action={{ label: round.index + 1 < round.total ? 'Next sentence' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-              >
-                You made a whole sentence!
-              </FeedbackMessage>
-            ) : null}
-          </AnimatePresence>
-        </div>
-      </section>
+        <section aria-label="Build the sentence" className="flex min-w-0 flex-col gap-4">
+          {sentence.mode === 'fill' ? (
+            <FillQuestion sentence={sentence} round={round} solved={solved} onSolved={succeed} onWrong={fail} controls={controls} />
+          ) : (
+            <ArrangeQuestion sentence={sentence} round={round} solved={solved} status={status} setStatus={setStatus} onSolved={succeed} onWrong={fail} controls={controls} />
+          )}
+          <div>
+            <AnimatePresence mode="wait">
+              {solved ? (
+                <FeedbackMessage
+                  key="ok"
+                  tone="success"
+                  title={`${pickLine(PRAISE, round.index)} Hooray!`}
+                  action={{ label: round.index + 1 < round.total ? 'Next sentence' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
+                >
+                  You made a whole sentence!
+                </FeedbackMessage>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -148,7 +162,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
 
   return (
     <>
-      <h2 className="text-center font-display text-2xl font-bold">Make the sentence</h2>
+      <h2 className="pl-wood mx-auto w-fit rounded-full px-6 py-1 text-center font-display text-xl font-bold sm:text-2xl">Make the sentence</h2>
       <motion.div variants={{ ...incorrectVariants, ...correctVariants }} animate={controls} initial="idle">
         <TileBoard
           tiles={tiles}
@@ -178,7 +192,11 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
           <FeedbackMessage key="hint" tone="hint" title="Need a hint?">
             The sentence starts with “{target[0]}”.
           </FeedbackMessage>
-        ) : null}
+        ) : (
+          <FeedbackMessage key="idle" tone="info" title={complete ? 'Ready to check?' : 'Let’s build it!'}>
+            {complete ? 'Press “Check my sentence” to see how it reads.' : 'Tap the words in order, or drag them into the glowing spots.'}
+          </FeedbackMessage>
+        )}
       </AnimatePresence>
     </>
   );
@@ -215,16 +233,16 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
 
   return (
     <>
-      <h2 className="text-center font-display text-2xl font-bold">Finish the sentence</h2>
+      <h2 className="pl-wood mx-auto w-fit rounded-full px-6 py-1 text-center font-display text-xl font-bold sm:text-2xl">Finish the sentence</h2>
       <motion.p
         variants={{ ...incorrectVariants, ...correctVariants }}
         animate={controls}
         initial="idle"
-        className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 font-display text-3xl font-bold sm:text-4xl"
+        className="pl-paper flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-[2rem] px-4 py-5 font-display text-3xl font-bold text-ink sm:text-4xl"
       >
         {sentence.words.map((w, i) =>
           i === blank ? (
-            <span key={i} data-blank="true" role="img" aria-label="missing word" className="inline-block h-14 min-w-[6.5rem] rounded-3xl border-[3px] border-dashed border-sun-500 bg-sun-100 align-middle sm:h-16" />
+            <span key={i} data-blank="true" role="img" aria-label="missing word"  className="inline-block h-14 min-w-[6.5rem] rounded-[1.5rem] border-[3px] border-dashed border-amber-400 bg-white/80 align-middle shadow-[inset_0_0_16px_rgba(255,200,80,0.55),0_0_0_4px_rgba(255,255,255,0.55)] sm:h-16" />
           ) : (
             <span key={i}>{w}</span>
           ),
@@ -232,8 +250,8 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
         <span>{sentence.punctuation}</span>
       </motion.p>
 
-      <ul aria-label="Word choices" className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-        {options.map((o) => {
+      <ul aria-label="Word choices" className="pl-wood flex flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
+        {options.map((o, oi) => {
           const isWrong = wrongOptions.includes(o);
           return (
             <li key={o}>
@@ -260,7 +278,8 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
                   sfx('place');
                   choose(o);
                 }}
-                className={`pl-draggable pl-chunk min-h-[3.75rem] rounded-3xl border-2 px-6 font-display text-2xl font-bold sm:min-h-[4.25rem] sm:text-3xl ${isWrong ? 'border-dashed border-black/15 bg-black/5 text-ink-soft opacity-60' : 'border-black/10 bg-white'}`}
+                style={isWrong ? undefined : ({ '--gem': GEMS[oi % GEMS.length] } as CSSProperties)}
+                className={`pl-draggable min-h-[3.75rem] rounded-[1.5rem] px-6 font-display text-2xl font-bold sm:min-h-[4.5rem] sm:text-3xl ${isWrong ? 'border-[3px] border-dashed border-white/50 bg-black/15 text-white/80 opacity-70' : 'pl-gem'}`}
               >
                 {o}
               </motion.button>
@@ -278,7 +297,11 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
           >
             Read the sentence again and pick another word.
           </FeedbackMessage>
-        ) : null}
+        ) : (
+          <FeedbackMessage key="idle" tone="info" title="Which word fits?">
+            Read the sentence, then tap or drag the word that finishes it.
+          </FeedbackMessage>
+        )}
       </AnimatePresence>
     </>
   );

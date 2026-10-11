@@ -14,7 +14,7 @@ describe('Navigation', () => {
     const cases: [string, RegExp][] = [
       ['Letter Playground', /Letter Playground/],
       ['Sound Discovery', /Sound Discovery/],
-      ['Word Builder', /Word Builder/],
+      ['Word Builder', /Magic Letters/],
       ['Sentence Fun', /Sentence Fun/],
       ['Match & Play', /Match & Play/],
     ];
@@ -37,7 +37,7 @@ describe('Navigation', () => {
 
   it('opens straight to initialActivity', async () => {
     renderPlayLab({ initialActivity: 'word-builder' });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Word Builder' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Magic Letters' })).toBeInTheDocument();
   });
 
   it('supports controlled navigation (host mirrors the screen in its own URL)', async () => {
@@ -71,12 +71,11 @@ describe('Configuration', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Hello, Maya!/ })).toBeInTheDocument();
   });
 
-  it('level="starter" limits words to 3 letters, shows guide letters, and hides the level picker', async () => {
+  it('level="starter" limits words to 3 letters with no decoys, and hides the level picker', async () => {
     const { user } = renderPlayLab({ initialActivity: 'word-builder', level: 'starter' });
-    await screen.findByText('Spell the word (3 letters)');
-    expect(document.querySelectorAll('[data-slot]')).toHaveLength(3);
-    const guides = [...document.querySelectorAll('[data-slot] > span[aria-hidden="true"]')];
-    expect(guides).toHaveLength(3); // faint guide letters in empty slots
+    await screen.findByRole('heading', { level: 1, name: 'Magic Letters' });
+    expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(3);
+    expect(document.querySelectorAll('[data-magic-tile]')).toHaveLength(3); // Starter: no decoy letters
     await user.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.queryByRole('radio', { name: /Starter/ })).toBeNull();
   });
@@ -85,7 +84,7 @@ describe('Configuration', () => {
     const { user } = renderPlayLab({ initialActivity: 'word-builder' });
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     await user.click(screen.getByRole('radio', { name: /Starter/ }));
-    await screen.findByText('Spell the word (3 letters)');
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(3));
   });
 
   it('applies a custom brand colour as CSS variables, and forced reduced motion as a data attribute', async () => {
@@ -189,7 +188,7 @@ describe('React StrictMode (dev double-mount)', () => {
         <PlayLab initialActivity="word-builder" progressAdapter={adapter} />
       </StrictMode>,
     );
-    await screen.findByRole('heading', { level: 1, name: 'Word Builder' });
+    await screen.findByRole('heading', { level: 1, name: 'Magic Letters' });
     await vi.waitFor(() => {
       const saved = adapter.load() as { activitiesStarted: number } | null;
       expect(saved?.activitiesStarted).toBe(1);

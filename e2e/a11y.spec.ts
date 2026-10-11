@@ -39,12 +39,12 @@ test('axe: states (selected letter, quiz question, game board, wrong answer, sum
   await audit(page, 'matching card selected');
 
   await page.goto('/#/word-builder');
-  await page.locator('[data-tile]').first().waitFor();
-  for (let i = 0; i < 3; i++) await page.locator('[data-tile][data-placed="false"]').first().click();
-  await audit(page, 'word builder partly filled');
-  const check = page.getByRole('button', { name: 'Check my word' });
-  if (await check.isEnabled()) await check.click();
-  await audit(page, 'word builder after check');
+  await page.locator('[data-magic-tile]').first().waitFor();
+  await audit(page, 'magic letters start');
+  await page.locator('[data-magic-tile]').first().click();
+  await audit(page, 'magic letters letter picked up');
+  await page.locator('[data-magic-slot]').first().click();
+  await audit(page, 'magic letters after a drop');
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await audit(page, 'settings open');

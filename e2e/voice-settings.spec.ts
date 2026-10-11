@@ -105,16 +105,12 @@ test.describe('voice selector', () => {
     await expect(select(page)).toHaveValue('daisy');
   });
 
-  test('Classic Word Builder and Magic Letters both speak with the chosen voice', async ({ page }) => {
+  test('Word Builder (Magic Letters) speaks with the chosen voice', async ({ page }) => {
     await installSynth(page, DEVICE);
     await page.addInitScript(() => localStorage.setItem('edurance.playlab.settings.v1', JSON.stringify({ sound: true, level: 'adventurer', voice: 'rita' })));
     await page.goto('/#/word-builder');
     await page.getByRole('button', { name: 'Hear the clue' }).click();
     await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Remote Rita');
-    await page.getByRole('tab', { name: 'Magic Letters' }).click();
-    await page.getByRole('button', { name: 'Hear the clue' }).click();
-    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(1);
-    expect((await spoken(page)).at(-1)?.voice).toBe('Remote Rita');
   });
 
   test('a saved voice that this device does not have falls back to automatic without any error', async ({ page }) => {

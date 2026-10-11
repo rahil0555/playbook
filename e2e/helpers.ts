@@ -60,13 +60,12 @@ export async function nextOrFinish(page: Page) {
   await page.getByRole('button', { name: /^(Next word|Next sentence|Next|Finish)$/ }).click();
 }
 
-/** Solve the current word-builder question by tapping tiles. Returns the word. */
+/** Solve the current word-builder (Magic Letters) question by typing its letters. Returns the word. */
 export async function solveWord(page: Page) {
-  const clue = await page.getByRole('region', { name: 'Clue' }).locator('p').first().innerText();
+  const clue = await page.locator('[data-magic-clue]').innerText();
   const word = englishWords.find((w) => w.clue === clue);
   if (!word) throw new Error(`Unknown clue: ${clue}`);
-  for (const ch of word.text) await page.locator(`[data-tile][data-value="${ch}"][data-placed="false"]`).first().click();
-  await page.getByRole('button', { name: 'Check my word' }).click();
+  for (const ch of word.text) await page.keyboard.press(ch);
   await expect(page.getByText(/You spelled/)).toBeVisible();
   return word;
 }

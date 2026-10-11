@@ -9,7 +9,7 @@ import { FeedbackMessage } from '../../components/FeedbackMessage';
 import { LetterGrid } from '../../components/LetterGrid';
 import { ProgressIndicator } from '../../components/ProgressIndicator';
 import { PronunciationControl } from '../../components/PronunciationControl';
-import { Mascot } from '../../components/Mascot';
+import { Companion } from '../../components/Companion';
 import { getActivity, nextActivityId } from '../../data/activities';
 import { useSpeech } from '../../hooks/useAudio';
 import { Illustration } from '../../illustrations/Illustration';
@@ -127,8 +127,7 @@ export default function AlphabetActivity() {
         <div className="sticky top-2 z-20 lg:top-4 lg:self-start">
           <section
             aria-label="Selected letter"
-            className="relative overflow-hidden rounded-5xl border-2 border-black/5 p-3 shadow-soft transition-colors sm:p-5"
-            style={{ backgroundColor: '#ffffff', backgroundImage: selected ? `linear-gradient(${color}1f, ${color}1f)` : undefined }}
+            className="pl-board relative overflow-hidden rounded-[2.4rem] p-3 sm:p-5"
           >
             <CelebrationEffect burst={burst} onDone={clear} />
             {selected ? (
@@ -162,8 +161,8 @@ export default function AlphabetActivity() {
                     </div>
                   </div>
 
-                  <div className="flex min-w-[9.5rem] flex-1 items-center gap-2 rounded-3xl bg-white p-2 pr-3 shadow-soft sm:gap-3 lg:w-full lg:flex-none">
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-cream sm:h-20 sm:w-20">
+                  <div className="pl-paper flex min-w-[9.5rem] flex-1 items-center gap-2 rounded-[1.6rem] p-2 pr-3 sm:gap-3 lg:w-full lg:flex-none">
+                    <span className="pl-frame grid h-14 w-14 shrink-0 place-items-center rounded-2xl sm:h-20 sm:w-20">
                       <Illustration name={selected.word.illustration} className="h-12 w-12 sm:h-[4.5rem] sm:w-[4.5rem]" label={selected.word.text} />
                     </span>
                     <span className="min-w-0">
@@ -187,7 +186,7 @@ export default function AlphabetActivity() {
                 </div>
               ) : (
                 <div key="empty" className="flex items-center gap-4 py-2 lg:flex-col lg:py-10">
-                  <Mascot mood="happy" className="h-24 w-24 lg:h-40 lg:w-40" float />
+                  <Companion mood="happy" className="h-24 w-24 lg:h-40 lg:w-40" />
                   <div className="lg:text-center">
                     <p className="font-display text-2xl font-bold text-ink lg:text-3xl">Tap a letter!</p>
                     <p className="mt-1 text-ink-soft">Pick any letter below to see it dance.</p>
@@ -195,7 +194,7 @@ export default function AlphabetActivity() {
                 </div>
             )}
           </section>
-          {selected ? <p className="mt-2 hidden text-center text-sm text-ink-soft lg:block">Tip: you can drag the big letters around, too!</p> : null}
+          {selected ? <p className="mx-auto mt-3 hidden w-fit rounded-full bg-white/90 px-4 py-1 text-center text-sm text-ink shadow-soft lg:block">Tip: you can drag the big letters around, too!</p> : null}
         </div>
 
         {/* -------------------------------- grid -------------------------------- */}
@@ -218,7 +217,7 @@ export default function AlphabetActivity() {
             onSelect={choose}
             className="grid-cols-5 min-[460px]:grid-cols-7 md:grid-cols-9 lg:grid-cols-6 xl:grid-cols-7"
           />
-          <p className="text-center text-sm text-ink-soft">
+          <p className="mx-auto w-fit rounded-full bg-white/90 px-4 py-1 text-center text-sm text-ink shadow-soft">
             {exploredIds.size} of {letters.length} letters found so far ⭐
           </p>
         </div>

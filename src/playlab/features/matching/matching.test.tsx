@@ -88,7 +88,7 @@ describe('Word completion', () => {
     const { user } = renderPlayLab({ initialActivity: 'matching', onActivityComplete });
     await user.click(await screen.findByText('Missing Letter'));
     for (let i = 0; i < 5; i++) {
-      const label = (await screen.findByLabelText(/Word with a missing letter/)).getAttribute('aria-label')!;
+      const label = (await screen.findByLabelText(/Word with a missing letter/, {}, { timeout: 4000 })).getAttribute('aria-label')!;
       const tokens = label.split(': ')[1]!.split(' ');
       const pattern = new RegExp(`^${tokens.map((t) => (t === 'blank' ? '.' : t)).join('')}$`);
       const word = englishWords.find((w) => pattern.test(w.text) && w.text.length === tokens.length)!;
@@ -96,12 +96,12 @@ describe('Word completion', () => {
       if (i === 0) {
         const wrong = [...document.querySelectorAll<HTMLElement>('[data-choice]')].find((el) => el.dataset.choice !== answer)!;
         await user.click(wrong);
-        expect(await screen.findByText(/Say the word out loud/)).toBeInTheDocument();
+        expect(await screen.findByText(/Say the word out loud/, {}, { timeout: 4000 })).toBeInTheDocument();
       }
       await user.click(document.querySelector<HTMLElement>(`[data-choice="${answer}"]`)!);
-      await user.click(await screen.findByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }));
+      await user.click(await screen.findByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }, { timeout: 4000 })); // appears after the idle bubble's short exit
     }
-    expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 4000 })).toBeInTheDocument();
     expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ variant: 'word-completion', total: 5 }));
   }, 20_000);
 });

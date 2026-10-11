@@ -22,8 +22,8 @@ export const ACTIVITIES: ActivityDefinition[] = [
   {
     id: 'word-builder',
     title: 'Word Builder',
-    tagline: 'Build words from letter tiles.',
-    instruction: 'Look at the picture. Tap or drag the letters to spell the word.',
+    tagline: 'Drag magic letters into place.',
+    instruction: 'Look at the picture. Drag each letter onto its glowing outline to spell the word.',
     accent: 'brand',
     illustration: 'cat',
     cta: 'Build words',

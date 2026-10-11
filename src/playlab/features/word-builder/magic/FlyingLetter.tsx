@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
+import { animate, motion, useMotionValue, useTransform, type MotionStyle } from 'framer-motion';
 import { bezier, clamp, controlPoint, flightDuration, flightRotation, flightScale, LANDING_SCALE, type Point, type Pose } from './flightPath';
 
 export interface Flight {
@@ -78,8 +78,8 @@ export function FlyingLetter({ flight, onLand, onDone }: FlyingLetterProps) {
         <TrailCopy key={i} p={p} lag={t.lag} opacity={t.opacity} scale={t.scale} start={start} control={control} to={to} from={from} color={color} />
       ))}
       <motion.span
-        className="pl-chunk absolute left-0 top-0 grid place-items-center rounded-[1.6rem] border-[3px] font-display text-[2.6rem] font-bold uppercase leading-none will-change-transform sm:text-[3.2rem]"
-        style={{ ...box, x, y, scale, rotate, opacity: fade, color, borderColor: color, backgroundColor: `${color}1f`, boxShadow: `0 10px 18px -8px ${color}99` }}
+        className="pl-gem absolute left-0 top-0 grid place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none will-change-transform sm:text-[3.2rem]"
+        style={{ ...box, x, y, scale, rotate, opacity: fade, '--gem': color } as unknown as MotionStyle}
       >
         {value}
       </motion.span>

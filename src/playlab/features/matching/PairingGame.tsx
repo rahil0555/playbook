@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { usePlayLab } from '../../app/PlayLabContext';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { FeedbackMessage } from '../../components/FeedbackMessage';
@@ -30,8 +31,9 @@ function pickLetters(all: readonly LetterEntry[], n: number): LetterEntry[] {
   return out;
 }
 
-const letterCard = (l: LetterEntry, i: number) => (
-  <span aria-hidden="true" className="flex items-baseline gap-1" style={{ color: letterColor(i + l.id.charCodeAt(0)) }}>
+const letterTone = (l: LetterEntry, i: number) => letterColor(i + l.id.charCodeAt(0));
+const letterCard = (l: LetterEntry) => (
+  <span aria-hidden="true" className="flex items-baseline gap-1">
     <span className="text-5xl">{l.upper}</span>
     <span className="text-4xl">{l.lower}</span>
   </span>
@@ -65,16 +67,17 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   const { left, right } = useMemo(() => {
     const leftItems: PairItem[] =
       variant === 'letter-picture'
-        ? letters.map((l, i) => ({ id: `L-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l, i), onActivate: () => sfx('tap') }))
+        ? letters.map((l, i) => ({ id: `L-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => sfx('tap') }))
         : letters.map((l, i) => ({
             id: `S-${l.id}`,
             pairId: l.id,
             label: `Sound ${i + 1}. Tap to hear it`,
             content: (
-              <span className="flex items-center gap-2 text-sky-700" aria-hidden="true">
+              <span className="flex items-center gap-2" aria-hidden="true">
                 <Icon name="speaker" size={32} /> <span className="text-2xl">Sound {i + 1}</span>
               </span>
             ),
+            tone: '#2f8fd8',
             onActivate: () => void sayLetterSound(l),
           }));
     const rightItems: PairItem[] =
@@ -84,14 +87,14 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
             pairId: l.id,
             label: `Picture of a ${l.word.text}`,
             content: (
-              <span className="flex flex-col items-center gap-1" aria-hidden="true">
-                <Illustration name={l.word.illustration} className="h-14 w-14 sm:h-16 sm:w-16" />
-                <span className="text-base">{l.word.text}</span>
+              <span className="flex items-center gap-3" aria-hidden="true">
+                <Illustration name={l.word.illustration} className="h-12 w-12 sm:h-14 sm:w-14" />
+                <span className="text-lg sm:text-xl">{l.word.text}</span>
               </span>
             ),
             onActivate: () => void sayWord(l.word.text, l.audio?.word),
           }))
-        : letters.map((l, i) => ({ id: `T-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l, i), onActivate: () => sfx('tap') }));
+        : letters.map((l, i) => ({ id: `T-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => sfx('tap') }));
     // shuffle each column independently so rows never line up with the answer
     return { left: shuffle(leftItems), right: shuffle(rightItems) };
   }, [letters, variant, sayLetterSound, sayWord, sfx]);
@@ -149,10 +152,12 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   if (summary) return <RoundSummary completion={summary} onPlayAgain={restart} extra={{ label: 'Pick another game', onClick: onPickGame }} />;
 
   return (
-    <div className="relative mx-auto max-w-3xl space-y-5">
+    <div className="relative mx-auto max-w-3xl space-y-4">
       <CelebrationEffect burst={burst} onDone={clear} />
-      <ProgressIndicator done={matched.size} total={total} accent="plum" text={`Pairs matched: ${matched.size} of ${total}`} />
-      <div className="rounded-5xl bg-white/70 p-4 shadow-soft sm:p-6">
+      <div className="flex justify-center">
+        <ProgressIndicator done={matched.size} total={total} accent="plum" text={`Pairs matched: ${matched.size} of ${total}`} />
+      </div>
+      <div className="pl-board rounded-[2.4rem] p-4 sm:p-7">
         <PairingBoard
           left={left}
           right={right}
@@ -163,16 +168,22 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
           rightTitle={variant === 'letter-picture' ? 'Pictures' : 'Letters'}
         />
       </div>
-      <div className="min-h-[5.5rem]" aria-live="polite">
-        {message === 'wrong' ? (
-          <FeedbackMessage tone="retry" title={pickLine(TRY_AGAIN, matched.size + Object.keys(attempts.current).length)} action={{ label: 'Got it', onClick: () => setMessage('none') }}>
-            That is not a pair. Try another!
-          </FeedbackMessage>
-        ) : matched.size > 0 ? (
-          <FeedbackMessage tone="success" title={pickLine(PRAISE, matched.size)}>
-            {matched.size} of {total} matched.
-          </FeedbackMessage>
-        ) : null}
+      <div className="min-h-[6rem]" aria-live="polite">
+        <AnimatePresence mode="wait">
+          {message === 'wrong' ? (
+            <FeedbackMessage key="wrong" tone="retry" nudge={Object.keys(attempts.current).length} title={pickLine(TRY_AGAIN, matched.size + Object.keys(attempts.current).length)} action={{ label: 'Got it', onClick: () => setMessage('none') }}>
+              That is not a pair. Try another!
+            </FeedbackMessage>
+          ) : matched.size > 0 ? (
+            <FeedbackMessage key={`ok-${matched.size}`} tone="success" title={pickLine(PRAISE, matched.size)}>
+              {matched.size} of {total} matched.
+            </FeedbackMessage>
+          ) : (
+            <FeedbackMessage key="idle" tone="info" title="Let’s explore!">
+              {variant === 'letter-picture' ? 'Tap a letter, then tap the picture that starts with it.' : 'Tap a speaker to listen, then tap the letter that makes that sound.'}
+            </FeedbackMessage>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -20,8 +20,8 @@ export interface Pose {
   rot: number;
 }
 
-/** How big the letter looks once it sits in its slot, compared with a tray bubble (slot glyph font ÷ bubble font). */
-export const LANDING_SCALE = 1.3;
+/** The slot's landed tile is the same size as a tray tile, so the flying copy settles at exactly 1. */
+export const LANDING_SCALE = 1;
 
 export const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

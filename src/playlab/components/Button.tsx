@@ -22,9 +22,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const a = ACCENTS[accent];
   const look =
     variant === 'primary'
-      ? `${a.solid} ${a.solidText} pl-chunk`
+      ? `${a.solid} ${a.solidText} pl-chunk pl-gel border-2 border-black/10`
       : variant === 'secondary'
-        ? `bg-white ${a.text} border-2 ${a.border} pl-chunk`
+        ? `bg-white ${a.text} border-[3px] ${a.border} pl-chunk`
         : `bg-transparent ${a.text} hover:bg-black/5`;
   const dim = size === 'lg' ? 'min-h-[3.75rem] px-7 text-xl gap-3' : 'min-h-[3rem] px-5 text-base gap-2';
   return (

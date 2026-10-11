@@ -263,7 +263,12 @@
     scroll-behavior: auto !important;
   }
   .pl-float,
-  .pl-blink {
+  .pl-blink,
+  .pl-drift,
+  .pl-twinkle,
+  .pl-sway,
+  .pl-glow-pulse,
+  .pl-aura {
     animation: none !important;
   }
   .pl-ripple {
@@ -282,7 +287,12 @@
   transition-duration: 0.001ms !important;
 }
 .pl-root[data-motion='reduce'] .pl-float,
-.pl-root[data-motion='reduce'] .pl-blink {
+.pl-root[data-motion='reduce'] .pl-blink,
+.pl-root[data-motion='reduce'] .pl-drift,
+.pl-root[data-motion='reduce'] .pl-twinkle,
+.pl-root[data-motion='reduce'] .pl-sway,
+.pl-root[data-motion='reduce'] .pl-glow-pulse,
+.pl-root[data-motion='reduce'] .pl-aura {
   animation: none !important;
 }
 .pl-root[data-motion='reduce'] .pl-ripple {
@@ -322,3 +332,84 @@
 .pl-bar:nth-child(3) {
   animation-delay: 0.3s;
 }
+
+/* =====================================================================
+ * Storybook visual system (v2): scenery, wood, paper, gem tiles
+ * ===================================================================== */
+@keyframes pl-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(70px); }
+}
+.pl-drift { animation: pl-drift 50s ease-in-out infinite alternate; will-change: transform; }
+
+@keyframes pl-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.pl-twinkle { animation: pl-twinkle 3.6s ease-in-out infinite; }
+
+@keyframes pl-sway {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.6deg); }
+}
+.pl-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: pl-sway 6s ease-in-out infinite; }
+
+@keyframes pl-glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.pl-glow-pulse { animation: pl-glow-pulse 1.8s ease-in-out infinite; }
+
+/* wooden sign */
+.pl-root.pl-root .pl-wood {
+  background:
+    repeating-linear-gradient(92deg, rgba(120, 60, 20, 0) 0 16px, rgba(120, 60, 20, 0.12) 16px 18px, rgba(255, 255, 255, 0.06) 18px 34px),
+    linear-gradient(180deg, #eeb066 0%, #dc8f43 52%, #c4772f 100%);
+  border: 3px solid #8a4b1e;
+  box-shadow: inset 0 3px 0 rgba(255, 240, 200, 0.6), inset 0 -4px 0 rgba(90, 40, 10, 0.25), 0 6px 0 rgba(90, 45, 15, 0.4), 0 16px 24px -10px rgba(40, 25, 10, 0.45);
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(110, 55, 15, 0.85), 0 0 14px rgba(110, 55, 15, 0.25);
+}
+/* paper / parchment panel */
+.pl-root.pl-root .pl-paper {
+  background: linear-gradient(180deg, #fffefa 0%, #fff8e6 100%);
+  border: 3px solid #f3dca8;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.75), 0 6px 0 rgba(160, 105, 35, 0.2), 0 22px 32px -14px rgba(20, 60, 50, 0.4);
+}
+/* the big learning board: wooden frame around a soft parchment inside */
+.pl-root.pl-root .pl-board {
+  background: linear-gradient(180deg, #fffdf4 0%, #fdf3da 100%);
+  border: 8px solid #c98a45;
+  outline: 3px solid #8a4b1e;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 3px #f2cf92, inset 0 8px 24px rgba(160, 100, 30, 0.16), 0 10px 0 rgba(90, 45, 15, 0.38), 0 28px 40px -14px rgba(20, 50, 40, 0.5);
+}
+/* picture frame */
+.pl-root.pl-root .pl-frame {
+  background: #fff;
+  border: 7px solid #d99a52;
+  outline: 3px solid #8a4b1e;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 3px #f6dba9, 0 6px 0 rgba(90, 45, 15, 0.38), 0 16px 22px -10px rgba(30, 20, 10, 0.45);
+}
+/* glossy candy button/tile in any colour: set --gem on the element */
+.pl-root.pl-root .pl-gem {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gem) 62%, white) 0%, var(--gem) 52%, color-mix(in srgb, var(--gem) 84%, black) 100%);
+  border: 3px solid color-mix(in srgb, var(--gem) 68%, black);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.5), inset 0 -5px 0 rgba(0, 0, 0, 0.13), 0 6px 0 color-mix(in srgb, var(--gem) 58%, black), 0 14px 16px -8px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.22);
+}
+.pl-root.pl-root .pl-gem-soft {
+  background: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--gem) 14%, white) 100%);
+  border: 3px solid color-mix(in srgb, var(--gem) 55%, white);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.9), 0 5px 0 color-mix(in srgb, var(--gem) 40%, white), 0 12px 14px -8px rgba(20, 50, 40, 0.35);
+}
+/* gloss on buttons */
+.pl-root.pl-root .pl-gel { background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 58%); }
+/* magical target outline */
+@keyframes pl-aura {
+  0%, 100% { opacity: 0.45; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+.pl-aura { animation: pl-aura 1.6s ease-in-out infinite; }

@@ -8,8 +8,8 @@ test.describe('navigation and refresh', () => {
   test('every activity opens from home, has a way back, and the URL hash survives a refresh', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: /Hello, explorer/ })).toBeVisible();
-    for (const [title, hash] of [['Letter Playground', 'alphabet'], ['Sound Discovery', 'phonics'], ['Word Builder', 'word-builder'], ['Sentence Fun', 'sentences'], ['Match & Play', 'matching']]) {
-      await page.locator('button', { hasText: title }).first().click();
+    for (const [card, hash, title] of [['Letter Playground', 'alphabet', 'Letter Playground'], ['Sound Discovery', 'phonics', 'Sound Discovery'], ['Word Builder', 'word-builder', 'Magic Letters'], ['Sentence Fun', 'sentences', 'Sentence Fun'], ['Match & Play', 'matching', 'Match & Play']]) {
+      await page.locator('button', { hasText: card }).first().click();
       await expect(page).toHaveURL(new RegExp(`#/${hash}$`));
       await expect(page.getByRole('heading', { level: 1 })).toContainText(title);
       await page.reload(); // refresh keeps us on the same screen
@@ -170,45 +170,6 @@ test.describe('word builder', () => {
     expect([...done].sort()).toEqual(englishWords.map((w) => w.id).sort());
     for (const required of ['cat', 'sun', 'dog', 'bat', 'pen', 'cup', 'fish', 'book', 'apple', 'mango']) expect(done.has(required)).toBe(true);
   });
-
-  test('drag and drop places a tile into a chosen slot; tap deselects; check is disabled until complete', async ({ page }) => {
-    await page.goto('/#/word-builder');
-    const check = page.getByRole('button', { name: 'Check my word' });
-    await expect(check).toBeDisabled();
-    const tile = page.locator('[data-tile][data-placed="false"]').first();
-    const value = await tile.getAttribute('data-value');
-    const box = (await tile.boundingBox())!;
-    const slot = (await page.locator('[data-slot="1"]').boundingBox())!;
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 30, box.y - 40, { steps: 4 });
-    await page.mouse.move(slot.x + slot.width / 2, slot.y + slot.height / 2, { steps: 10 });
-    await page.mouse.up();
-    await expect(page.locator('[data-slot="1"]')).toHaveAttribute('aria-label', `Slot 2: ${value!.toUpperCase()}`);
-    await page.locator('[data-slot="1"] [data-tile]').click(); // tap to take it back
-    await expect(page.locator('[data-slot="1"]')).toHaveAttribute('aria-label', 'Slot 2: empty');
-    await expect(check).toBeDisabled();
-  });
-
-  test('wrong answer: kind feedback, retry keeps the correct letters, hint appears after two misses', async ({ page }) => {
-    await page.goto('/#/word-builder');
-    const clue = await page.getByRole('region', { name: 'Clue' }).locator('p').first().innerText();
-    const word = englishWords.find((w) => w.clue === clue)!;
-    // a deliberately wrong arrangement: the word reversed (palindromes aside)
-    const wrong = [...word.text].reverse();
-    const alt = wrong.join('') === word.text ? [...word.text.slice(1), word.text[0]!] : wrong;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      for (const ch of alt) await page.locator(`[data-tile][data-value="${ch}"][data-placed="false"]`).first().click();
-      await page.getByRole('button', { name: 'Check my word' }).click();
-      await expect(page.getByText(/Almost|Not quite|Good try|So close/)).toBeVisible();
-      await page.getByRole('button', { name: 'Try again' }).click();
-      await page.getByRole('button', { name: 'Clear' }).click().catch(() => undefined);
-    }
-    await expect(page.getByText('Need a hint?')).toBeVisible();
-    await solveWord(page);
-    await nextOrFinish(page);
-    await expect(page.getByText(/Word 2 of 5/)).toBeVisible();
-  });
 });
 
 test.describe('sentences', () => {
@@ -325,7 +286,7 @@ test.describe('reduced motion', () => {
     });
     await page.locator('[data-letter="m"]').click();
     const seen = await frames;
-    expect(seen.every((t) => t === 'none' || t === 'matrix(1, 0, 0, 1, 0, 0)')).toBe(true);
+    expect(seen.filter((t) => t !== 'none' && t !== 'matrix(1, 0, 0, 1, 0, 0)'), 'non-identity transforms seen').toEqual([]);
     await expect(page.locator('[data-letter="m"]')).toHaveAttribute('aria-pressed', 'true'); // still clearly selected
     await expect(page.getByRole('region', { name: 'Selected letter' }).getByText('M is for moon', { exact: true })).toBeVisible();
   });
@@ -353,7 +314,7 @@ test.describe('responsive layout', () => {
     const page = await ctx.newPage();
     for (const view of ['home', 'alphabet', 'word-builder', 'sentences']) {
       await page.goto(`/#/${view}`);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(900); // let the letter tiles finish their staggered pop-in
       const small = await page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>('button')]
           .filter((b) => b.offsetParent !== null && !b.closest('[aria-hidden="true"]'))
@@ -379,10 +340,11 @@ test.describe('responsive layout', () => {
     const center = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
 
     await page.goto('/#/word-builder');
-    const tile = page.locator('[data-tile][data-placed="false"]').first();
-    const value = (await tile.getAttribute('data-value'))!;
-    await drag(center((await tile.boundingBox())!), center((await page.locator('[data-slot="2"]').boundingBox())!));
-    await expect(page.locator('[data-slot="2"]')).toHaveAttribute('aria-label', `Slot 3: ${value.toUpperCase()}`);
+    const clue = await page.locator('[data-magic-clue]').innerText();
+    const first = englishWords.find((w) => w.clue === clue)!.text[0]!;
+    const tile = page.locator(`[data-magic-tile][data-value="${first}"][data-decoy="false"]`).first();
+    await drag(center((await tile.boundingBox())!), center((await page.locator('[data-magic-slot="0"]').boundingBox())!));
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'filled');
     expect(await page.evaluate(() => window.scrollY)).toBe(0); // dragging did not scroll the page
 
     await page.goto('/#/matching');
@@ -428,7 +390,7 @@ test.describe('accessibility basics', () => {
   test('moves focus to the new screen after navigating', async ({ page }) => {
     await page.goto('/#/home');
     await page.locator('button', { hasText: 'Word Builder' }).first().click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Word Builder' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Magic Letters' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('pl-main');
   });
 });

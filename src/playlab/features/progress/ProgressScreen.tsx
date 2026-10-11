@@ -9,7 +9,7 @@ import { ACCENTS } from '../../lib/accents';
 
 function Tile({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
-    <div className="rounded-3xl bg-white p-4 shadow-soft">
+    <div className="pl-paper rounded-[1.8rem] p-4">
       <p className="font-display text-3xl font-bold leading-none text-ink">{value}</p>
       <p className="mt-1 font-semibold">{label}</p>
       {hint ? <p className="text-sm text-ink-soft">{hint}</p> : null}
@@ -38,15 +38,15 @@ export default function ProgressScreen() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-4xl font-bold">My Stars</h1>
-          <p className="mt-1 text-ink-soft">Everything you have tried and learned. Mistakes are part of learning!</p>
+          <h1 className="pl-wood inline-block rounded-[1.6rem] px-8 py-2 font-display text-4xl font-bold">My Stars</h1>
+          <p className="mt-2 inline-block rounded-full bg-white/90 px-4 py-1 text-ink shadow-soft">Everything you have tried and learned. Mistakes are part of learning!</p>
         </div>
         <Button variant="secondary" icon="arrow-left" onClick={() => navigate('home')} aria-label="Back to home">
           Home
         </Button>
       </header>
 
-      <section aria-labelledby="pl-p-session" className="rounded-4xl bg-brand-100 p-5 sm:p-6">
+      <section aria-labelledby="pl-p-session" className="pl-board rounded-[2.2rem] p-5 sm:p-6">
         <h2 id="pl-p-session" className="font-display text-2xl font-bold">This visit</h2>
         <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
@@ -55,7 +55,7 @@ export default function ProgressScreen() {
             ['Correct answers', session.correctAnswers],
             ['Rounds finished', session.activitiesCompleted],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-3xl bg-white p-4">
+            <div key={label} className="pl-paper rounded-[1.8rem] p-4">
               <dd className="font-display text-3xl font-bold leading-none" data-testid={`session-${String(label).toLowerCase().replace(/ /g, '-')}`}>{value}</dd>
               <dt className="mt-1 font-semibold">{label}</dt>
             </div>
@@ -65,7 +65,7 @@ export default function ProgressScreen() {
       </section>
 
       <section aria-labelledby="pl-p-total">
-        <h2 id="pl-p-total" className="mb-3 font-display text-2xl font-bold">All time</h2>
+        <h2 id="pl-p-total" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">All time</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5" data-hydrated={hydrated}>
           <Tile label="Stars" value={lifetime.stars} />
           <Tile label="Activities started" value={lifetime.activitiesStarted} />
@@ -76,7 +76,7 @@ export default function ProgressScreen() {
       </section>
 
       <section aria-labelledby="pl-p-act">
-        <h2 id="pl-p-act" className="mb-3 font-display text-2xl font-bold">By activity</h2>
+        <h2 id="pl-p-act" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">By activity</h2>
         <ul className="grid gap-3 md:grid-cols-2">
           {ACTIVITIES.map((a) => {
             const p = lifetime.perActivity[a.id];
@@ -101,12 +101,12 @@ export default function ProgressScreen() {
       </section>
 
       <section aria-labelledby="pl-p-badges">
-        <h2 id="pl-p-badges" className="mb-3 font-display text-2xl font-bold">Badges</h2>
+        <h2 id="pl-p-badges" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">Badges</h2>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {BADGES.map((b) => {
             const earned = lifetime.badges.includes(b.id);
             return (
-              <li key={b.id} data-earned={earned} className={`flex items-center gap-3 rounded-3xl p-4 ${earned ? 'bg-sun-100' : 'bg-white shadow-soft'}`}>
+              <li key={b.id} data-earned={earned} className={`flex items-center gap-3 rounded-[1.8rem] p-4 ${earned ? 'pl-paper !border-sun-300 !bg-sun-100' : 'pl-paper'}`}>
                 <span className={`grid h-14 w-14 place-items-center rounded-full text-3xl ${earned ? 'bg-white' : 'bg-black/5 grayscale'}`} aria-hidden="true">{b.emoji}</span>
                 <span>
                   <span className="block font-display text-lg font-semibold leading-tight">{b.title}</span>
@@ -119,13 +119,13 @@ export default function ProgressScreen() {
       </section>
 
       <section aria-labelledby="pl-p-recent">
-        <h2 id="pl-p-recent" className="mb-3 font-display text-2xl font-bold">Recently finished</h2>
+        <h2 id="pl-p-recent" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">Recently finished</h2>
         {lifetime.recent.length === 0 ? (
-          <p className="rounded-3xl bg-white p-5 text-ink-soft shadow-soft">Nothing yet. Finish a round and it will show up here!</p>
+          <p className="pl-paper rounded-[1.8rem] p-5 text-ink-soft">Nothing yet. Finish a round and it will show up here!</p>
         ) : (
           <ol className="space-y-2">
             {lifetime.recent.map((r) => (
-              <li key={`${r.at}-${r.activityId}`} className="flex flex-wrap items-center justify-between gap-2 rounded-3xl bg-white px-4 py-3 shadow-soft">
+              <li key={`${r.at}-${r.activityId}`} className="flex flex-wrap items-center justify-between gap-2 pl-paper rounded-[1.8rem] px-4 py-3">
                 <span className="font-semibold">
                   {getActivity(r.activityId).title}
                   {r.variant ? <span className="ml-2 text-sm font-normal text-ink-soft">({r.variant.replace(/-/g, ' ')})</span> : null}

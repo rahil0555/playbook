@@ -18,7 +18,7 @@ export default function PhonicsActivity() {
         activityId="phonics"
         instruction={mode === 'discover' ? 'Pick a letter. Hear its name, then hear its sound. They are different!' : 'Listen to the sound. Then tap the letter that makes it.'}
       />
-      <div role="tablist" aria-label="Sound activities" className="mb-6 inline-flex rounded-full bg-sky-100 p-1.5">
+      <div role="tablist" aria-label="Sound activities" className="mb-5 inline-flex rounded-full bg-white/90 p-1.5 shadow-soft">
         {TABS.map((t) => (
           <button
             key={t.id}

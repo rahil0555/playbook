@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { motion, useAnimationControls, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { elementUnder } from '../../../lib/dom';
@@ -110,11 +110,14 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
       onClick={() => {
         if (!dragging.current) onTap(tile.id);
       }}
-      className={`pl-draggable pl-chunk relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center rounded-[1.6rem] border-[3px] font-display text-[2.6rem] font-bold uppercase leading-none active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:text-[3.2rem] ${
-        hinted ? 'ring-4 ring-sky-300' : selected ? 'ring-4 ring-white' : ''
-      }`}
-      style={{ color, borderColor: color, backgroundColor: `${color}1f` }}
+      className="pl-draggable pl-gem relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:text-[3.2rem]"
+      style={{ '--gem': color } as CSSProperties}
     >
+      {/* selected / hinted ring (a separate layer, so the tile keeps its glossy shadow) */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute -inset-1.5 rounded-[2rem] border-4 transition-opacity duration-150 ${hinted ? 'border-sky-300 opacity-100' : selected ? 'border-white opacity-100' : 'opacity-0'}`}
+      />
       {/* lifted-off-the-tray look: a soft glow and a cast shadow, faded in with opacity only */}
       <motion.span
         aria-hidden="true"

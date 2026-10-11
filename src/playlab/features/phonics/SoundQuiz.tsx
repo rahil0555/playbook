@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePlayLab } from '../../app/PlayLabContext';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
@@ -63,7 +63,7 @@ function Question({ round, question }: QuestionProps) {
   return (
     <div className="relative mx-auto max-w-3xl">
       <CelebrationEffect burst={burst} onDone={clear} />
-      <div className="flex flex-col items-center gap-3 rounded-5xl bg-white p-5 text-center shadow-soft sm:p-8">
+      <div className="flex flex-col items-center gap-3 pl-board rounded-[2.4rem] p-5 text-center sm:p-8">
         <h2 className="font-display text-2xl font-bold sm:text-3xl">Which letter makes this sound?</h2>
         <PronunciationControl label="Listen to the sound" accent="sky" variant="primary" size="lg" icon="speaker" onPlay={() => sayLetterSound(answer)} />
         <p className="text-sm text-ink-soft">Listen as many times as you like.</p>
@@ -86,10 +86,10 @@ function Question({ round, question }: QuestionProps) {
                 animate={lastWrong === c.id ? 'incorrect' : isRight ? 'correct' : 'idle'}
                 whileTap={isWrong || round.solved ? undefined : { scale: 0.93 }}
                 onClick={() => choose(c.id)}
-                className={`relative flex min-h-[6.5rem] w-full items-center justify-center gap-1 rounded-4xl border-4 font-display font-bold leading-none shadow-soft transition-colors sm:min-h-[8rem] ${
-                  isRight ? 'border-brand-500 bg-brand-100' : isWrong ? 'border-dashed border-black/15 bg-black/5 opacity-60' : 'border-transparent bg-white'
+                className={`relative flex min-h-[6.5rem] w-full items-center justify-center gap-1 rounded-[2rem] font-display font-bold leading-none transition-colors sm:min-h-[8rem] ${
+                  isRight ? 'pl-gem' : isWrong ? 'border-[3px] border-dashed border-black/15 bg-black/5 opacity-60' : 'pl-gem-soft'
                 }`}
-                style={{ color: isWrong ? '#43615b' : color }}
+                style={{ '--gem': isRight ? '#16a286' : color, color: isWrong ? '#43615b' : isRight ? '#fff' : color } as CSSProperties}
               >
                 <span aria-hidden="true" className="text-[3.6rem] sm:text-[4.6rem]">{c.upper}</span>
                 <span aria-hidden="true" className="text-[2.6rem] sm:text-[3.2rem]">{c.lower}</span>

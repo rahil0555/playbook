@@ -7,14 +7,13 @@ import { expect, test } from './helpers';
 
 async function openMagic(page: Page) {
   await page.goto('/#/word-builder');
-  await page.getByRole('tab', { name: 'Magic Letters' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Magic Letters' })).toBeVisible();
   await page.locator('[data-magic-slot="0"]').waitFor();
   await page.waitForTimeout(700); // let the tiles finish their staggered entrance
 }
 
 async function currentWord(page: Page) {
-  const clue = await page.locator('p.max-w-xs').first().innerText();
+  const clue = await page.locator('[data-magic-clue]').first().innerText();
   const w = englishWords.find((x) => x.clue === clue);
   if (!w) throw new Error(`Unknown clue ${clue}`);
   return w;
@@ -42,15 +41,12 @@ async function finishRound(page: Page) {
   }
 }
 
-test.describe('mode switch', () => {
-  test('Classic is the default and still works; Magic is one click away and back', async ({ page }) => {
+test.describe('word builder is Magic Letters only', () => {
+  test('opens straight into Magic Letters: no Classic / Magic switch, no Check button', async ({ page }) => {
     await page.goto('/#/word-builder');
-    await expect(page.getByRole('tab', { name: 'Classic' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('button', { name: 'Check my word' })).toBeVisible();
-    await page.getByRole('tab', { name: 'Magic Letters' }).click();
     await expect(page.locator('[data-mode="magic"]')).toBeVisible();
-    await page.getByRole('tab', { name: 'Classic' }).click();
-    await expect(page.getByRole('button', { name: 'Check my word' })).toBeVisible();
+    await expect(page.getByRole('tablist')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Check my word' })).toHaveCount(0);
   });
 });
 
@@ -209,8 +205,7 @@ test.describe('levels', () => {
       await page.getByRole('button', { name: 'Settings' }).click();
       await page.getByRole('radio', { name: new RegExp(level) }).click();
       await page.keyboard.press('Escape');
-      await page.getByRole('tab', { name: 'Magic Letters' }).click();
-      await page.locator('[data-magic-slot="0"]').waitFor();
+          await page.locator('[data-magic-slot="0"]').waitFor();
       await expect(page.locator('[data-decoy="true"]')).toHaveCount(decoys);
     });
   }

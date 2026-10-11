@@ -46,12 +46,12 @@ export function LetterDiscovery() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
       <section aria-label={`About the letter ${letter.upper}`} className="relative space-y-4 lg:order-1">
         <CelebrationEffect burst={burst} onDone={clear} />
-        <p className="rounded-3xl bg-sky-100 p-4 text-[1.05rem] leading-snug">
+        <p className="pl-paper rounded-[1.8rem] p-4 text-[1.05rem] leading-snug">
           <strong>{letter.upper}</strong> is <em>called</em> “{letter.name}”, but it <em>says</em> <strong>{letter.sound.symbol}</strong> in <strong>{letter.word.text}</strong>.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <article className="flex flex-col items-center rounded-4xl bg-white p-4 text-center shadow-soft">
+          <article className="flex flex-col items-center pl-paper rounded-[2rem] p-4 text-center">
             <h2 className="font-display text-xl font-bold text-ink-soft">Letter name</h2>
             <AnimatedLetter
               glyph={`${letter.upper}${letter.lower}`}
@@ -65,7 +65,7 @@ export function LetterDiscovery() {
             <PronunciationControl label="Say the name" accent="coral" onPlay={() => sayLetterName(letter)} className="mt-3" />
           </article>
 
-          <article className="flex flex-col items-center rounded-4xl bg-white p-4 text-center shadow-soft">
+          <article className="flex flex-col items-center pl-paper rounded-[2rem] p-4 text-center">
             <h2 className="font-display text-xl font-bold text-ink-soft">Letter sound</h2>
             <p className="my-1 grid h-28 place-items-center font-display text-6xl font-bold" style={{ color }}>
               {letter.sound.symbol}
@@ -75,11 +75,11 @@ export function LetterDiscovery() {
           </article>
         </div>
 
-        <article className="flex flex-wrap items-center gap-4 rounded-4xl bg-white p-4 shadow-soft">
-          <span className="grid h-24 w-24 shrink-0 place-items-center rounded-3xl bg-cream">
+        <article className="flex flex-wrap items-center gap-4 pl-paper rounded-[2rem] p-4">
+          <span className="grid pl-frame h-24 w-24 shrink-0 place-items-center rounded-3xl">
             <Illustration name={letter.word.illustration} className="h-20 w-20" label={letter.word.text} />
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[9rem] flex-1">
             <h2 className="font-display text-xl font-bold text-ink-soft">Example word</h2>
             <p className="font-display text-4xl font-bold leading-tight">
               <span style={{ color }}>{letter.word.text.slice(0, 1)}</span>

@@ -5,6 +5,7 @@ import { getBadge } from '../data/badges';
 import { useAudioStatus } from '../hooks/useAudio';
 import { Icon, type IconName } from './Icon';
 import { Logo } from './Logo';
+import { Scene, type SceneName } from './Scene';
 import { SettingsPanel } from './SettingsPanel';
 import { CelebrationEffect, useBurst } from './CelebrationEffect';
 import { springs } from '../motion/variants';
@@ -31,7 +32,7 @@ function NavButton({ icon, label, current, onClick, showLabel, expanded, pressed
       aria-pressed={pressed}
       aria-label={showLabel ? undefined : label}
       className={`inline-flex min-h-[2.9rem] min-w-[2.9rem] items-center justify-center gap-2 rounded-full px-3.5 font-display text-base font-semibold transition-colors ${
-        current ? 'bg-brand-700 text-white' : 'bg-white text-ink shadow-soft hover:bg-brand-50'
+        current ? 'pl-gel bg-brand-700 text-white shadow-chunk' : 'bg-brand-50 text-ink hover:bg-brand-100'
       }`}
     >
       <Icon name={icon} size={22} />
@@ -83,6 +84,17 @@ function BadgeToast() {
   );
 }
 
+/** Each screen gets its own painted world. */
+const SCENES: Record<string, SceneName> = {
+  home: 'meadow',
+  alphabet: 'garden',
+  phonics: 'dusk',
+  'word-builder': 'meadow',
+  sentences: 'storybook',
+  matching: 'forest',
+  progress: 'garden',
+};
+
 /** Frame: header with simple navigation, audio notice, main content area, badge toast. */
 export function AppShell({ children }: { children: ReactNode }) {
   const { view, navigate, soundEnabled, setSoundEnabled, canExit, exit, learner } = usePlayLab();
@@ -104,8 +116,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [view]);
 
   return (
-    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-4 pb-10 sm:px-6">
-      <header className="relative z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2 sm:py-4">
+    <div className="relative isolate min-h-[var(--pl-min-height,100dvh)] w-full">
+    <Scene name={SCENES[view] ?? 'meadow'} />
+    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-3 pb-10 sm:px-6">
+      <header className="relative z-40 my-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-[2rem] bg-white/85 px-3 py-1.5 shadow-soft backdrop-blur-sm sm:my-3 sm:px-4 sm:py-2">
         <button type="button" onClick={() => navigate('home')} aria-label="Edurance PlayLab, go to home" className="rounded-2xl p-1">
           <Logo compact />
         </button>
@@ -150,6 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <BadgeToast />
+    </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, type KeyboardEvent } from 'react';
+import { memo, useCallback, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { letterColor } from '../lib/accents';
 import { useRipple } from '../hooks/useRipple';
@@ -36,10 +36,8 @@ const LetterTile = memo(function LetterTile({ letter, index, selected, explored,
         void controls.start({ ...(v.idle as object) }, { duration: 0 }).then(() => controls.start(v.play as never));
         onSelect(letter, index);
       }}
-      className={`relative flex aspect-square min-h-[3.5rem] w-full items-center justify-center overflow-hidden rounded-3xl border-2 font-display font-bold leading-none shadow-soft transition-colors ${
-        selected ? 'border-transparent text-white' : 'border-black/5 bg-white'
-      }`}
-      style={selected ? { background: color, boxShadow: `0 0 0 4px ${color}33, 0 8px 18px -8px ${color}` } : { color }}
+      className={`relative flex aspect-square min-h-[3.5rem] w-full items-center justify-center overflow-hidden rounded-[1.4rem] font-display font-bold leading-none ${selected ? 'pl-gem' : 'pl-gem-soft'}`}
+      style={{ '--gem': color, ...(selected ? {} : { color }) } as CSSProperties}
     >
       {rippleLayer}
       <span aria-hidden="true" className="relative flex items-baseline gap-0.5">
@@ -91,7 +89,7 @@ export function LetterGrid({
   };
 
   return (
-    <ul ref={ref} aria-label={label} onKeyDown={onKeyDown} className={`grid gap-2 sm:gap-3 ${className}`}>
+    <ul ref={ref} aria-label={label} onKeyDown={onKeyDown} className={`pl-paper grid gap-2.5 rounded-[2rem] p-3 sm:gap-3 sm:p-4 ${className}`}>
       {letters.map((l, i) => (
         <li key={l.id}>
           <LetterTile letter={l} index={i} selected={selectedId === l.id} explored={exploredIds.has(l.id)} onSelect={handleSelect} />

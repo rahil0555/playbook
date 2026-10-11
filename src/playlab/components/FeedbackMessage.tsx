@@ -3,14 +3,15 @@ import { motion } from 'framer-motion';
 import { springs } from '../motion/variants';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
-import { Mascot, type MascotMood } from './Mascot';
+import { Companion } from './Companion';
+import type { MascotMood } from './Mascot';
 
 export type FeedbackTone = 'success' | 'retry' | 'hint' | 'info';
 
 const TONES: Record<FeedbackTone, { box: string; icon: IconName; mood: MascotMood }> = {
-  success: { box: 'bg-brand-100 border-brand-300 text-brand-900', icon: 'check', mood: 'cheer' },
-  retry: { box: 'bg-sun-100 border-sun-300 text-ink', icon: 'refresh', mood: 'oops' },
-  hint: { box: 'bg-sky-100 border-sky-300 text-ink', icon: 'bulb', mood: 'think' },
+  success: { box: 'bg-[#e6fbf3] border-brand-400 text-brand-900', icon: 'check', mood: 'cheer' },
+  retry: { box: 'bg-[#fff4d6] border-sun-300 text-ink', icon: 'refresh', mood: 'oops' },
+  hint: { box: 'bg-[#e8f4ff] border-sky-300 text-ink', icon: 'bulb', mood: 'think' },
   info: { box: 'bg-white border-black/10 text-ink', icon: 'sparkle', mood: 'happy' },
 };
 
@@ -21,22 +22,28 @@ interface FeedbackMessageProps {
   /** e.g. "Try again" or "Next" */
   action?: { label: string; onClick: () => void; icon?: IconName };
   className?: string;
+  /** Override the mascot's expression for this message (e.g. a thinking Pip while a letter is picked up). */
+  mood?: MascotMood;
+  /** Bump to replay the mascot's reaction (e.g. a second miss in a row while the message stays). */
+  nudge?: number;
 }
 
 /** Encouraging feedback. Announced politely to screen readers; never uses red or "wrong". */
-export function FeedbackMessage({ tone, title, children, action, className = '' }: FeedbackMessageProps) {
+export function FeedbackMessage({ tone, title, children, action, className = '', mood, nudge }: FeedbackMessageProps) {
   const t = TONES[tone];
   return (
     <motion.div
-      role="status"
-      aria-live="polite"
+      role={tone === 'info' ? undefined : 'status'}
+      aria-live={tone === 'info' ? undefined : 'polite'}
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 6 }}
+      exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}
       transition={springs.soft}
-      className={`flex items-center gap-3 rounded-3xl border-2 p-3 pr-4 ${t.box} ${className}`}
+      className={`flex items-end gap-1 sm:gap-2 ${className}`}
     >
-      <Mascot mood={t.mood} className="h-14 w-14 shrink-0" />
+      <Companion mood={mood ?? t.mood} nudge={nudge} className="h-[4.5rem] w-[4.5rem] sm:h-24 sm:w-24" />
+      {/* the mascot's speech bubble */}
+      <div className={`relative flex min-w-0 flex-1 items-center gap-3 rounded-[1.6rem] border-[3px] p-3 pr-4 shadow-soft before:absolute before:-left-[0.7rem] before:bottom-6 before:h-4 before:w-4 before:rotate-45 before:rounded-sm before:border-b-[3px] before:border-l-[3px] before:border-inherit before:bg-inherit before:content-[''] ${t.box}`}>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 font-display text-lg font-semibold leading-tight">
           <Icon name={t.icon} size={20} />
@@ -49,6 +56,7 @@ export function FeedbackMessage({ tone, title, children, action, className = '' 
           {action.label}
         </Button>
       ) : null}
+      </div>
     </motion.div>
   );
 }

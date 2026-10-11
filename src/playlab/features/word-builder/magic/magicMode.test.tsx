@@ -20,8 +20,7 @@ const realTile = (value: string) => tilesOf(value).find((t) => t.dataset.decoy =
 
 async function openMagic(props: Parameters<typeof renderPlayLab>[0] = {}) {
   const r = renderPlayLab({ initialActivity: 'word-builder', ...props });
-  await r.user.click(await screen.findByRole('tab', { name: 'Magic Letters' }));
-  await screen.findByRole('heading', { level: 1, name: 'Magic Letters' });
+  await screen.findByRole('heading', { level: 1, name: 'Magic Letters' }, { timeout: 5000 }); // the activity is lazy-loaded
   return r;
 }
 const typeWord = (w: string) => w.split('').forEach((ch) => fireEvent.keyDown(window, { key: ch }));
@@ -30,22 +29,14 @@ async function place(user: User, value: string, slotIndex: number) {
   await user.click(slot(slotIndex));
 }
 
-describe('Word Builder mode switch', () => {
-  it('opens in Classic by default and Classic behaves as before', async () => {
-    renderPlayLab({ initialActivity: 'word-builder' });
-    expect(await screen.findByRole('tab', { name: 'Classic' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Magic Letters' })).toHaveAttribute('aria-selected', 'false');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Word Builder' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Check my word' })).toBeDisabled();
-    expect(document.querySelector('[data-mode="magic"]')).toBeNull();
-  });
-
-  it('switches to Magic Letters (no Check button) and back to Classic', async () => {
-    const { user } = await openMagic();
+describe('Word Builder is Magic Letters only', () => {
+  it('opens straight into Magic Letters: no Classic / Magic switch and no Check button', async () => {
+    await openMagic();
+    expect(screen.queryByRole('tablist', { name: 'Word Builder mode' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Classic' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Check my word' })).toBeNull();
+    expect(document.querySelector('[data-mode="magic"]')).not.toBeNull();
     expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(5); // APPLE
-    await user.click(screen.getByRole('tab', { name: 'Classic' }));
-    expect(await screen.findByRole('button', { name: 'Check my word' })).toBeInTheDocument();
   });
 });
 
@@ -115,7 +106,7 @@ describe('Magic Letters: decoys', () => {
       expect(slot(0)).toHaveAttribute('data-state', 'empty');
     }
     typeWord(word);
-    expect(await screen.findByText(/You spelled/)).toBeInTheDocument();
+    expect(await screen.findByText(/You spelled/, {}, { timeout: 4000 })).toBeInTheDocument();
   });
 });
 
@@ -126,10 +117,10 @@ describe('Magic Letters: hints, retry and typed letters', () => {
       await user.click(realTile('a'));
       await user.click(slot(4));
     }
-    await user.click(screen.getByRole('button', { name: 'Start this word again' }));
+    await user.click(await screen.findByRole('button', { name: 'Start this word again' }));
     expect(await screen.findByText('Need a hint?')).toBeInTheDocument();
     expect(slot(0)).toHaveAttribute('data-state', 'hint');
-    expect(realTile('a').className).toContain('ring-sky');
+    expect(realTile('a').querySelector('.border-sky-300')).not.toBeNull(); // the sky-blue hint ring
   });
 
   it('"Start this word again" clears placed letters and reshuffles', async () => {
@@ -202,8 +193,8 @@ describe('Magic Letters: a whole round', () => {
       await screen.findByLabelText('Word slots. Drop each letter on its outline');
       expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(w.length);
       typeWord(w);
-      expect(await screen.findByText(/You spelled/)).toBeInTheDocument();
-      expect(audioLog.at(-1)?.text).toBe(w); // the word is read aloud
+      expect(await screen.findByText(/You spelled/, {}, { timeout: 4000 })).toBeInTheDocument();
+      expect(audioLog.at(-1)?.text).toContain(w); // the word is read aloud, with a cheer
       await user.click(screen.getByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }));
     }
     expect(await screen.findByRole('region', { name: 'Amazing!' })).toBeInTheDocument();

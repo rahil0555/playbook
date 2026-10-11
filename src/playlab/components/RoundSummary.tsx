@@ -8,7 +8,7 @@ import type { ActivityCompletion } from '../types/learning';
 import { Button } from './Button';
 import { CelebrationEffect, useBurst } from './CelebrationEffect';
 import { Icon } from './Icon';
-import { Mascot } from './Mascot';
+import { Companion } from './Companion';
 
 interface RoundSummaryProps {
   completion: ActivityCompletion;
@@ -37,11 +37,11 @@ export function RoundSummary({ completion, onPlayAgain, extra }: RoundSummaryPro
       variants={completionContainer}
       initial="hidden"
       animate="show"
-      className="relative mx-auto flex max-w-xl flex-col items-center rounded-5xl bg-white px-5 py-8 text-center shadow-soft sm:px-10"
+      className="relative mx-auto flex max-w-xl flex-col items-center pl-board rounded-[2.4rem] px-5 py-8 text-center sm:px-10"
     >
       <CelebrationEffect burst={burst} onDone={clear} />
       <motion.div variants={completionItem}>
-        <Mascot mood="cheer" className="h-32 w-32" float />
+        <Companion mood="cheer" className="h-32 w-32" />
       </motion.div>
       <motion.h2 variants={completionItem} id="pl-summary-title" className="mt-2 font-display text-4xl font-bold text-ink">
         {HEADLINES[completion.stars]}
