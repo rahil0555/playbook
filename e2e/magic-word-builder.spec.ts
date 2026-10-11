@@ -198,6 +198,96 @@ test.describe('rounds, progress, success and retry', () => {
   });
 });
 
+/** Nothing a child (or a screen reader) can read in the play area may give the word away before it is placed. */
+async function expectAnswerHidden(page: Page, word: string, placed: number[] = []) {
+  const info = await page.evaluate((placedIdx) => {
+    const slots = [...document.querySelectorAll<HTMLElement>('[data-magic-slot]')];
+    const board = document.querySelector('[data-mode="magic"]') as HTMLElement;
+    // the board's text without the loose tiles (their letters are shuffled on purpose) and the sr-only live region
+    const clone = board.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[data-magic-tile], .sr-only, [data-magic-flight]').forEach((n) => n.remove());
+    return {
+      slots: slots.map((s, i) => ({
+        i,
+        text: s.textContent ?? '',
+        label: s.getAttribute('aria-label') ?? '',
+        graphics: s.querySelectorAll('svg, img, canvas').length,
+        stroke: [...s.querySelectorAll<HTMLElement>('*')].some((e) => parseFloat(getComputedStyle(e).webkitTextStrokeWidth || '0') > 0),
+        placed: placedIdx.includes(i),
+      })),
+      boardText: clone.textContent ?? '',
+      tray: [...document.querySelectorAll<HTMLElement>('[data-magic-tile][data-decoy="false"]')].map((t) => t.dataset.value).join(''),
+    };
+  }, placed);
+  expect(info.slots).toHaveLength(word.length);
+  for (const s of info.slots) {
+    if (s.placed) continue; // a letter the child has already placed is allowed to show
+    expect(s.text, `slot ${s.i + 1} must be empty before placement (${word})`).toBe('');
+    expect(s.graphics, `slot ${s.i + 1} graphics`).toBe(0);
+    expect(s.stroke, `slot ${s.i + 1} outlined-text glyph`).toBe(false);
+    expect(s.label, `slot ${s.i + 1} accessible name`).toMatch(/^Slot \d+, empty/);
+  }
+  expect(info.boardText.toLowerCase(), 'the word is not written on the board').not.toMatch(new RegExp(`\\b${word}\\b`));
+  if (placed.length === 0) expect(info.tray, 'the tray does not spell the word').not.toBe(word);
+}
+
+test.describe('learning integrity: the answer is never shown before it is placed', () => {
+  test('every word starts with empty slots and a shuffled tray, and keeps its other slots secret as letters land', async ({ page }) => {
+    test.setTimeout(120_000);
+    await openMagic(page);
+    const seen = new Set<string>();
+    for (let round = 0; round < 4 && seen.size < englishWords.length; round++) {
+      for (let q = 0; q < 5; q++) {
+        const w = await currentWord(page);
+        seen.add(w.id);
+        await expectAnswerHidden(page, w.text);
+        // place the first letter: only that slot may show a letter
+        await page.keyboard.press(w.text[0]!);
+        await expect(page.locator('[data-magic-slot="0"]')).toContainText(w.text[0]!, { ignoreCase: true });
+        if (w.text.length > 1) await expectAnswerHidden(page, w.text, [...w.text].flatMap((c, i) => (c === w.text[0] ? [i] : [])).slice(0, 1));
+        for (const ch of w.text.slice(1)) await page.keyboard.press(ch);
+        await expect(page.getByText(/You spelled/)).toBeVisible();
+        await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+      }
+      if (seen.size < englishWords.length) await page.getByRole('button', { name: 'Play again' }).click();
+    }
+    expect(seen.size).toBe(englishWords.length);
+  });
+
+  test('a wrong try (tap or drag) leaves the slot as an empty outline', async ({ page }) => {
+    await openMagic(page);
+    const w = await currentWord(page);
+    const wrong = [...w.text].findIndex((c) => c !== w.text[0]);
+    await realTile(page, w.text[0]!).click();
+    await page.locator(`[data-magic-slot="${wrong}"]`).click();
+    await expect(page.getByText(/different spot/)).toBeVisible();
+    await expectAnswerHidden(page, w.text);
+    await dragTo(page, realTile(page, w.text[0]!), wrong);
+    await page.waitForTimeout(700);
+    await expectAnswerHidden(page, w.text);
+  });
+
+  test('while the letter is flying the slot is still empty; the letter shows only once it has landed', async ({ page }) => {
+    await openMagic(page);
+    const w = await currentWord(page);
+    await realTile(page, w.text[0]!).click();
+    await page.locator('[data-magic-slot="0"]').click();
+    await expect(page.locator('[data-magic-flight]')).toHaveCount(1); // the bubble is in the air...
+    expect(await page.locator('[data-magic-slot="0"]').textContent()).toBe(''); // ...and the slot has not shown it yet
+    await expect(page.locator('[data-magic-slot="0"]')).toContainText(w.text[0]!, { ignoreCase: true });
+    await expect(page.locator('[data-magic-flight]')).toHaveCount(0);
+  });
+
+  test('reduced motion: still empty before, and the letter appears on placement', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openMagic(page);
+    const w = await currentWord(page);
+    await expectAnswerHidden(page, w.text);
+    await page.keyboard.press(w.text[0]!);
+    await expect(page.locator('[data-magic-slot="0"]')).toContainText(w.text[0]!, { ignoreCase: true });
+  });
+});
+
 test.describe('levels', () => {
   for (const [level, decoys] of [['Starter', 0], ['Explorer', 1], ['Adventurer', 2]] as const) {
     test(`${level}: ${decoys} decoy letter(s)`, async ({ page }) => {

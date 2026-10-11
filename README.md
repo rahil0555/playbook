@@ -59,11 +59,11 @@ Word Builder *is* Magic Letters: open Word Builder and you are in it (there is n
 
 How it plays:
 
-* **Outline letter slots.** A picture and clue sit beside a row of slots. Each slot shows a *faint outline* of its letter (stroke only, never filled), like the ghost letters in the reference reel.
+* **Empty glowing slots.** A picture and clue sit beside a row of slots. Every unfilled slot is an *empty* glowing outline: **the target letter is never drawn there** (no ghost, watermark or outlined glyph, not even at Starter level), so the word cannot be read before the child has placed its letters. The loose tiles are shuffled so they never spell the word left to right, with or without decoys. The answer exists only in the internal data used to validate each drop; a slot's accessible name says "Slot 1, empty" until a correct letter has landed. (An earlier version showed faint outline letters in the slots, which gave the answer away; that was removed.)
 * **Loose letters below.** Colourful rounded letter bubbles pop in with a staggered spring. Tap one and it **jiggles side to side with a little squash and stretch, lifts, and gets a soft shadow and glow**; drag one and it lifts and tilts while the slot under the pointer highlights.
 * **Each drop is judged immediately** (there is no "Check" button). A letter only lands if it belongs in that slot; repeated letters work, so either P in APPLE fills either P slot.
 * **Correct drop:** the *same bubble* that was picked up **flies to its slot** (about 0.35-0.5 s, along a gentle curve with a slight size change and a short fading trail), starting from where it really was: its tray position for tap-tap, or the exact spot where a drag was released. On arrival the bubble hands over to the slot's letter, which becomes the same glossy tile and **squashes and springs in** (one of the existing bounce / jelly / pop moves, varied per slot) with a soft glow flash and a small 8-star burst. The drop is *judged* the instant it happens (so fast taps and drags never block each other); only the visuals follow. Finishing the word waits for the last letter to land, then the letters hop in a staggered wave with a slightly larger burst, the word is read aloud, and a success message offers **Next word**.
-* **Wrong drop:** nothing flies into the slot; the letter wobbles and (for a drag) springs back to the tray, with a kind message and a kind message ("That letter goes in a different spot. Try another!"). Nothing is penalised and the word is never blocked. **Start this word again** reshuffles the letters. After two misses a hint pulses the next outline and puts a star on the matching letter.
+* **Wrong drop:** nothing flies into the slot; the letter wobbles and (for a drag) springs back to the tray, with a kind message ("That letter goes in a different spot. Try another!"). Nothing is penalised and the word is never blocked. **Start this word again** reshuffles the letters. After two misses a hint pulses the next outline and puts a star on the matching letter.
 * **Tap-to-select fallback.** Dragging is never required: tap a letter (it lifts and glows), then tap a slot. Tapping the letter again puts it down.
 * **Keyboard and assistive tech.** Letters and slots are real buttons (Enter on a letter, then Enter on a slot). Typing a letter places it in the first matching empty slot. Every placement, miss and hint is announced through a polite live region.
 * **Reduced motion.** With the OS setting (or `theme.motion: 'reduce'`) nothing moves: no jiggle, no flight, no trail; letters appear in their slot instantly, the star burst is omitted, the glow becomes an opacity fade, and the slot's filled colour plus the announcement still make the result clear.
@@ -84,7 +84,7 @@ Design rules followed everywhere: no timers, no penalties, no "wrong" wording, a
 
 ### Difficulty levels
 
-`starter` (Pre-K): 3-letter words, 5 short sentences, 3 answer choices, 3 pairs, faint **guide letters** in the answer slots (as in the reference reel) ·
+`starter` (Pre-K): 3-letter words, 5 short sentences, 3 answer choices, 3 pairs, no decoy letters in Word Builder ·
 `explorer` (K): adds 4-letter words and sentences ·
 `adventurer` (Grade 1, default): all content, 5 pairs, 4 choices.
 The host app can lock the level with the `level` prop; otherwise it is a setting (gear icon).
@@ -118,7 +118,7 @@ I studied the attached video by extracting frames (88 s, 530×550, sampled at 2�
 **How it shaped the product**
 
 * Direct manipulation is the core: letters respond *under the finger* (tap squash, drag with spring-back) → Alphabet and Word Builder.
-* Ghost outlines + snapping → Word Builder slots, with faint guide letters at `starter` level.
+* Ghost outlines + snapping → Word Builder slots, as *empty* glowing outlines (the faint ghost letters were dropped so the answer is not revealed).
 * Star-burst on success, colour change as reward → `CelebrationEffect` + success states.
 * Sentences made of touchable words → Sentence Fun.
 

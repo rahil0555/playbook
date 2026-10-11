@@ -53,6 +53,22 @@ describe('decoys', () => {
   });
 });
 
+describe('the tray never spells the answer', () => {
+  it('the needed letters are never in the solved left-to-right order, at any level (decoys or not)', () => {
+    for (const w of englishWords) {
+      const target = w.text.split('');
+      if (new Set(target).size === 1) continue; // a word of one repeated letter has only one order
+      for (const level of LEVELS) {
+        for (let seed = 1; seed <= 40; seed++) {
+          const tiles = buildMagicTiles(w.id, target, level, mulberry32(seed));
+          const real = tiles.filter((t) => !t.decoy).map((t) => t.value).join('');
+          expect(real, `${w.text}/${level}/seed ${seed}`).not.toBe(w.text);
+        }
+      }
+    }
+  });
+});
+
 describe('tryPlace', () => {
   const target = 'apple'.split('');
   const tiles = buildMagicTiles('apple', target, 'adventurer', mulberry32(3));

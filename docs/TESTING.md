@@ -2,17 +2,17 @@
 
 Everything under **Executed** was actually run, in this repository (Node 22, Chromium from Playwright 1.56). Everything under **Not tested** was not, and no claim is made about it.
 
-> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The e2e suite passed 82 of 82 in the final full run of the visual transformation (after one e2e helper fix described below), but contains tests that have flaked under load. Numbers below are from specific runs and are labelled as such.
+> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The most recent full e2e run passed 85 of 86 (one known flaky test, see below), and the unit suite has one known timing-dependent failure that also fails on earlier commits. Numbers below are from specific runs and are labelled as such.
 
 ## Executed
 
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **151 tests in 16 files. After the visual transformation, 5 consecutive full runs on an otherwise idle machine: 151 of 151 passed each time.** (The Classic Word Builder tests were removed with that mode, which is why the count is lower than the 159 before.) Earlier runs while the machine was busy, before I widened a few of my own `findBy` timeouts, failed 1-3 timing-sensitive tests each (the known alphabet "26 letters" test among them). |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **160 tests in 17 files. After the answer-reveal fix, 3 consecutive full runs: 159 passed and 1 failed each time: the known timing-dependent alphabet "26 letters" test, which fails the same way (3 of 3 runs) on the previous commit with my changes stashed, so it is pre-existing and not touched.** All Magic Letters tests passed in every run (it passed in 5 of 5 idle runs earlier the same day, so it is timing-dependent, not deterministic). |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **82 tests; the final full run passed 82 of 82.** Immediately before that the same suite had 1 failure (the sentences helper race below). |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **86 tests; the latest full run passed 85 of 86.** The one failure was the known flaky `reduced motion › OS reduced-motion removes movement…` test (alphabet tile tap-scale caught mid-press under load; reproduced on earlier commits, see below). All 37 Magic Letters e2e tests (both Magic specs) passed. |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 
@@ -35,6 +35,14 @@ Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 ne
 * `magicBoard.test.ts` (10, pure logic): decoy counts (Starter 0 / Explorer 1 / Adventurer 2); decoys never contain a letter from the word; **all 18 words are completable at all 3 levels**; tiles never start in the solved order; right/wrong/occupied/ignored drops; the repeated P in APPLE; a decoy never fits any slot; typed-letter slot lookup; hint selection.
 * `magicMode.test.tsx` (18, component): Word Builder opens straight into Magic Letters (no mode switch, no Check button); tap-to-select then tap a slot; wrong slot is turned down kindly and recorded as an incorrect answer; tapping a slot first asks for a letter; putting a letter down; APPLE's two P tiles; decoys per level (and that a decoy never lands); hint after two misses; "Start this word again"; typed letters (including a miss); keyboard (Enter on letter then slot); live-region announcements; accessible names; the 8-star burst on a correct landing; **reduced motion (no burst, still lands and is announced)**; a whole round (5 words, one answer per word, progress recorded under Word Builder, next-step buttons); a round with a miss (4/5 first try, still finishes, never says "wrong").
 * `e2e/magic-word-builder.spec.ts` (21, real Chromium): mode switch; **mouse drag** snaps into the slot, with burst present then gone; wrong-slot drop springs back to its origin with kind feedback; empty-space release is not a miss; **touch drag via CDP touch events** (no page scroll); tap-tap with mouse and touch emulation; keyboard-only; a full round plus My Stars counting it as Word Builder; **every one of the 18 words finished** in Magic mode; retry + hint; finished state; decoy counts at each level via Settings; reduced motion (letter lands, no burst); **axe WCAG 2.1 A/AA clean** in initial, picked-up, after-a-miss and finished states; no horizontal overflow at 320 / 375 / 768 / 1440 px.
+
+### Magic Letters never reveals the answer: what the tests cover
+
+Bug fixed: empty slots drew a faint outline of their target letter, which gave the word away. Empty slots are now plain glowing outlines, and the tray's needed letters are never in solved order (decoys or not).
+
+* `magicNoReveal.test.tsx` (8, component, round fixed to start with **PIG**): three empty slots contain no text, graphics or outlined glyph and are named "Slot N, empty"; the picture, clue and Hear-the-clue button are still shown; "pig" is written nowhere on the screen; Starter / Explorer / Adventurer show 3 / 4 / 5 shuffled tiles with 0 / 1 / 2 decoys that never spell PIG; the slots stay empty after wrong tries and while the hint glows; right letters still land one by one (other slots stay empty) and the word completes; same with reduced motion. **These tests fail on the previous code (4 of 8 failed) and pass now.**
+* `magicBoard.test.ts` (+1): for all 18 words, 3 levels and 40 seeds each, the needed letters are never in the solved order.
+* `e2e/magic-word-builder.spec.ts` (+4): across **all 18 words** the slots are empty (no text, no graphics, no outlined-text style, accessible name "empty") and the tray is not in solved order at the start of every question, and only the placed slot shows a letter as letters land; a wrong tap/drag leaves the slot empty; while the bubble is still flying the slot is still empty and the letter shows only after it lands; the same under reduced motion. **All 4 fail on the previous code and pass now.**
 
 ### Visual transformation (storybook world, Magic Letters only): what changed in the tests
 
@@ -128,7 +136,7 @@ Baseline for this change (commit `c465297`, before any edit): `tsc` clean; unit 
 
 ```bash
 npm install
-npx tsc -b && npm test          # types + 151 unit/component tests (the known timing-dependent alphabet test may fail; see above)
-npm run test:e2e                # builds, serves the production build, runs 82 Chromium tests (first run: npx playwright install chromium if needed)
+npx tsc -b && npm test          # types + 160 unit/component tests (the known timing-dependent alphabet test may fail; see above)
+npm run test:e2e                # builds, serves the production build, runs 86 Chromium tests (first run: npx playwright install chromium if needed)
 npm run build:lib               # integration package
 ```

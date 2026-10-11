@@ -33,7 +33,7 @@ interface OutlineSlotProps {
 const TILE = 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]';
 
 /**
- * A magical, softly glowing outline of the target letter. The right tile flies in on its own layer (FlyingLetter);
+ * A magical, softly glowing EMPTY outline (it never shows its target letter). The right tile flies in on its own layer (FlyingLetter);
  * when it arrives the slot turns into the same glossy tile, squashing and springing in with a glow flash and a
  * small star burst. The slot is a real button so the tap-to-place fallback works with mouse, touch and keyboard.
  */
@@ -65,18 +65,9 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
         />
       ) : null}
 
-      {/* faint outline of the letter: stroke only, never filled */}
-      {!landed ? (
-        <motion.span
-          aria-hidden="true"
-          animate={hinted ? { opacity: [0.45, 1, 0.45] } : { opacity: next ? 0.75 : 0.5 }}
-          transition={hinted ? { duration: 1.4, repeat: 3, ease: 'easeInOut' } : { duration: 0.2 }}
-          className="select-none font-display text-[2.9rem] font-bold uppercase leading-none sm:text-[3.7rem]"
-          style={{ color: 'transparent', WebkitTextStroke: `3px ${color}`, filter: `drop-shadow(0 0 5px ${color}88)` }}
-        >
-          {letter}
-        </motion.span>
-      ) : (
+      {/* An unfilled slot is an EMPTY glowing outline: the target letter is never drawn here (no ghost, watermark or
+          stroke glyph), so the word cannot be read before the child has placed its letters. */}
+      {landed ? (
         <span className="relative block h-full w-full">
           {fresh ? (
             <motion.span
@@ -104,7 +95,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
           </motion.span>
           {fresh ? <StarBurst seed={index + 1} count={grand ? 14 : 8} spread={grand ? 90 : 56} /> : null}
         </span>
-      )}
+      ) : null}
     </button>
   );
 }

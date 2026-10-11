@@ -32,7 +32,8 @@ const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');
  * All letters of the word (each its own tile, so repeated letters are separate tiles)
  * plus decoys. Decoys are drawn only from letters that are NOT in the word, so they can
  * never fit any slot and can never be confused with a needed letter: the word always
- * stays completable. The order is shuffled and never equals the solved order.
+ * stays completable. The order is shuffled, and the needed letters never appear in the solved
+ * left-to-right order (decoys or not), so the tray itself never spells the answer.
  */
 export function buildMagicTiles(wordId: string, target: readonly string[], level: DifficultyLevel, rng: Rng = Math.random): MagicTile[] {
   const real: MagicTile[] = target.map((value, i) => ({ id: `${wordId}-${i}`, value, decoy: false }));
@@ -42,7 +43,7 @@ export function buildMagicTiles(wordId: string, target: readonly string[], level
   const solved = target.join('');
   const allSame = all.length > 1 && all.every((t) => t.value === all[0]?.value);
   let out = shuffle(all, rng);
-  for (let tries = 0; !allSame && out.filter((t) => !t.decoy).map((t) => t.value).join('') === solved && decoys.length === 0 && tries < 20; tries++) {
+  for (let tries = 0; !allSame && out.filter((t) => !t.decoy).map((t) => t.value).join('') === solved && tries < 50; tries++) {
     out = shuffle(all, rng);
   }
   return out;
