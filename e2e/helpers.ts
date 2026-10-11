@@ -72,6 +72,8 @@ export async function solveWord(page: Page) {
 
 /** Solve the current sentence question (arrange or fill). Returns the sentence id. */
 export async function solveSentence(page: Page) {
+  // wait for the question to render (tiles for "arrange", options for "fill") before deciding which kind it is
+  await page.locator('[data-tile], [data-option]').first().waitFor();
   if (await page.getByText('Finish the sentence').isVisible()) {
     const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
     const s = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string) && (x.distractors ?? []).every((d) => options.includes(d)))!;
