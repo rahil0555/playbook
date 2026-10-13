@@ -60,30 +60,44 @@ export function useRound<T extends { id: string }>(
 
   const current = items[index];
   const currentResult = current ? results[current.id] : undefined;
+  // Synchronous mirrors of the state above. A second tap in the same frame reads these, not the stale render's values,
+  // so a double tap on Check or Finish is counted once and cannot skip a question.
+  const resultsRef = useRef(results);
+  resultsRef.current = results;
+  const finishedRef = useRef(false);
+  const movingRef = useRef(-1);
 
   const submit = useCallback<Round<T>['submit']>(
     (response, expected, correct) => {
       if (!current) throw new Error('No current question');
-      const prev = results[current.id];
+      const prev = resultsRef.current[current.id];
       if (prev?.solved) {
         // Already solved: do not double count (e.g. rapid double tap).
         return { activityId, questionId: current.id, correct, attempt: prev.attempts, response, expected, timestamp: Date.now() };
       }
       const attempt = (prev?.attempts ?? 0) + 1;
-      setResults((r) => ({ ...r, [current.id]: { attempts: attempt, solved: correct, firstTry: correct && attempt === 1 } }));
+      const next = { ...resultsRef.current, [current.id]: { attempts: attempt, solved: correct, firstTry: correct && attempt === 1 } };
+      resultsRef.current = next;
+      setResults(next);
       return recordAnswer({ activityId, questionId: current.id, correct, attempt, response, expected });
     },
-    [activityId, current, recordAnswer, results],
+    [activityId, current, recordAnswer],
   );
 
   const solvedCount = useMemo(() => Object.values(results).filter((r) => r.solved).length, [results]);
 
   const next = useCallback(() => {
     if (index + 1 < items.length) {
+      // a double tap on "Next" moves once: the first call already asked for index + 1
+      if (movingRef.current === index) return;
+      movingRef.current = index;
       setIndex(index + 1);
       return;
     }
-    const score = Object.values(results).filter((r) => r.firstTry).length;
+    // a double tap on "Finish" records the completion once (host callbacks fire once too)
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    const score = Object.values(resultsRef.current).filter((r) => r.firstTry).length;
     const total = items.length;
     const completion = recordCompletion({
       activityId,
@@ -94,13 +108,16 @@ export function useRound<T extends { id: string }>(
       variant,
     });
     setSummary(completion);
-  }, [activityId, index, items.length, recordCompletion, results, variant]);
+  }, [activityId, index, items.length, recordCompletion, variant]);
 
   const restart = useCallback(() => {
     setItems(buildRef.current());
     setIndex(0);
     setResults({});
+    resultsRef.current = {};
     setSummary(null);
+    finishedRef.current = false;
+    movingRef.current = -1;
     startedAt.current = Date.now();
     recordStart(activityId);
   }, [activityId, recordStart]);

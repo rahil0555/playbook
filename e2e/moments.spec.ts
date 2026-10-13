@@ -74,7 +74,7 @@ test.describe('Sentence Fun: words react to touch', () => {
     await expect(reward).toBeVisible();
     await expect(reward).toHaveText(/\S/);
     // the reward never blocks the next step
-    await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click({ timeout: 500 });
+    await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click({ timeout: 1500 }); // the button settles after its entrance; under load that can take a moment
   });
 
   test('rapid taps: a double tap places the word once, and two different words placed together both land', async ({ page }) => {

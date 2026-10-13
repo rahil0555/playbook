@@ -9,10 +9,10 @@ Everything under **Executed** was actually run, in this repository (Node 22, Chr
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **193 tests in 22 files. Final run for the Magic Moments change: 193 of 193 passed.** The alphabet "26 letters" test is timing-dependent: in this session it failed when run alone, both on this branch and on `1ee0718` (checked in a separate worktree), and passed in the final full run (see Known pre-existing failures). |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **199 tests in 23 files. Final run for the quality pass: 199 of 199 passed.** (Earlier runs: 193 of 193 for the Magic Moments change.) The alphabet "26 letters" test is timing-dependent: in this session it failed when run alone, both on this branch and on `1ee0718` (checked in a separate worktree), and passed in the final full run (see Known pre-existing failures). |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **112 tests; the final full run passed 112 of 112.** New in the Magic Moments change: `e2e/moments.spec.ts` (11 tests, see the Magic Moments section). Earlier: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **134 tests; the final full run passed 134 of 134.** New in the quality pass: `e2e/quality.spec.ts` (22 tests, phone and desktop; see the Quality pass section). Magic Moments: `e2e/moments.spec.ts` (11 tests). Earlier: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 
@@ -44,6 +44,48 @@ Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 ne
 * **Two problems found and fixed along the way (both real):** (1) the "Sound isn't available" notice pushed the whole board down by 88 px about 2.5 s after the first spoken attempt on a browser without voices, which is a layout shift a child would see. The notice now floats over the page, fades away after 9 s, and can still be dismissed. (2) The picture button had no accessible name of its own, which the keyboard-focus check counts as an unnamed button; it now has an explicit label.
 * **Test problems fixed (not app bugs):** the rapid-tap test assumed six clicks happen inside the 1.4 s gap; Playwright clicks are slower than that, so the test now dispatches the six taps together. The jiggle test sampled the wrong element and then a sampler that browser scheduling starved; it now samples in the same task as the tap.
 * **Recordings** (headless Chromium, the same scripted play on the previous commit `eee8c87` and on this change): see the report accompanying this commit. Sound was not audible here: the timeline is the browser's own record of when each sound-effect oscillator started and each spoken request was made.
+
+### Quality pass (completion, timing and rapid input): what the tests cover
+
+This pass did not add an activity. It checked the Magic Letters and Sentence Fun interactions against what the page actually does (sound-effect oscillator starts, spoken lines, progress saved to localStorage, and element positions after the next frame), then fixed what the checks showed.
+
+Final checks on this change: `tsc -b` clean; `npm run build` and `npm run build:lib` succeed; unit **199 of 199** (23 files); e2e **134 of 134** in the final full run.
+
+* `e2e/quality.spec.ts` (22 = 11 per viewport: phone 390 × 844 with touch, desktop 1280 × 800 with mouse):
+  * **Tap to next frame:** a tapped letter (5 taps) and a tapped word (3 taps) answer on the next frame; the sound for the tap is scheduled within a few ms of the pointer going down (both are checked as medians under 100 ms).
+  * **Typed at full speed:** a word typed with no pause between keys completes, every slot ends with its own letter, and exactly one answer is recorded for the word.
+  * **Finishing a word:** Pip's reveal does not overlap any letter slot or the Next button; the fanfare plays first and the spoken cheer starts at least 600 ms after it (the fanfare's length); the cheer is spoken once; Next is usable at once; no horizontal scroll.
+  * **Sound off and reduced motion (Magic Letters):** the word completes, Pip still appears with no burst, and no tone or speech is produced.
+  * **Fast word taps:** every word is tapped with no pause; each word ends up in its slot exactly once, nothing is overwritten, and it is still in place 0.9 s later.
+  * **Double tap on Check:** one answer is recorded, one fanfare plays, and the sentence is read aloud once.
+  * **A lifted word:** the first free spot is marked straight after the tap, and the word lands there.
+  * **Landing chime:** the chime is within 120 ms of the word's centre reaching its slot (the test samples the word's centre every frame).
+  * **Sentence completed on its own:** the sentence is read aloud only after the fanfare has finished; Next is usable at once.
+  * **Sound off and reduced motion (Sentence Fun):** the words go in and the sentence completes, with no tone or speech.
+* **Before and after (same checks, `5f9d240` against this change; headless Chromium, 2 workers):**
+
+  | Check | Before (`5f9d240`) | After |
+  |---|---|---|
+  | Quality checks passing | 12 of 22 (10 failing: the new reveal, the glow, the landing timing and the completion timing) | 22 of 22 |
+  | Letter tap to next frame, median (phone / desktop) | 14.2 / 17.5 ms | 15.6 / 23.1 ms |
+  | Word tap to next frame, median (phone / desktop) | 8.4 / 9.3 ms | 10.3 / 9.6 ms |
+  | First sound after a letter tap, median (phone / desktop) | 1.9 / 2.6 ms | 2.5 / 2.8 ms |
+  | Landing chime relative to the word's arrival (phone / desktop) | 130 / 147 ms **early** | within 2 ms |
+
+  The tap response is unchanged within the run-to-run noise of headless Chromium; these are JavaScript-side times, not what a child sees on a real screen, and they were measured on this container only.
+* **Real bugs found by these checks and fixed:**
+  1. *Duplicate fanfare (introduced and caught during this pass, not in a released commit):* a leftover call played the fanfare twice on each sentence. Removed; the double-tap check now counts one.
+  2. *Chime before the landing:* Sentence Fun played the landing chime on a fixed timer, 130–150 ms before the word arrived. The chime and burst now fire from the word's own layout-complete callback, with a fallback timer.
+  3. *Spoken praise over the fanfare:* the praise was spoken 450 ms after the fanfare started, but the fanfare lasts 600 ms. The spoken line now waits for the fanfare's real length (`sfxDurationMs`) plus a 120 ms gap (720 ms in total).
+  4. *Stale slot reads:* a letter typed or tapped in the same frame as another could read stale slots. Magic Letters now commits against the latest slots (`slotsRef`).
+  5. *Feedback layout on phones:* the action button squeezed the message text into a 56 px column, so "Great job! Hooray!" broke onto five lines. The action now wraps underneath on narrow screens (the title is 216 px wide on the 390 px test screen).
+  6. *Stale pick-up after a drag:* a word dragged while it was still lifting could be placed a second time. A drag now cancels a pending tap pick-up.
+* **Round guards (`useRound`):** a double call to submit, to Next at the last question, or to Finish now counts once. The new unit tests (`useRound.test.tsx`) fail on `5f9d240` (3 of 5) and pass now. In the browser, the Check button re-renders after its first tap, so the double-tap check passed on both builds; the guard covers calls that land in the same frame.
+* **Playwright timing changes in existing tests:** `playlab › sentences › full round` now waits for the five spoken lines (the last one follows its fanfare by about 0.7 s); `moments › key word big` allows 1.5 s for the Next button to settle (it passes alone; under two workers it can take longer than 500 ms).
+* **Pre-existing or flaky, not from this change:** `Alphabet playground › selects each of the 26 letters…` (unit) is timing-dependent: it failed when run alone on this branch and on `1ee0718`, and passed in the final unit run. `magic-animation › a wrong slot…` failed once in an earlier full parallel run and has passed since.
+* **Not covered:** no real device or real touch screen; no audible check by a person; no screen-reader check of the new reveal (it is `aria-hidden`, like the sparkles it sits with); no check at tablet sizes or with OS-level font scaling.
+
+**Recordings (this change; `clips/` is not in the repository):** eight clips at the viewport's own size, driven by Playwright with real pointer input (touch taps on the phone, mouse on the desktop). Sound-on clips carry the app's own Web Audio output, captured from the page; speech is not captured because headless Chromium has no voices. Measured against the sound log: for the six sound-on clips, 10 of 10 to 20 of 20 scheduled sound starts matched an onset in four clips and 12 of 16 and 17 of 19 in the other two; the RMS residual is 17–43 ms (mean about 33 ms). That residual includes the capture block (11 ms) and the detector, so it is a check on the capture, not a measure of what a child perceives. The clip's audio starts relative to its video are set from the page clock, with an uncertainty of roughly ±0.3 s (the video starts before the test body does). The sound-off and reduced-motion clips are silent by design.
 
 ### Magic Moments (touch feel across activities): what the tests cover
 

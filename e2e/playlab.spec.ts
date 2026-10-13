@@ -183,7 +183,8 @@ test.describe('sentences', () => {
       await nextOrFinish(page);
     }
     await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();
-    expect((await spoken(page)).filter((t) => /\.$/.test(t))).toHaveLength(5); // read aloud after each success
+    // read aloud after each success, once its fanfare has finished (the last line follows the fanfare by ~0.7 s)
+    await expect.poll(async () => (await spoken(page)).filter((t) => /\.$/.test(t)).length, { timeout: 3000 }).toBe(5);
     await page.getByRole('button', { name: 'Play again' }).click();
     await expect(page.getByText(/Make the sentence|Finish the sentence/)).toBeVisible();
   });

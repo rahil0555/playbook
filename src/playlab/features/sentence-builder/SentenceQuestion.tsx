@@ -8,7 +8,7 @@ import { FeedbackMessage } from '../../components/FeedbackMessage';
 import { PronunciationControl } from '../../components/PronunciationControl';
 import { TileBoard } from '../../components/TileBoard';
 import { KeyWordReward, type Reward } from '../../moments/KeyWordReward';
-import { CELEBRATION_SPEECH_MS, useMoments } from '../../moments/useMoments';
+import { useMoments } from '../../moments/useMoments';
 import { useSpeech } from '../../hooks/useAudio';
 import type { Round } from '../../hooks/useRound';
 import { Illustration } from '../../illustrations/Illustration';
@@ -74,10 +74,9 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
   const succeed = useCallback(() => {
     setStatus('solved');
     fire('burst', { x: 50, y: 40 });
-    moments.celebrate();
     setReward((r) => ({ id: (r?.id ?? 0) + 1, word: keyWordOf(sentence), color: REWARD_COLOURS[sentence.words.length % REWARD_COLOURS.length] as string }));
     void controls.start('correct');
-    moments.say(text, CELEBRATION_SPEECH_MS); // the fanfare first, then the sentence read aloud
+    moments.celebrateThenSay(text); // the fanfare first, then the sentence read aloud once it has finished
   }, [controls, fire, moments, sentence, text]);
 
   const fail = useCallback(() => {
@@ -143,8 +142,11 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
   const [slots, setSlots] = useState<Slots>(() => emptySlots(target.length));
   const [states, setStates] = useState<SlotState[] | undefined>(undefined);
   const complete = isComplete(slots);
+  /** set by a Check until the child changes the sentence again: a double tap checks once */
+  const checking = useRef(false);
 
   const touched = () => {
+    checking.current = false;
     if (status === 'wrong') setStatus('building');
     setStates(undefined);
   };
@@ -162,7 +164,8 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
     touched();
   };
   const check = () => {
-    if (solved || !isComplete(slots)) return;
+    if (solved || !isComplete(slots) || checking.current) return;
+    checking.current = true;
     const ok = isCorrect(slots, tiles, target);
     round.submit(slotValues(slots, tiles).join(' '), target.join(' '), ok);
     setStates(slotStates(slots, tiles, target));
@@ -173,6 +176,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
     }
   };
   const retry = () => {
+    checking.current = false;
     setSlots((s) => s.map((id, i) => (states?.[i] === 'correct' ? id : null)));
     setStatus('building');
     setStates(undefined);
@@ -234,8 +238,11 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
   const [showRetry, setShowRetry] = useState(false);
   const dragging = useRef(false);
 
+  /** every option this question has already answered: a double tap is one answer, never two */
+  const answered = useRef(new Set<string>());
   const choose = (option: string) => {
-    if (solved || wrongOptions.includes(option)) return;
+    if (solved || wrongOptions.includes(option) || answered.current.has(option)) return;
+    answered.current.add(option);
     const ok = option === answer;
     round.submit(option, answer, ok);
     if (ok) {

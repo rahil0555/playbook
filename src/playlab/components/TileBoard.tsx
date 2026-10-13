@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { LayoutGroup, motion, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../app/PlayLabContext';
 import { useMoments } from '../moments/useMoments';
+import { StarBurst } from '../moments/StarBurst';
 import { letterColor } from '../lib/accents';
 import { elementUnder } from '../lib/dom';
 import { isPlaced, type SlotState, type Slots, type Tile } from '../lib/tiles';
@@ -30,8 +31,8 @@ interface TileBoardProps {
 
 /** a tapped tile lifts for this long (the selection) before it travels to its slot */
 const PICK_UP_MS = 150;
-/** the landing chime waits for the tile to finish its glide */
-const GLIDE_MS = 420;
+/** if a placed word never reports that its glide has finished, it still lands after this long (a safety net only) */
+const LANDING_FALLBACK_MS = 1100;
 
 const SIZE = {
   letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]', text: 'text-[2.6rem] sm:text-[3.2rem]' },
@@ -56,32 +57,60 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
   const { reducedMotion } = usePlayLab();
   const moments = useMoments();
   const [over, setOver] = useState<number | null>(null);
-  /** tray tiles that are lifted right now (their selection), and where each one is travelling to */
-  const [lifting, setLifting] = useState<ReadonlySet<string>>(new Set());
+  /** tray tiles that are lifted right now (their selection), and the slot each one is travelling to */
+  const [lifting, setLifting] = useState<ReadonlyMap<string, number>>(new Map());
+  /** the slot each landing word is for, bumped when it lands: a small burst marks the landing */
+  const [landings, setLandings] = useState<Record<number, number>>({});
   const travelling = useRef(new Map<string, number>());
+  /** placed words whose glide has not finished yet: slot index by tile id. The chime and burst wait for the real landing. */
+  const awaitingLanding = useRef(new Map<string, number>());
+  /** the latest committed slots, so a tap in the same frame as a landing reads the truth */
+  const slotsRef = useRef(slots);
+  slotsRef.current = slots;
   const dragging = useRef(false);
   const size = SIZE[kind];
   const byId = new Map(tiles.map((t) => [t.id, t]));
+  const landingSlots = new Set(lifting.values());
+
+  /** the word has arrived: its chime and its landing burst, together */
+  const landed = (slotIndex: number) => {
+    moments.chime();
+    setLandings((all) => ({ ...all, [slotIndex]: (all[slotIndex] ?? 0) + 1 }));
+  };
+  /** a word has been placed: it lands when its glide has finished (reduced motion has no glide: it lands at once) */
+  const placedInto = (tileId: string, slotIndex: number) => {
+    if (reducedMotion) return landed(slotIndex);
+    awaitingLanding.current.set(tileId, slotIndex);
+    moments.after(() => {
+      if (awaitingLanding.current.delete(tileId)) landed(slotIndex);
+    }, LANDING_FALLBACK_MS);
+  };
+  const stopLifting = (tileId: string) => {
+    travelling.current.delete(tileId);
+    setLifting((m) => {
+      const next = new Map(m);
+      next.delete(tileId);
+      return next;
+    });
+  };
 
   /** Tap a tray tile: it lifts with a pop (the selection), then travels to the first free slot and lands with a chime. */
   const pickUp = (tile: Tile) => {
     // the same tile cannot be tapped twice; a different tile can be picked up while one is still travelling
-    if (locked || travelling.current.has(tile.id)) return;
+    if (locked || travelling.current.has(tile.id) || isPlaced(slotsRef.current, tile.id)) return;
     const reserved = new Set(travelling.current.values());
-    const target = slots.findIndex((s, i) => s === null && !reserved.has(i));
+    const target = slotsRef.current.findIndex((s, i) => s === null && !reserved.has(i));
     if (target < 0) return;
     travelling.current.set(tile.id, target);
-    setLifting((set) => new Set(set).add(tile.id));
+    setLifting((m) => new Map(m).set(tile.id, target));
     moments.pop();
     moments.after(() => {
-      travelling.current.delete(tile.id);
-      setLifting((set) => {
-        const next = new Set(set);
-        next.delete(tile.id);
-        return next;
-      });
+      // a drag took this tile while it was lifting: the drag has already placed it, so nothing else happens
+      if (travelling.current.get(tile.id) !== target) return;
+      stopLifting(tile.id);
+      if (isPlaced(slotsRef.current, tile.id)) return;
       onPlace(tile.id, target);
-      moments.after(() => moments.chime(), GLIDE_MS);
+      placedInto(tile.id, target);
     }, PICK_UP_MS);
   };
 
@@ -113,8 +142,16 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
             : { x: 0, y: 0, scale: 1, rotate: 0 }
         }
         transition={isLifted ? { duration: 0.45, ease: 'easeOut', layout: springs.snappy } : { ...springs.bouncy, layout: springs.snappy }}
+        onLayoutAnimationComplete={() => {
+          // the glide into the slot has finished: this is the landing
+          const slotIndex = awaitingLanding.current.get(tile.id);
+          if (slotIndex === undefined || placedIn === null) return;
+          awaitingLanding.current.delete(tile.id);
+          landed(slotIndex);
+        }}
         onDragStart={() => {
           dragging.current = true;
+          stopLifting(tile.id); // a drag replaces a pending tap-pick-up of the same word
           if (placedIn === null) moments.pop();
         }}
         onDrag={(_, info) => setOver(slotAt(info))}
@@ -123,7 +160,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
           setOver(null);
           if (target !== null) {
             onPlace(tile.id, target);
-            moments.chime();
+            placedInto(tile.id, target);
           } else if (placedIn !== null) onRemove(tile.id);
           // keep the flag until the click that follows pointer-up has been ignored
           setTimeout(() => (dragging.current = false), 0);
@@ -149,6 +186,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
         {slots.map((tileId, i) => {
           const tile = tileId ? byId.get(tileId) : undefined;
           const state = slotStates?.[i];
+          // the spot a lifted word is flying to glows, the same way a word dragged over it does
+          const aimed = over === i || (landingSlots.has(i) && !tile);
           return (
             <div
               key={i}
@@ -156,13 +195,13 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
               role="group"
               data-state={state ?? (tile ? 'filled' : 'empty')}
               aria-label={tile ? `Slot ${i + 1}: ${format(tile.value)}` : `Slot ${i + 1}: empty`}
-              style={tile || state ? undefined : { boxShadow: over === i ? undefined : 'inset 0 0 16px rgba(255,200,80,0.5), 0 0 0 4px rgba(255,255,255,0.55)' }}
-              className={`relative flex items-center justify-center rounded-[1.5rem] border-[3px] border-dashed transition-colors ${size.box} ${
+              style={tile || state ? undefined : { boxShadow: aimed ? undefined : 'inset 0 0 16px rgba(255,200,80,0.5), 0 0 0 4px rgba(255,255,255,0.55)' }}
+              className={`relative flex items-center justify-center rounded-[1.5rem] border-[3px] border-dashed transition-[transform,background-color,border-color] ${size.box} ${
                 state === 'correct'
                   ? 'border-brand-500 bg-brand-100 shadow-[0_0_0_4px_rgba(22,162,134,0.25)]'
                   : state === 'wrong'
                     ? 'border-sun-500 bg-sun-100'
-                    : over === i
+                    : aimed
                       ? 'scale-105 border-sky-500 bg-sky-100'
                       : tile
                         ? 'border-transparent bg-black/[0.05]'
@@ -170,6 +209,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
               }`}
             >
               {tile ? renderTile(tile, i) : guide?.[i] ? <span aria-hidden="true" className={`font-display font-bold text-black/15 ${size.text}`}>{format(guide[i] as string)}</span> : null}
+              {landings[i] ? <StarBurst key={landings[i]} seed={landings[i]! + i} count={6} spread={46} /> : null}
             </div>
           );
         })}

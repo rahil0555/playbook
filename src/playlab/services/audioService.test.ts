@@ -274,3 +274,12 @@ describe('audioService: voice selection', () => {
     expect(d.spoken).toEqual([]);
   });
 });
+
+describe('sound effect timing', () => {
+  it('each sound effect lasts as long as its notes, so speech can wait for the fanfare to finish', async () => {
+    const { sfxDurationMs } = await vi.importActual<typeof import('./audioService')>('./audioService');
+    expect(sfxDurationMs('celebrate')).toBe(600);
+    expect(sfxDurationMs('correct')).toBe(400);
+    expect(sfxDurationMs('chime')).toBe(390);
+  });
+});

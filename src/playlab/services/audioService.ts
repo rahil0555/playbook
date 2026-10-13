@@ -116,6 +116,11 @@ const NOTES: Record<SfxName, { freq: number; at: number; dur: number; type?: Osc
   ],
 };
 
+/** How long a sound effect takes to finish, in ms. Spoken lines wait for it, so speech never plays over a fanfare. */
+export function sfxDurationMs(name: SfxName): number {
+  return Math.round(Math.max(...NOTES[name].map((n) => n.at + n.dur)) * 1000);
+}
+
 export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   let snapshot: AudioSnapshot = {
     speaking: false,
@@ -287,6 +292,20 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     }
     return ctx;
   };
+
+  // The first sound of a session used to wait for the AudioContext to be created and resumed, which showed up as a
+  // late first pop. Creating it on the first touch (a user gesture, so browsers allow it) keeps every later sound on time.
+  // Sound off never creates a context.
+  if (typeof document !== 'undefined' && env.AudioContextCtor) {
+    const prime = () => {
+      document.removeEventListener('pointerdown', prime, true);
+      if (!snapshot.muted) {
+        const c = getCtx();
+        if (c?.state === 'suspended') void c.resume().catch(() => undefined);
+      }
+    };
+    document.addEventListener('pointerdown', prime, true);
+  }
 
   return {
     play,

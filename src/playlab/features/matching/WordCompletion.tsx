@@ -10,7 +10,7 @@ import { useSpeech } from '../../hooks/useAudio';
 import { FlyingTile, type Flight } from '../../moments/FlyingTile';
 import { measurePose } from '../../moments/flightPath';
 import { StarBurst } from '../../moments/StarBurst';
-import { CELEBRATION_SPEECH_MS, useMoments } from '../../moments/useMoments';
+import { useMoments } from '../../moments/useMoments';
 import { useRound, type Round } from '../../hooks/useRound';
 import { Illustration } from '../../illustrations/Illustration';
 import { letterColor } from '../../lib/accents';
@@ -38,10 +38,9 @@ function Question({ round, q }: { round: Round<BlankQuestion>; q: BlankQuestion 
   /** the letter has arrived: the word is finished, so a brief, bigger celebration and the word read aloud after it */
   const landOnBlank = () => {
     setLanded(true);
-    moments.celebrate();
     fire('burst', { x: 50, y: 30 });
     setCelebration((n) => n + 1);
-    moments.say(word, CELEBRATION_SPEECH_MS);
+    moments.celebrateThenSay(word); // the fanfare, then the word read aloud once it has finished
   };
 
   /** from the chosen letter's button to the blank, measured in the question's own box */

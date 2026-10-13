@@ -13,7 +13,8 @@ import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
 import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
 import { FlyingTile, type Flight } from '../../../moments/FlyingTile';
-import { StarBurst } from '../../../moments/StarBurst';
+import { CharacterReveal } from '../../../moments/CharacterReveal';
+import { useMoments } from '../../../moments/useMoments';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
@@ -27,11 +28,19 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
   const { content, level, reducedMotion } = usePlayLab();
   const { speak, sfx, sayLetterSound } = useSpeech();
+  const moments = useMoments();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
 
   const [tiles, setTiles] = useState<MagicTile[]>(() => buildMagicTiles(word.id, target, level));
   const [slots, setSlots] = useState<MagicSlots>(() => emptyMagicSlots(target.length));
+  // The latest slots, updated the moment a letter is committed. Two letters typed or tapped in the same frame read this,
+  // not the stale render's slots, so a second letter can never land on a slot the first one just filled.
+  const slotsRef = useRef(slots);
+  const commitSlots = (next: MagicSlots) => {
+    slotsRef.current = next;
+    setSlots(next);
+  };
   const [selected, setSelected] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const [fresh, setFresh] = useState<number | null>(null);
@@ -92,18 +101,18 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       freshTimer.current = setTimeout(() => setFresh(null), 1200);
       if (last) {
         fire('burst', { x: 50, y: 42 });
-        sfx('celebrate');
         // the picture of the word hops out of its frame, a little star burst marks it: connected to the word, and
         // nothing waits for it (Next word is already there)
         if (!reducedMotion) void animal.start({ y: [0, -28, 0, -12, 0], rotate: [0, -8, 8, -4, 0], scale: [1, 1.14, 1, 1.06, 1], transition: { duration: 0.9, ease: 'easeOut' } });
         setReveal((n) => n + 1);
+        // the fanfare first, then the spoken cheer once it has finished (the duration comes from the sound itself)
         clearTimeout(speechTimer.current);
-        speechTimer.current = setTimeout(() => void speak(`Hooray! You spelled ${word.text}!`), 450); // after the fanfare
+        moments.celebrateThenSay(`Hooray! You spelled ${word.text}!`);
       } else {
         sfx('chime');
       }
     },
-    [target.length, fire, sfx, speak, word.text, reducedMotion, animal],
+    [target.length, fire, sfx, moments, word.text, reducedMotion, animal],
   );
 
   const onFlightLand = useCallback(
@@ -142,9 +151,9 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       if (done) return;
       const tile = tiles.find((t) => t.id === tileId);
       if (!tile) return;
-      const result = tryPlace(target, slots, tiles, tileId, slotIndex);
+      const result = tryPlace(target, slotsRef.current, tiles, tileId, slotIndex);
       if (result.kind === 'placed') {
-        setSlots(result.slots);
+        commitSlots(result.slots);
         setSelected(null);
         setMissed(false);
         if (isMagicDone(result.slots)) round.submit(word.text, word.text, true);
@@ -160,7 +169,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
         setSelected(null);
       }
     },
-    [done, tiles, target, slots, round, word.text, reducedMotion, land, miss],
+    [done, tiles, target, round, word.text, reducedMotion, land, miss],
   );
 
   const tapTile = (tileId: string) => {
@@ -202,25 +211,27 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const value = e.key.toLowerCase();
-      const tile = tiles.find((x) => x.value === value && !isTilePlaced(slots, x.id));
+      const now = slotsRef.current;
+      const tile = tiles.find((x) => x.value === value && !isTilePlaced(now, x.id));
       if (!tile) return;
-      const idx = slotFor(target, slots, value);
+      const idx = slotFor(target, now, value);
       if (idx === null) miss(tile, null);
       else attempt(tile.id, idx);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tiles, slots, target, done, attempt, miss]);
+  }, [tiles, target, done, attempt, miss]);
 
   const startAgain = () => {
     clearTimeout(speechTimer.current); // nothing from the old word may speak over the new one
+    moments.cancelSpeech();
     generation.current += 1; // flights still in the air belong to the old round
     landedRef.current = new Set();
     setLanded(new Set());
     setFlights([]);
     setGrand(null);
     setTiles(buildMagicTiles(word.id, target, level));
-    setSlots(emptyMagicSlots(target.length));
+    commitSlots(emptyMagicSlots(target.length));
     setSelected(null);
     setMissed(false);
     setFresh(null);
@@ -248,7 +259,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             <motion.button type="button" onClick={wiggleAnimal} animate={animal} aria-label={complete ? word.text : 'Picture clue. Tap to wiggle it'} className="grid h-full w-full place-items-center rounded-[1.6rem]">
               <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
             </motion.button>
-            {reveal > 0 && !reducedMotion ? <StarBurst key={reveal} seed={reveal + 3} count={12} spread={84} /> : null}
+            {/* Pip hops in on the picture's corner once the word is finished, with a little burst (beside, never on, the letters) */}
+            <CharacterReveal trigger={reveal} className="-right-5 -top-6 h-16 w-16 sm:h-20 sm:w-20" />
             <span aria-hidden="true" className="pl-twinkle absolute -right-3 -top-3 text-2xl text-sun-500">✦</span>
             <span aria-hidden="true" className="pl-twinkle absolute -bottom-2 -left-3 text-xl text-brand-400" style={{ animationDelay: '1.2s' }}>✦</span>
           </motion.span>
