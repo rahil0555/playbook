@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { Button } from '../../../components/Button';
 import { CelebrationEffect, useBurst } from '../../../components/CelebrationEffect';
@@ -15,6 +15,7 @@ import type { WordEntry } from '../../../types/learning';
 import { FlyingLetter, type Flight } from './FlyingLetter';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
+import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
 import type { Pose } from './flightPath';
 import { OutlineSlot } from './OutlineSlot';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
@@ -23,8 +24,8 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
-  const { level, reducedMotion } = usePlayLab();
-  const { speak, sfx } = useSpeech();
+  const { content, level, reducedMotion } = usePlayLab();
+  const { speak, sfx, sayLetterSound } = useSpeech();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
 
@@ -45,7 +46,18 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const generation = useRef(0);
   const scene = useRef<HTMLDivElement>(null);
   const freshTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(freshTimer.current), []);
+  /** the spoken phonics sound / the spoken cheer: scheduled a moment after the pop or chime, so they never overlap */
+  const speechTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [phonicsGate] = useState(() => createRepeatGate(PHONICS_GAP_MS));
+  const [picks, setPicks] = useState(0);
+  const animal = useAnimationControls();
+  useEffect(
+    () => () => {
+      clearTimeout(freshTimer.current);
+      clearTimeout(speechTimer.current);
+    },
+    [],
+  );
 
   const done = isMagicDone(slots);
   /** every letter is in place AND has finished landing: now the word is "complete" */
@@ -77,10 +89,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       freshTimer.current = setTimeout(() => setFresh(null), 1200);
       if (last) {
         fire('burst', { x: 50, y: 42 });
-        sfx('correct');
-        void speak(`Hooray! You spelled ${word.text}!`);
+        sfx('celebrate');
+        clearTimeout(speechTimer.current);
+        speechTimer.current = setTimeout(() => void speak(`Hooray! You spelled ${word.text}!`), 450); // after the fanfare
       } else {
-        sfx('place');
+        sfx('chime');
       }
     },
     [target.length, fire, sfx, speak, word.text],
@@ -145,10 +158,26 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
   const tapTile = (tileId: string) => {
     if (done) return;
-    sfx('tap');
-    setSelected((s) => (s === tileId ? null : tileId));
+    // the pop itself is played by the tile (LooseLetter); here the picked-up letter's phonics sound is spoken
     const t = tiles.find((x) => x.id === tileId);
-    setAnnounce(selected === tileId ? 'Put the letter down.' : `${t?.value.toUpperCase()} picked up. Now choose a spot.`);
+    const picking = selected !== tileId;
+    setSelected((s) => (s === tileId ? null : tileId));
+    setPicks((n) => n + 1);
+    if (picking && t) {
+      const letter = content.letters.find((l) => l.id === t.value);
+      if (letter && phonicsGate.allow(t.value)) {
+        clearTimeout(speechTimer.current);
+        speechTimer.current = setTimeout(() => void sayLetterSound(letter), PHONICS_DELAY_MS);
+      }
+    }
+    setAnnounce(picking ? `${t?.value.toUpperCase()} picked up. Now choose a spot.` : 'Put the letter down.');
+  };
+  /** tapping the picture wiggles it like a little toy: it never says the word, so it cannot give the answer away */
+  const wiggleAnimal = () => {
+    sfx('boing');
+    if (!reducedMotion) {
+      void animal.start({ rotate: [0, -10, 8, -6, 3, 0], scale: [1, 1.1, 0.94, 1.04, 1], transition: { duration: 0.6, ease: 'easeInOut' } });
+    }
   };
   const tapSlot = (slotIndex: number) => {
     if (selected) attempt(selected, slotIndex);
@@ -177,6 +206,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   }, [tiles, slots, target, done, attempt, miss]);
 
   const startAgain = () => {
+    clearTimeout(speechTimer.current); // nothing from the old word may speak over the new one
     generation.current += 1; // flights still in the air belong to the old round
     landedRef.current = new Set();
     setLanded(new Set());
@@ -208,7 +238,9 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             transition={springs.bouncy}
             className="pl-frame relative grid h-24 w-24 shrink-0 place-items-center rounded-[1.8rem] sm:h-32 sm:w-32 md:h-44 md:w-44 md:rounded-[2.2rem]"
           >
-            <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
+            <motion.button type="button" onClick={wiggleAnimal} animate={animal} aria-label={complete ? word.text : 'Picture clue. Tap to wiggle it'} className="grid h-full w-full place-items-center rounded-[1.6rem]">
+              <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
+            </motion.button>
             <span aria-hidden="true" className="pl-twinkle absolute -right-3 -top-3 text-2xl text-sun-500">✦</span>
             <span aria-hidden="true" className="pl-twinkle absolute -bottom-2 -left-3 text-xl text-brand-400" style={{ animationDelay: '1.2s' }}>✦</span>
           </motion.span>
@@ -291,11 +323,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
                     Look for the glowing spot and the letter with a star.
                   </FeedbackMessage>
                 ) : selected ? (
-                  <FeedbackMessage key="picked" tone="info" mood="think" title="Nice pick!">
+                  <FeedbackMessage key="picked" tone="info" mood="think" nudge={picks} title="Nice pick!">
                     Now tap its glowing spot, or drag it there.
                   </FeedbackMessage>
                 ) : (
-                  <FeedbackMessage key="idle" tone="info" mood={mood} title="Spell the word!">
+                  <FeedbackMessage key="idle" tone="info" mood={mood} nudge={landed.size} title="Spell the word!">
                     Drag each letter onto its outline, or tap a letter and then tap a spot.
                   </FeedbackMessage>
                 )}

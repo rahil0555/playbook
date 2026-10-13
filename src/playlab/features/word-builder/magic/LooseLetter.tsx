@@ -1,6 +1,9 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion, useAnimationControls, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
+import { useSpeech } from '../../../hooks/useAudio';
+import { StarBurst } from './StarBurst';
+import { tapSoundGate } from './magicFeel';
 import { elementUnder } from '../../../lib/dom';
 import { springs } from '../../../motion/variants';
 import { parseTransform, type Pose } from './flightPath';
@@ -53,24 +56,38 @@ const slotAt = (info: PanInfo): number | null => {
  */
 export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop }: LooseLetterProps) {
   const { reducedMotion } = usePlayLab();
+  const { sfx } = useSpeech();
   const wobble = useAnimationControls();
   const jiggle = useAnimationControls();
+  /** changes on every pick-up, so the sparkle plays again each time (and only the latest one is kept in the DOM) */
+  const [sparkle, setSparkle] = useState(0);
   const dragging = useRef(false);
   const ref = useRef<HTMLButtonElement>(null);
   /** pointer → bubble-centre offset, taken when the drag starts (so the release point never depends on render timing) */
   const grab = useRef<{ dx: number; dy: number } | null>(null);
 
-  // Picked up: a quick playful jiggle with a little squash and stretch (skipped for reduced motion).
-  useEffect(() => {
-    if (!selected || reducedMotion) return;
-    void jiggle.start({
-      x: [0, -5, 5, -4, 3, 0],
-      rotate: [0, -7, 7, -5, 3, 0],
-      scaleX: [1, 1.1, 0.94, 1.05, 1],
-      scaleY: [1, 0.9, 1.07, 0.97, 1],
-      transition: { duration: 0.5, ease: 'easeInOut' },
-    });
-  }, [selected, reducedMotion, jiggle]);
+  /**
+   * The touch response, started straight from the tap (not after a re-render) so it feels instant:
+   * a playful jelly wiggle with squash and stretch, a short pop sound and a tiny sparkle. Reduced motion keeps the
+   * sound and drops the movement. Rapid taps share one short pop, so they never stack into noise.
+   */
+  const feelTap = () => {
+    if (!selected) {
+      if (tapSoundGate.allow('tap')) sfx('boing');
+      if (!reducedMotion) {
+        void jiggle.start({
+          x: [0, -6, 6, -4, 3, 0],
+          rotate: [0, -9, 8, -5, 3, 0],
+          scaleX: [0.9, 1.12, 0.95, 1.04, 1],
+          scaleY: [1.08, 0.9, 1.05, 0.98, 1],
+          transition: { duration: 0.46, ease: 'easeOut' },
+        });
+        setSparkle((n) => n + 1);
+      }
+    } else if (tapSoundGate.allow('tap')) {
+      sfx('pop');
+    }
+  };
 
   useEffect(() => {
     if (wobbleKey > 0) void wobble.start({ rotate: [0, -12, 10, -6, 3, 0], x: [0, -6, 6, -3, 2, 0], transition: { duration: 0.55, ease: 'easeInOut' } });
@@ -108,11 +125,14 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         setTimeout(() => (dragging.current = false), 0); // swallow the click that follows pointer-up
       }}
       onClick={() => {
-        if (!dragging.current) onTap(tile.id);
+        if (dragging.current) return;
+        feelTap();
+        onTap(tile.id);
       }}
       className="pl-draggable pl-gem relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:text-[3.2rem]"
       style={{ '--gem': color } as CSSProperties}
     >
+      {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
       {/* selected / hinted ring (a separate layer, so the tile keeps its glossy shadow) */}
       <span
         aria-hidden="true"

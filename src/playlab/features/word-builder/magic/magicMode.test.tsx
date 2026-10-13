@@ -194,7 +194,7 @@ describe('Magic Letters: a whole round', () => {
       expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(w.length);
       typeWord(w);
       expect(await screen.findByText(/You spelled/, {}, { timeout: 4000 })).toBeInTheDocument();
-      expect(audioLog.at(-1)?.text).toContain(w); // the word is read aloud, with a cheer
+      await vi.waitFor(() => expect(audioLog.at(-1)?.text ?? '').toContain(w), { timeout: 2000 }); // read aloud after the celebration sound
       await user.click(screen.getByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }));
     }
     expect(await screen.findByRole('region', { name: 'Amazing!' })).toBeInTheDocument();

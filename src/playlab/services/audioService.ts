@@ -27,7 +27,8 @@ export const SPEECH_STYLE = {
 } as const;
 
 export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error';
-export type SfxName = 'tap' | 'pop' | 'place' | 'correct' | 'oops' | 'celebrate';
+/** 'boing' = a soft playful pop when a tile is picked up; 'chime' = a gentle landing; 'sparkle' = a tiny shimmer. */
+export type SfxName = 'tap' | 'pop' | 'place' | 'correct' | 'oops' | 'celebrate' | 'boing' | 'chime' | 'sparkle';
 
 export interface PlayRequest {
   text: string;
@@ -104,6 +105,9 @@ const NOTES: Record<SfxName, { freq: number; at: number; dur: number; type?: Osc
     { freq: 784, at: 0.2, dur: 0.2 },
   ],
   oops: [{ freq: 247, at: 0, dur: 0.14, type: 'sine', gain: 0.05 }, { freq: 196, at: 0.12, dur: 0.18, type: 'sine', gain: 0.05 }],
+  boing: [{ freq: 392, at: 0, dur: 0.14, type: 'sine', gain: 0.07 }, { freq: 784, at: 0.035, dur: 0.1, type: 'sine', gain: 0.035 }],
+  chime: [{ freq: 880, at: 0, dur: 0.28, type: 'sine', gain: 0.06 }, { freq: 1318, at: 0.07, dur: 0.32, type: 'sine', gain: 0.04 }],
+  sparkle: [{ freq: 1568, at: 0, dur: 0.07, type: 'triangle', gain: 0.035 }, { freq: 2093, at: 0.05, dur: 0.1, type: 'triangle', gain: 0.03 }],
   celebrate: [
     { freq: 523, at: 0, dur: 0.12 },
     { freq: 659, at: 0.1, dur: 0.12 },

@@ -103,6 +103,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  // the notice is information, not a task: it fades away by itself after a while (and can always be dismissed)
+  useEffect(() => {
+    if (!unavailable || noticeDismissed) return;
+    const t = setTimeout(() => setNoticeDismissed(true), 9000);
+    return () => clearTimeout(t);
+  }, [unavailable, noticeDismissed]);
   const prevView = useRef(view);
 
   // After navigating, move focus to the new screen (screen readers + keyboard users) and scroll it into view.
@@ -149,7 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {unavailable && !noticeDismissed ? (
-        <div role="status" className="mb-4 flex items-start gap-3 rounded-3xl border-2 border-sky-300 bg-sky-100 p-3 text-[0.98rem]">
+        <div role="status" className="fixed inset-x-3 bottom-3 z-[55] mx-auto flex max-w-md items-start gap-3 rounded-3xl border-2 border-sky-300 bg-sky-100 p-3 text-[0.98rem] shadow-[0_18px_36px_-14px_rgba(18,49,44,0.5)]">
           <Icon name="speaker-off" className="mt-0.5 shrink-0 text-sky-700" />
           <p className="flex-1">
             Sound isn’t available on this device or browser right now. You can still play: look at the pictures and letters! Voices depend on your browser and installed voices.
