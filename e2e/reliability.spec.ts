@@ -63,7 +63,8 @@ test.describe('nothing is spoken on its own', () => {
     await page.locator('[data-tile], [data-option]').first().waitFor();
     await page.waitForTimeout(500);
     let arranged: { words: string[]; punctuation: string } | undefined;
-    if ((await page.locator('[data-option]').count()) > 0) {
+    // the sentences come in a random order: solve any fill-in questions first, until an arrange question is on screen
+    for (let i = 0; i < 6 && (await page.locator('[data-option]').count()) > 0; i++) {
       const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
       const fill = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string))!;
       await page.locator(`[data-option="${fill.words[fill.blankIndex!]}"]`).click();
@@ -199,13 +200,13 @@ test.describe('the sound message never blocks the controls', () => {
     await expect(page.getByText(/You spelled/)).toBeVisible();
     // no speech on this device: the message appears after the first attempt
     await page.getByRole('button', { name: 'Hear the clue' }).click();
-    await expect(page.getByRole('status').filter({ hasText: /Spoken words|Sound isn/ })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /no spoken voice|Spoken words/ })).toBeVisible();
     const next = page.getByRole('button', { name: /^(Next word|Finish)$/ });
     // on a short phone the button can be below the fold: scroll to it the way a child would, then compare the boxes
     await next.scrollIntoViewIfNeeded();
     const boxes = await page.evaluate(() => {
       const n = [...document.querySelectorAll('button')].find((b) => /^(Next word|Finish)$/.test(b.textContent?.trim() ?? ''))!;
-      const s = [...document.querySelectorAll('[role="status"]')].find((el) => /Spoken words|Sound isn/.test(el.textContent ?? ''));
+      const s = [...document.querySelectorAll('[role="status"]')].find((el) => /no spoken voice|Spoken words|Sound can’t play/.test(el.textContent ?? ''));
       const a = n.getBoundingClientRect();
       const b = s!.getBoundingClientRect();
       const overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
