@@ -4,6 +4,12 @@ import { listEnglishVoices, type VoiceLike } from '../services/voiceCatalog';
 /** Every request that reached the (fake) audio service, in order. */
 export const audioLog: PlayRequest[] = [];
 export const sfxLog: string[] = [];
+/**
+ * Everything the audio made, with the time (performance.now) it happened: a sound effect, a line said, or a stop.
+ * Timing tests read this, so they can check what came first and how far apart.
+ */
+export const timeline: { t: number; kind: 'sfx' | 'say' | 'stop'; what: string }[] = [];
+const note = (kind: 'sfx' | 'say' | 'stop', what: string) => timeline.push({ t: performance.now(), kind, what });
 /** Ids passed to setVoice, in order. */
 export const voiceLog: (string | null)[] = [];
 
@@ -35,13 +41,16 @@ export function createFakeAudio(): AudioService {
   return {
     play: async (req) => {
       audioLog.push(req);
+      note('say', req.text);
       return snapshot.muted ? 'muted' : 'played';
     },
     playSequence: async (reqs) => {
       audioLog.push(...reqs);
+      reqs.forEach((r) => note('say', r.text));
       return 'played';
     },
     stop: () => {
+      note('stop', '');
       waiting.forEach((t) => clearTimeout(t));
       waiting.clear();
     },
@@ -49,6 +58,7 @@ export function createFakeAudio(): AudioService {
       const t = setTimeout(() => {
         waiting.delete(t);
         audioLog.push(req);
+        note('say', req.text);
       }, delayMs);
       waiting.add(t);
       return () => {
@@ -58,6 +68,7 @@ export function createFakeAudio(): AudioService {
     },
     sfx: (name) => {
       sfxLog.push(name);
+      note('sfx', name);
     },
     setMuted: (m) => set({ muted: m }),
     setVoice: (id) => {

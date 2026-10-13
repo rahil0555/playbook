@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { audioLog, sfxLog } from '../../../test/fakeAudio';
+import { audioLog, sfxLog, timeline } from '../../../test/fakeAudio';
 import { renderPlayLab } from '../../../test/utils';
 
 // A fixed round that starts with PIG, so the sound checks are about concrete letters (P: name "pee", sound "puh").
@@ -57,18 +57,43 @@ describe('Magic Letters feel: tapping a tile', () => {
     expect(document.body.textContent?.toLowerCase()).not.toContain('pig.'); // the word is not written out either
   });
 
-  it('a finished word plays the celebration and speaks "Hooray!" after it, not on top of it', async () => {
+  it('a finished word plays the fanfare on the landing, and "Hooray!" follows its first note, not the whole fanfare', async () => {
     const { user } = await openPig();
     await user.click(realTile('p'));
     await user.click(slot(0));
     await user.click(realTile('i'));
     await user.click(slot(1));
     await user.click(realTile('g'));
+    const drop = performance.now();
     await user.click(slot(2));
-    // the last letter sparkles at the drop; the fanfare waits for Pip to land on the word
+    // the last letter sparkles at the drop; the fanfare waits for Pip to land on the word (after its ~480 ms hop)
     expect(sfxLog).toContain('sparkle');
     expect(sfxLog).not.toContain('celebrate');
-    await vi.waitFor(() => expect(sfxLog).toContain('celebrate'), { timeout: 2000 });
-    await vi.waitFor(() => expect(spokenTexts().some((t) => t.startsWith('Hooray! You spelled pig'))).toBe(true), { timeout: 2000 });
+    await vi.waitFor(() => expect(timeline.some((e) => e.kind === 'say' && e.what.startsWith('Hooray! You spelled pig'))).toBe(true), { timeout: 2000 });
+    const fanfare = timeline.find((e) => e.kind === 'sfx' && e.what === 'celebrate')!;
+    const cheer = timeline.find((e) => e.kind === 'say' && e.what.startsWith('Hooray! You spelled pig'))!;
+    expect(fanfare.t - drop, 'the fanfare waits for the landing').toBeGreaterThanOrEqual(400);
+    expect(cheer.t - fanfare.t, 'the cheer starts after the first note, while the fanfare is still playing').toBeGreaterThanOrEqual(100);
+    expect(cheer.t - fanfare.t, 'and well before the fanfare has finished (600 ms)').toBeLessThan(400);
+  });
+
+  it('a restarted word speaks nothing from the first attempt, and finishing it gives exactly one cheer', async () => {
+    const { user } = await openPig();
+    await user.click(realTile('g'));
+    await user.click(slot(0)); // G does not go on the empty P spot: the retry message appears
+    await user.click(await screen.findByRole('button', { name: 'Start this word again' }));
+    expect(timeline.some((e) => e.kind === 'stop'), 'restarting stops speech already being said').toBe(true);
+    const cheersBefore = timeline.filter((e) => e.kind === 'say' && e.what.startsWith('Hooray')).length;
+    expect(cheersBefore).toBe(0);
+    // now finish the word from the beginning, quickly
+    await user.click(realTile('p'));
+    await user.click(slot(0));
+    await user.click(realTile('i'));
+    await user.click(slot(1));
+    await user.click(realTile('g'));
+    await user.click(slot(2));
+    await vi.waitFor(() => expect(timeline.some((e) => e.kind === 'say' && e.what.startsWith('Hooray'))).toBe(true), { timeout: 2000 });
+    await new Promise((r) => setTimeout(r, 400)); // long enough for any duplicate cheer to be queued and said
+    expect(timeline.filter((e) => e.kind === 'say' && e.what.startsWith('Hooray')), 'one cheer for the one completion').toHaveLength(1);
   });
 });

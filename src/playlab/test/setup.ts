@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import { audioLog, createFakeAudio, sfxLog } from './fakeAudio';
+import { audioLog, createFakeAudio, sfxLog, timeline } from './fakeAudio';
 
 // Component tests never touch real speech synthesis; audioService.test.ts imports the real module explicitly.
 vi.mock('../services/audioService', async (importOriginal) => ({
@@ -12,6 +12,7 @@ vi.mock('../services/audioService', async (importOriginal) => ({
 beforeEach(() => {
   audioLog.length = 0;
   sfxLog.length = 0;
+  timeline.length = 0;
   window.localStorage.clear();
 });
 afterEach(() => cleanup());

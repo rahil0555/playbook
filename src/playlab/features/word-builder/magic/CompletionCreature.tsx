@@ -14,14 +14,14 @@ interface CompletionCreatureProps {
   /** the perch on the word: a fixed, empty box above the letters that Pip sits in (measured to plan the hop) */
   perchRef: RefObject<HTMLSpanElement>;
   reducedMotion: boolean;
-  /** called the moment Pip lands on the word: the fanfare, the spoken cheer and the letters' gold finish start here */
+  /** called the moment Pip lands on the word: the fanfare and the letters' gold finish start here; the cheer follows its first note */
   onLand: () => void;
 }
 
 /**
  * Pip, the existing mascot, hops off the picture and lands on the completed word, sitting above the letters (never on
  * them). Landing = a squash, a green ring and a burst of stars. Reduced motion: Pip fades in on the word with no hop and
- * no burst; the landing sound and the spoken cheer still come at the same moment.
+ * no burst; the landing sound comes at the same moment, and the spoken cheer follows it.
  */
 export function CompletionCreature({ trigger, from, perchRef, reducedMotion, onLand }: CompletionCreatureProps) {
   const body = useAnimationControls();

@@ -189,7 +189,7 @@ for (const [device, viewport] of [
       const lastLetterAt = await page.evaluate(() => performance.now());
       await page.keyboard.press(word.text.at(-1)!);
       await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 8000 });
-      // Pip has landed on the word once the cheer is spoken: it sits above the letters, and covers no letter and no control
+      // Pip has landed on the word by the time the cheer is spoken: it sits above the letters, and covers no letter and no control
       await expect.poll(async () => (await speech(page)).some((x) => x.text.startsWith('Hooray! You spelled')), { timeout: 3000 }).toBe(true);
       const geometry = await page.evaluate(() => {
         const creature = document.querySelector('[data-testid="completion-creature"]')!.getBoundingClientRect();
@@ -210,7 +210,9 @@ for (const [device, viewport] of [
       expect(fanfare, 'a fanfare plays').toBeTruthy();
       expect(fanfare!.t - lastLetterAt, 'the fanfare waits for Pip to land on the word').toBeGreaterThanOrEqual(400);
       const cheer = (await speech(page)).find((x) => x.text.startsWith('Hooray! You spelled'));
-      expect(cheer!.t - fanfare!.t, 'the cheer waits for the whole fanfare').toBeGreaterThanOrEqual(600);
+      expect(cheer!.t - fanfare!.t, 'the cheer starts after the fanfare\'s first note, during the celebration').toBeGreaterThanOrEqual(100);
+      expect(cheer!.t - fanfare!.t, 'and well before the fanfare has finished (600 ms)').toBeLessThan(400);
+      expect(cheer!.t - lastLetterAt, 'the cheer is asked for about a second after the last letter, not 1.5 s').toBeLessThan(1200);
       expect((await speech(page)).filter((x) => x.text.startsWith('Hooray')).length).toBe(1);
       // the child can carry on at once
       await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click({ timeout: 1000 });

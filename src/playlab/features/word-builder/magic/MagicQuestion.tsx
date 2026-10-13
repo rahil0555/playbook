@@ -27,7 +27,7 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
   const { content, level, reducedMotion } = usePlayLab();
-  const { speak, sfx, sayLetterSound } = useSpeech();
+  const { speak, sfx, sayLetterSound, stop } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
@@ -106,13 +106,16 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
   /**
    * Pip has landed on the word: one event. The letters take their gold finish, the strip shows a green ring, the
-   * confetti bursts, and the fanfare plays now with the spoken cheer after it. (Scheduled by Pip's hop in CompletionCreature.)
+   * confetti bursts, and the fanfare plays now. The spoken cheer follows the fanfare's first note, not the whole fanfare,
+   * so it is heard during the celebration. (Scheduled by Pip's hop in CompletionCreature.)
    */
   const onCreatureLand = useCallback(() => {
     setCelebrated(true);
     void stripRing.start({ opacity: [0, 0.95, 0], scale: [0.985, 1.015, 1.03], transition: { duration: 0.75, ease: 'easeOut' } });
     fire('burst', { x: 50, y: 30 });
-    moments.celebrateThenSay(`Hooray! You spelled ${word.text}!`);
+    moments.celebrate();
+    // say() replaces a cheer still waiting, so one landing can never queue two
+    moments.say(`Hooray! You spelled ${word.text}!`);
   }, [fire, moments, stripRing, word.text]);
 
   /** A letter has arrived visually: show it in its slot, and on the last one start the completion (Pip's hop, then the landing). */
@@ -249,7 +252,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
   const startAgain = () => {
     clearTimeout(speechTimer.current); // nothing from the old word may speak over the new one
-    moments.cancelSpeech();
+    moments.cancelSpeech(); // a line still waiting to be said
+    stop(); // and a line already being said (a cheer or a letter sound)
     setCreature((c) => ({ n: 0, from: c.from })); // Pip goes back to the picture's side of the board
     setCelebrated(false);
     setSplash(0);
