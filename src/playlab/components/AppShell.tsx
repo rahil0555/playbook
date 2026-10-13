@@ -99,7 +99,9 @@ const SCENES: Record<string, SceneName> = {
 /** Frame: header with simple navigation, audio notice, main content area, badge toast. */
 export function AppShell({ children }: { children: ReactNode }) {
   const { view, navigate, soundEnabled, setSoundEnabled, canExit, exit, learner } = usePlayLab();
-  const { unavailable } = useAudioStatus();
+  const { unavailable, voices, speechSupported } = useAudioStatus();
+  // Tell the truth about why: no voice on this device, or a voice that did not play this time (it may work next time)
+  const noVoice = !speechSupported || voices.length === 0;
   const { session } = useProgressState();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
@@ -158,7 +160,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           // tap pass through, so it never hides an answer or the Next button; only its own dismiss button takes a tap.
           <div role="status" className="pointer-events-none absolute right-3 top-full z-[55] mt-2 flex w-[min(16rem,calc(100%-1.5rem))] items-center gap-2 rounded-2xl border-2 border-sky-300 bg-sky-100/95 py-2 pl-3 pr-1.5 text-sm shadow-[0_12px_24px_-12px_rgba(18,49,44,0.45)]">
             <Icon name="speaker-off" size={18} className="shrink-0 text-sky-700" />
-            <p className="flex-1 leading-snug">Spoken words aren’t available on this device or browser. Sounds and pictures still work.</p>
+            <p className="flex-1 leading-snug">
+              {noVoice
+                ? 'This device has no spoken voice for this browser. Sounds and pictures still work.'
+                : 'Spoken words did not play just now. Sounds and pictures still work.'}
+            </p>
             <button type="button" aria-label="Dismiss sound message" onClick={() => setNoticeDismissed(true)} className="pointer-events-auto grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full hover:bg-black/5">
               <Icon name="close" size={18} />
             </button>

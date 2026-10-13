@@ -217,13 +217,13 @@ test.describe('the sound message never blocks the controls', () => {
     expect(boxes.hit, 'a tap on Next reaches Next').toBe(true);
   });
 
-  test('the message says that spoken words are unavailable (the sound effects still play)', async ({ page }) => {
+  test('the message says there is no spoken voice here (the sound effects still play)', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true });
     });
     await openMagic(page);
     await page.getByRole('button', { name: 'Hear the clue' }).click();
-    await expect(page.getByText(/Spoken words aren’t available/)).toBeVisible();
+    await expect(page.getByText(/no spoken voice for this browser/)).toBeVisible();
   });
 
   test('the dismiss button and the sound switch are at least 44 px high', async ({ page }) => {

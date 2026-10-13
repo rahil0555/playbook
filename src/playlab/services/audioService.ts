@@ -26,6 +26,13 @@ export const SPEECH_STYLE = {
   soundRate: 0.8,
 } as const;
 
+/**
+ * How long speech may take to START before we give up on it. Online (network) voices can take a couple of seconds to
+ * begin, so they get more time than the voices on the device.
+ */
+export const START_TIMEOUT_MS = 2500;
+export const ONLINE_START_TIMEOUT_MS = 6000;
+
 export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error';
 /** 'boing' = a soft playful pop when a tile is picked up; 'chime' = a gentle landing; 'sparkle' = a tiny shimmer. */
 export type SfxName = 'tap' | 'pop' | 'place' | 'correct' | 'oops' | 'celebrate' | 'boing' | 'chime' | 'sparkle';
@@ -142,6 +149,11 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   let token = 0; // bumped by stop() so queued sequence items are dropped
   /** lines waiting for their delay (see later()): stop() cancels them all */
   const waiting = new Set<ReturnType<typeof setTimeout>>();
+  /**
+   * Utterances the browser is still speaking. Kept referenced until they end: some browsers stop speaking, and never report
+   * the end, when the only reference to an utterance is garbage-collected mid-sentence.
+   */
+  const inFlight = new Set<SpeechSynthesisUtterance>();
 
   const set = (patch: Partial<AudioSnapshot>) => {
     const next = { ...snapshot, ...patch };
@@ -198,16 +210,22 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       let settled = false;
       const lang = req.lang ?? 'en-US';
       let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let utterance: SpeechSynthesisUtterance | null = null;
       const finish = (outcome: SpeakOutcome) => {
         if (settled) return;
         settled = true;
         if (watchdog) clearTimeout(watchdog);
+        if (utterance) inFlight.delete(utterance);
         set({ speaking: false });
         resolve(outcome);
       };
       try {
         synth.cancel();
+        // a paused engine accepts speak() and then says nothing, so it is resumed first
+        if (synth.paused) synth.resume();
         const u = new Utterance(req.text);
+        utterance = u;
+        inFlight.add(u);
         u.lang = lang;
         u.rate = req.rate ?? SPEECH_STYLE.rate;
         u.pitch = req.pitch ?? SPEECH_STYLE.pitch;
@@ -240,7 +258,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
             set({ unavailable: true });
             finish('unsupported');
           }
-        }, env.startTimeoutMs ?? 2500);
+        }, env.startTimeoutMs ?? (voice?.localService === false ? ONLINE_START_TIMEOUT_MS : START_TIMEOUT_MS));
         synth.speak(u);
       } catch {
         set({ unavailable: true });

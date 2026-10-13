@@ -143,7 +143,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
       <p className="mt-4 text-sm leading-snug text-ink-soft">
         Voices come from your browser and device, so they may sound different on each one.
-        {unavailable ? ' No voice is available right now.' : voiceName ? ` Current voice: ${voiceName}.` : ''} Language: {content.label}.
+        {unavailable ? ' The last spoken line did not play.' : voiceName ? ` Current voice: ${voiceName}.` : ''} Language: {content.label}.
       </p>
     </div>
   );

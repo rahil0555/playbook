@@ -64,8 +64,9 @@ Work through these on each device. Tick what works; write down anything that doe
 - [ ] Tap a letter on the first screen. You hear a sound. (Some browsers stay silent until the first tap: that is expected.)
 - [ ] Open **Settings** (gear icon, top right). The **Sound** switch turns sound off and on.
 - [ ] With Sound on, tap **Hear the clue** or a letter's name. Speech should start within about a second.
-- [ ] If you see a message that **spoken words aren’t available**, write down the device and browser. The pictures and
-      sound effects should still work, and the message should go away by itself after a few seconds.
+- [ ] If you see a message that **this device has no spoken voice for this browser**, write down the device and browser.
+      If you see **spoken words did not play just now**, tap **Hear the clue** again: the voice may just have been slow.
+      The pictures and sound effects should still work, and the message should go away by itself after a few seconds.
 - [ ] In **Settings → Voice**, check the list of voices. Choose one, tap **Preview voice**, and check it is different
       from the automatic voice. Then **Use this voice**.
 
