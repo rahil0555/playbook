@@ -85,7 +85,8 @@ export function WordSplash() {
     <span aria-hidden="true" data-testid="word-splash" className="pointer-events-none absolute inset-x-4 top-1/2 z-10 h-28 -translate-y-1/2">
       <motion.span
         initial={{ scale: 0.35, opacity: 0 }}
-        animate={{ scale: [0.35, 1.2], opacity: [0, 0.9, 0] }}
+        // it swells to 1.2 and settles back to 1, so it finishes inside the board (a stuck 1.2 would poke past its edge)
+        animate={{ scale: [0.35, 1.2, 1], opacity: [0, 0.9, 0] }}
         transition={{ duration: 0.75, ease: 'easeOut' }}
         className="absolute inset-0 block rounded-full"
         style={{ background: 'radial-gradient(ellipse at center, rgba(245,184,46,0.9) 0%, rgba(245,184,46,0.35) 45%, rgba(245,184,46,0) 72%)' }}
