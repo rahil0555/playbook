@@ -22,20 +22,21 @@ const TRAIL = [
   { lag: 0.21, opacity: 0.1, scale: 0.66 },
 ] as const;
 
-interface FlyingLetterProps {
+interface FlyingTileProps {
   flight: Flight;
   onLand: (flight: Flight) => void;
   onDone: (flight: Flight) => void;
 }
 
 /**
+ * A copy of a tile that flies from where it was to its slot. Shared by Magic Letters, Missing Letter and Sentence Fun.
  * The SAME bubble the child picked up, flying on its own layer from where it really was to its slot.
  * It is a copy of the tray bubble (same size, colours and letter), positioned over the scene.
  * It never blocks the pointer. When it arrives it hands over to the slot (`onLand`) and fades out
  * while the slot's own letter squashes in at exactly the same spot (`onDone` removes it).
  * Only transforms and opacity animate, so it stays on the compositor and causes no layout shift.
  */
-export function FlyingLetter({ flight, onLand, onDone }: FlyingLetterProps) {
+export function FlyingTile({ flight, onLand, onDone }: FlyingTileProps) {
   const { from, to, color, value, slotIndex } = flight;
   const start: Point = { x: from.cx, y: from.cy };
   const control = controlPoint(start, to, slotIndex);

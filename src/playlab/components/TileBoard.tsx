@@ -1,5 +1,7 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { LayoutGroup, motion, type PanInfo } from 'framer-motion';
+import { usePlayLab } from '../app/PlayLabContext';
+import { useMoments } from '../moments/useMoments';
 import { letterColor } from '../lib/accents';
 import { elementUnder } from '../lib/dom';
 import { isPlaced, type SlotState, type Slots, type Tile } from '../lib/tiles';
@@ -26,6 +28,11 @@ interface TileBoardProps {
   trailing?: ReactNode;
 }
 
+/** a tapped tile lifts for this long (the selection) before it travels to its slot */
+const PICK_UP_MS = 150;
+/** the landing chime waits for the tile to finish its glide */
+const GLIDE_MS = 420;
+
 const SIZE = {
   letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]', text: 'text-[2.6rem] sm:text-[3.2rem]' },
   word: { box: 'h-[3.75rem] min-w-[4.75rem] px-4 sm:h-[4.5rem] sm:px-6', text: 'text-[1.7rem] sm:text-[2.1rem]' },
@@ -46,12 +53,40 @@ function slotAt(info: PanInfo): number | null {
  * - tiles keep a stable "bay" in the tray, so nothing reflows while playing
  */
 export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, hintTileId, locked = false, kind, format = (v) => v, noun, trailing }: TileBoardProps) {
+  const { reducedMotion } = usePlayLab();
+  const moments = useMoments();
   const [over, setOver] = useState<number | null>(null);
+  /** tray tiles that are lifted right now (their selection), and where each one is travelling to */
+  const [lifting, setLifting] = useState<ReadonlySet<string>>(new Set());
+  const travelling = useRef(new Map<string, number>());
   const dragging = useRef(false);
   const size = SIZE[kind];
   const byId = new Map(tiles.map((t) => [t.id, t]));
 
+  /** Tap a tray tile: it lifts with a pop (the selection), then travels to the first free slot and lands with a chime. */
+  const pickUp = (tile: Tile) => {
+    // the same tile cannot be tapped twice; a different tile can be picked up while one is still travelling
+    if (locked || travelling.current.has(tile.id)) return;
+    const reserved = new Set(travelling.current.values());
+    const target = slots.findIndex((s, i) => s === null && !reserved.has(i));
+    if (target < 0) return;
+    travelling.current.set(tile.id, target);
+    setLifting((set) => new Set(set).add(tile.id));
+    moments.pop();
+    moments.after(() => {
+      travelling.current.delete(tile.id);
+      setLifting((set) => {
+        const next = new Set(set);
+        next.delete(tile.id);
+        return next;
+      });
+      onPlace(tile.id, target);
+      moments.after(() => moments.chime(), GLIDE_MS);
+    }, PICK_UP_MS);
+  };
+
   const renderTile = (tile: Tile, placedIn: number | null) => {
+    const isLifted = lifting.has(tile.id);
     const color = kind === 'letter' ? letterColor(tile.value.charCodeAt(0)) : (GEMS[Math.max(0, tiles.indexOf(tile)) % GEMS.length] as string);
     const isHint = hintTileId === tile.id;
     return (
@@ -59,7 +94,6 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
         key={tile.id}
         type="button"
         layoutId={`pl-tile-${tile.id}`}
-        transition={{ layout: springs.snappy }}
         disabled={locked}
         data-tile={tile.id}
         data-value={tile.value}
@@ -72,24 +106,34 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
         dragTransition={dragProps.dragTransition}
         whileDrag={dragProps.whileDrag}
         whileTap={{ scale: 0.92 }}
+        initial={placedIn !== null && !reducedMotion ? { scale: 0.55 } : false}
+        animate={
+          isLifted && !reducedMotion
+            ? { x: [0, -6, 6, -3, 0], y: [0, -8, -12, -10], scale: [1, 1.1, 0.96, 1.08], rotate: [0, -6, 5, -2, 0] }
+            : { x: 0, y: 0, scale: 1, rotate: 0 }
+        }
+        transition={isLifted ? { duration: 0.45, ease: 'easeOut', layout: springs.snappy } : { ...springs.bouncy, layout: springs.snappy }}
         onDragStart={() => {
           dragging.current = true;
+          if (placedIn === null) moments.pop();
         }}
         onDrag={(_, info) => setOver(slotAt(info))}
         onDragEnd={(_, info) => {
           const target = slotAt(info);
           setOver(null);
-          if (target !== null) onPlace(tile.id, target);
-          else if (placedIn !== null) onRemove(tile.id);
+          if (target !== null) {
+            onPlace(tile.id, target);
+            moments.chime();
+          } else if (placedIn !== null) onRemove(tile.id);
           // keep the flag until the click that follows pointer-up has been ignored
           setTimeout(() => (dragging.current = false), 0);
         }}
         onClick={() => {
           if (dragging.current) return;
           if (placedIn !== null) onRemove(tile.id);
-          else onPlace(tile.id);
+          else pickUp(tile);
         }}
-        className={`pl-draggable pl-gem relative z-10 inline-flex cursor-grab items-center justify-center rounded-[1.5rem] font-display font-bold leading-none active:cursor-grabbing ${size.box} ${size.text}`}
+        className={`pl-draggable pl-gem relative z-10 inline-flex cursor-grab items-center justify-center rounded-[1.5rem] font-display font-bold leading-none active:cursor-grabbing ${size.box} ${size.text} ${isLifted ? 'ring-4 ring-white' : ''}`}
         style={{ '--gem': color } as CSSProperties}
       >
         {isHint ? <span aria-hidden="true" className="pointer-events-none absolute -inset-1.5 rounded-[1.9rem] border-4 border-sky-300" /> : null}

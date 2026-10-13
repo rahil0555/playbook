@@ -9,10 +9,10 @@ Everything under **Executed** was actually run, in this repository (Node 22, Chr
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **193 tests in 22 files. Latest runs (2 consecutive, idle): 192 passed and 1 failed each time: the known timing-dependent alphabet "26 letters" test, which also fails on the commit before this change (see Known pre-existing failures).** New in this change: 10 tests for the touch feel (`magicFeel.test.ts`, `magicFeel.test.tsx`). |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **193 tests in 22 files. Final run for the Magic Moments change: 193 of 193 passed.** The alphabet "26 letters" test is timing-dependent: in this session it failed when run alone, both on this branch and on `1ee0718` (checked in a separate worktree), and passed in the final full run (see Known pre-existing failures). |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **101 tests; the latest full run passed 101 of 101.** New in this change: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **112 tests; the final full run passed 112 of 112.** New in the Magic Moments change: `e2e/moments.spec.ts` (11 tests, see the Magic Moments section). Earlier: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 
@@ -44,6 +44,27 @@ Added with the mode: **29 unit/component tests** and **21 e2e tests** (the 50 ne
 * **Two problems found and fixed along the way (both real):** (1) the "Sound isn't available" notice pushed the whole board down by 88 px about 2.5 s after the first spoken attempt on a browser without voices, which is a layout shift a child would see. The notice now floats over the page, fades away after 9 s, and can still be dismissed. (2) The picture button had no accessible name of its own, which the keyboard-focus check counts as an unnamed button; it now has an explicit label.
 * **Test problems fixed (not app bugs):** the rapid-tap test assumed six clicks happen inside the 1.4 s gap; Playwright clicks are slower than that, so the test now dispatches the six taps together. The jiggle test sampled the wrong element and then a sampler that browser scheduling starved; it now samples in the same task as the tap.
 * **Recordings** (headless Chromium, the same scripted play on the previous commit `eee8c87` and on this change): see the report accompanying this commit. Sound was not audible here: the timeline is the browser's own record of when each sound-effect oscillator started and each spoken request was made.
+
+### Magic Moments (touch feel across activities): what the tests cover
+
+Final checks for this change: `tsc -b` clean; `npm run build` and `npm run build:lib` succeed; unit **193 of 193** in the final run; e2e **112 of 112** in the final full run (`e2e/moments.spec.ts` 11 of 11 in its own runs).
+
+* `e2e/moments.spec.ts` (11, real Chromium; it records every sound-effect oscillator start and every spoken line in browser time):
+  * **Sentence Fun:** a tapped word shows the lifted ring at once, then travels into its slot, and its landing chime comes more than 300 ms after the pop; a finished sentence shows its key word and Next works at once; a double tap places a word once; two different words tapped back to back both land; sound off: nothing plays and the word still lands; reduced motion: the word still lands; a 390 px phone: a tapped word lands and the page does not scroll sideways.
+  * **Missing Letter:** the gap is empty before a choice and stays empty after a wrong choice; the right letter flies out (the flight marker and the still-empty gap are read in the same task) and the celebration sound plays; reduced motion: no flight, and the letter appears in the gap at once.
+  * **Letter–Picture matching:** selecting a card pops; a correct match chimes and draws the glowing line.
+  * **Magic Letters:** finishing a word throws the star burst from the picture frame, the picture's transform changes (the hop), and Next word is visible within 800 ms.
+  * **Spoken lines:** after a finished sentence, no two spoken lines start within 50 ms of each other.
+* **Real bugs these checks and runs found (all fixed):**
+  1. *Sentence Fun could lose a word on fast taps.* A tile's target slot is chosen when it is tapped, but it is committed about 150 ms later. A second tile could be committed into that slot in the gap before React re-rendered, and `placeTile` overwrites the slot's occupant, which sent the first word back to the tray with nothing left to tap ("Check my sentence" stayed disabled). `place` now uses the first free slot when the chosen one has been taken. This was seen once, in `playlab › sentences › a full round` during a full parallel run. The race needs a tap inside that gap, and I did not find a deterministic way to reproduce it. After the fix, that test passed alone, and one full run passed 112 of 112. That is evidence, not proof.
+  2. *The key-word reward crashed its animation.* It used a spring transition with three scale keyframes, which Motion rejects ("Only two keyframes currently supported with spring"). It now uses an ease-out tween. The unit suite caught it.
+  3. *Praise was lost when the child moved on quickly.* Moving to the next sentence within 450 ms unmounted the question and cancelled its pending spoken line, so one of the five praise lines in `sentences › a full round` went missing. `useMoments` now says a line that has already been decided on at once when its question goes; sounds and timers are still cancelled.
+  4. *Test helper.* The "Finish the sentence" heading appears only on fill-in questions, so `openArrangeSentence` now solves fill-ins on the way to a word-tile question, instead of reloading the page.
+* **Pre-existing or flaky, not from this change:**
+  * `Alphabet playground › selects each of the 26 letters…` (unit): fails when run alone on this branch and on `1ee0718`; passed in the final full run.
+  * `magic-animation › a wrong slot never receives the letter…` (e2e): failed once in a full parallel run; it passed alone and in a 12-test run with two workers. This change does not touch that path. Watch it.
+* **Not covered:** no unit test for `KeyWordReward` or `keyWordOf`; no hearing check (headless Chromium is silent); no check on real phones or with a screen reader; the Magic hop under reduced motion is gated in code but has no dedicated e2e assertion.
+* **Recordings:** four side-by-side clips, before (`1ee0718`) on the left and this change on the right, 390 × 844 headless Chromium, the same scripted play: Magic Letters word completion, Sentence Fun tap and place, matching a pair, Missing Letter completion. The clips have no sound. They are not committed to the repository.
 
 ### Rewards and hearts: what the tests cover
 

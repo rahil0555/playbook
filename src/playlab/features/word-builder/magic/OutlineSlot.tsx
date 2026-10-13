@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { wave } from '../../../motion/variants';
-import { StarBurst } from './StarBurst';
+import { StarBurst } from '../../../moments/StarBurst';
 
 interface OutlineSlotProps {
   index: number;

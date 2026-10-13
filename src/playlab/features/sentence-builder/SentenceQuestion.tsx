@@ -7,6 +7,8 @@ import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect'
 import { FeedbackMessage } from '../../components/FeedbackMessage';
 import { PronunciationControl } from '../../components/PronunciationControl';
 import { TileBoard } from '../../components/TileBoard';
+import { KeyWordReward, type Reward } from '../../moments/KeyWordReward';
+import { CELEBRATION_SPEECH_MS, useMoments } from '../../moments/useMoments';
 import { useSpeech } from '../../hooks/useAudio';
 import type { Round } from '../../hooks/useRound';
 import { Illustration } from '../../illustrations/Illustration';
@@ -23,6 +25,13 @@ import type { SentenceEntry } from '../../types/learning';
 type Status = 'building' | 'wrong' | 'solved';
 
 const fullText = (s: SentenceEntry) => `${s.words.join(' ')}${s.punctuation}`;
+
+/** The word a finished sentence highlights: the word that was missing, or the longest word (the first if tied). */
+export const keyWordOf = (s: SentenceEntry): string => {
+  if (s.mode === 'fill') return s.words[s.blankIndex ?? 0] ?? s.words[0] ?? '';
+  return s.words.reduce((best, w) => (w.length > best.length ? w : best), s.words[0] ?? '');
+};
+const REWARD_COLOURS = ['#e8573f', '#16a286', '#2f8fd8', '#8a5cc7', '#d9741c'] as const;
 
 const GEMS = ['#e8573f', '#16a286', '#2f8fd8', '#8a5cc7', '#d9741c'] as const;
 
@@ -58,13 +67,18 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
   const solved = status === 'solved';
   const text = fullText(sentence);
 
+  /** the key word, shown big for a moment over the picture (only words the child can already see) */
+  const [reward, setReward] = useState<Reward | null>(null);
+  const moments = useMoments();
+
   const succeed = useCallback(() => {
     setStatus('solved');
     fire('burst', { x: 50, y: 40 });
-    sfx('correct');
+    moments.celebrate();
+    setReward((r) => ({ id: (r?.id ?? 0) + 1, word: keyWordOf(sentence), color: REWARD_COLOURS[sentence.words.length % REWARD_COLOURS.length] as string }));
     void controls.start('correct');
-    void speak(text);
-  }, [controls, fire, sfx, speak, text]);
+    moments.say(text, CELEBRATION_SPEECH_MS); // the fanfare first, then the sentence read aloud
+  }, [controls, fire, moments, sentence, text]);
 
   const fail = useCallback(() => {
     sfx('oops');
@@ -75,7 +89,8 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
     <div className="pl-board relative rounded-[2.4rem] p-3 sm:p-6">
       <CelebrationEffect burst={burst} onDone={clear} />
       <div className="relative grid items-center gap-5 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-8">
-        <section aria-label="Picture" className="flex flex-col items-center gap-3 text-center">
+        <section aria-label="Picture" className="relative flex flex-col items-center gap-3 text-center">
+          <KeyWordReward reward={reward} className="rounded-5xl" />
           <StoryBook className="w-full max-w-[13rem]">
             <span className="grid aspect-square w-full place-items-center">
               <Illustration name={sentence.illustration} className="h-[78%] w-[78%]" />
@@ -135,8 +150,9 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
   };
   const place = (id: string, i?: number) => {
     if (solved) return;
-    sfx('place');
-    setSlots((s) => placeTile(s, id, i));
+    // the slot was chosen when the tile was picked up: if another word has taken it since, use the first free slot
+    // instead of overwriting that word (the sound and the glide are the tile board's)
+    setSlots((s) => placeTile(s, id, i !== undefined && (s[i] === null || s[i] === id) ? i : undefined));
     touched();
   };
   const remove = (id: string) => {
@@ -197,7 +213,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
             The sentence starts with “{target[0]}”.
           </FeedbackMessage>
         ) : (
-          <FeedbackMessage key="idle" tone="info" title={complete ? 'Ready to check?' : 'Let’s build it!'}>
+          <FeedbackMessage key="idle" tone="info" nudge={filledCount(slots)} title={complete ? 'Ready to check?' : 'Let’s build it!'}>
             {complete ? 'Press “Check my sentence” to see how it reads.' : 'Tap the words in order, or drag them into the glowing spots.'}
           </FeedbackMessage>
         )}
@@ -291,7 +307,7 @@ function FillQuestion({ sentence, round, solved, onSolved, onWrong, controls }: 
           );
         })}
       </ul>
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {showRetry ? (
           <FeedbackMessage
             key="retry"

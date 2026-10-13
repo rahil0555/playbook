@@ -12,11 +12,12 @@ import { letterColor } from '../../../lib/accents';
 import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
 import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
-import { FlyingLetter, type Flight } from './FlyingLetter';
+import { FlyingTile, type Flight } from '../../../moments/FlyingTile';
+import { StarBurst } from '../../../moments/StarBurst';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
-import type { Pose } from './flightPath';
+import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
 
@@ -50,6 +51,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const speechTimer = useRef<ReturnType<typeof setTimeout>>();
   const [phonicsGate] = useState(() => createRepeatGate(PHONICS_GAP_MS));
   const [picks, setPicks] = useState(0);
+  /** counts each completed word: the picture hops and a star burst marks it (see land) */
+  const [reveal, setReveal] = useState(0);
   const animal = useAnimationControls();
   useEffect(
     () => () => {
@@ -90,13 +93,17 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       if (last) {
         fire('burst', { x: 50, y: 42 });
         sfx('celebrate');
+        // the picture of the word hops out of its frame, a little star burst marks it: connected to the word, and
+        // nothing waits for it (Next word is already there)
+        if (!reducedMotion) void animal.start({ y: [0, -28, 0, -12, 0], rotate: [0, -8, 8, -4, 0], scale: [1, 1.14, 1, 1.06, 1], transition: { duration: 0.9, ease: 'easeOut' } });
+        setReveal((n) => n + 1);
         clearTimeout(speechTimer.current);
         speechTimer.current = setTimeout(() => void speak(`Hooray! You spelled ${word.text}!`), 450); // after the fanfare
       } else {
         sfx('chime');
       }
     },
-    [target.length, fire, sfx, speak, word.text],
+    [target.length, fire, sfx, speak, word.text, reducedMotion, animal],
   );
 
   const onFlightLand = useCallback(
@@ -227,7 +234,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     <div ref={scene} className="pl-board relative overflow-clip rounded-[2.4rem] p-3 sm:p-6">
       <CelebrationEffect burst={burst} onDone={clear} />
       {flights.map((f) => (
-        <FlyingLetter key={`${f.generation}-${f.id}`} flight={f} onLand={onFlightLand} onDone={onFlightDone} />
+        <FlyingTile key={`${f.generation}-${f.id}`} flight={f} onLand={onFlightLand} onDone={onFlightDone} />
       ))}
 
       <div className="relative grid items-center gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8">
@@ -241,6 +248,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             <motion.button type="button" onClick={wiggleAnimal} animate={animal} aria-label={complete ? word.text : 'Picture clue. Tap to wiggle it'} className="grid h-full w-full place-items-center rounded-[1.6rem]">
               <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
             </motion.button>
+            {reveal > 0 && !reducedMotion ? <StarBurst key={reveal} seed={reveal + 3} count={12} spread={84} /> : null}
             <span aria-hidden="true" className="pl-twinkle absolute -right-3 -top-3 text-2xl text-sun-500">✦</span>
             <span aria-hidden="true" className="pl-twinkle absolute -bottom-2 -left-3 text-xl text-brand-400" style={{ animationDelay: '1.2s' }}>✦</span>
           </motion.span>

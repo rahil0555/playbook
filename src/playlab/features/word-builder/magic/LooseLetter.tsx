@@ -2,11 +2,14 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion, useAnimationControls, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { useSpeech } from '../../../hooks/useAudio';
-import { StarBurst } from './StarBurst';
+import { StarBurst } from '../../../moments/StarBurst';
 import { tapSoundGate } from './magicFeel';
 import { elementUnder } from '../../../lib/dom';
 import { springs } from '../../../motion/variants';
-import { parseTransform, type Pose } from './flightPath';
+import { measurePose, type Pose } from '../../../moments/flightPath';
+
+/** kept under its old name for Magic Letters: where a tile is right now */
+export const measureTile = measurePose;
 import type { MagicTile } from './magicBoard';
 
 interface LooseLetterProps {
@@ -23,18 +26,6 @@ interface LooseLetterProps {
   onHover: (slot: number | null) => void;
   /** pointer released; slot under it or null, plus where the bubble was when let go (viewport coordinates) */
   onDrop: (tileId: string, slot: number | null, pose: Pose | null) => void;
-}
-
-/** Where a bubble is right now (viewport coordinates), including any drag offset, scale and tilt. */
-export function measureTile(el: Element | null): Pose | null {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  const html = el as HTMLElement;
-  const w = html.offsetWidth;
-  const h = html.offsetHeight;
-  if (!w || !h) return null;
-  const { scale, rot } = parseTransform(getComputedStyle(el).transform);
-  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w, h, scale, rot };
 }
 
 /** Where the bubble was when let go: the pointer position plus the grab offset, with the scale/tilt it had. */

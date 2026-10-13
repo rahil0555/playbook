@@ -15,8 +15,11 @@ vi.mock('../../lib/random', async (importOriginal) => {
 
 type User = ReturnType<typeof renderPlayLab>['user'];
 const word = (w: string) => screen.getByRole('button', { name: new RegExp(`^word ${w}\\.`) });
+/** words currently sitting in an answer slot (a tapped word first lifts, then travels, so placement is a moment later) */
+const placed = () => document.querySelectorAll('[data-slot] [data-tile]').length;
 const arrange = async (user: User, words: string[]) => {
   for (const w of words) await user.click(word(w));
+  await vi.waitFor(() => expect(placed()).toBe(words.length), { timeout: 2000 });
 };
 
 describe('Sentence builder', () => {
@@ -35,10 +38,11 @@ describe('Sentence builder', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await user.click(word('The'));
     await user.click(word('cat'));
+    await vi.waitFor(() => expect(check).toBeEnabled(), { timeout: 2000 });
     await user.click(check);
     expect(await screen.findByText('You made a whole sentence!')).toBeInTheDocument();
     expect(screen.getByLabelText('The cat is sleeping.')).toBeInTheDocument();
-    expect(audioLog.at(-1)?.text).toBe('The cat is sleeping.'); // read aloud on success
+    await vi.waitFor(() => expect(audioLog.at(-1)?.text).toBe('The cat is sleeping.'), { timeout: 2000 }); // read aloud after the fanfare
     expect(screen.getByRole('button', { name: 'Next sentence' })).toBeInTheDocument();
   });
 

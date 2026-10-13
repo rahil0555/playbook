@@ -74,7 +74,7 @@ describe('Sound to letter', () => {
     await user.click(await screen.findByText('Sound ↔ Letter'));
     await screen.findByText('Pairs matched: 0 of 5');
     await user.click(cards('left')[0]!);
-    expect(audioLog.at(-1)?.text).toMatch(/^[a-z]+$/);
+    await vi.waitFor(() => expect(audioLog.at(-1)?.text ?? '').toMatch(/^[a-z]+$/), { timeout: 1000 }); // the sound follows the pop
     await user.click(cards('left')[0]!); // deselect
     await solvePairs(user);
     expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 3000 })).toBeInTheDocument();

@@ -69,3 +69,15 @@ export function parseTransform(transform: string): { scale: number; rot: number 
   if (![a, b].every(Number.isFinite)) return { scale: 1, rot: 0 };
   return { scale: Math.hypot(a, b) || 1, rot: (Math.atan2(b, a) * 180) / Math.PI };
 }
+
+/** Where an element is right now (viewport coordinates), including any transform: centre, layout size, scale and tilt. */
+export function measurePose(el: Element | null): Pose | null {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  const html = el as HTMLElement;
+  const w = html.offsetWidth;
+  const h = html.offsetHeight;
+  if (!w || !h) return null;
+  const { scale, rot } = parseTransform(getComputedStyle(el).transform);
+  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w, h, scale, rot };
+}

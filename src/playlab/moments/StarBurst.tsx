@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { usePlayLab } from '../../../app/PlayLabContext';
-import { burstParticles } from '../../../motion/variants';
+import { usePlayLab } from '../app/PlayLabContext';
+import { burstParticles } from '../motion/variants';
 
 /**
  * A small, subtle star burst (8 particles; a few more for the last letter) centred on its parent. Parent must be `relative`.
@@ -11,7 +11,7 @@ export function StarBurst({ seed = 1, count = 8, spread = 54 }: { seed?: number;
   if (reducedMotion) return null;
   const particles = burstParticles(count, spread, seed);
   return (
-    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-20">
+    <span aria-hidden="true" data-testid="star-burst" className="pointer-events-none absolute left-1/2 top-1/2 z-20">
       {particles.map((p) => (
         <motion.svg
           key={p.id}

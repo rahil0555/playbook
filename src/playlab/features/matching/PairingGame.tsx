@@ -8,6 +8,7 @@ import { PairingBoard, type PairItem } from '../../components/PairingBoard';
 import { ProgressIndicator } from '../../components/ProgressIndicator';
 import { RoundSummary } from '../../components/RoundSummary';
 import { useSpeech } from '../../hooks/useAudio';
+import { SPEECH_AFTER_SOUND_MS, useMoments } from '../../moments/useMoments';
 import { Illustration } from '../../illustrations/Illustration';
 import { letterColor } from '../../lib/accents';
 import { pairCount } from '../../lib/level';
@@ -44,6 +45,7 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   const { content, level, recordStart, recordAnswer, recordCompletion } = usePlayLab();
   const { sayLetterSound, sayWord, sfx } = useSpeech();
   const { burst, fire, clear } = useBurst();
+  const moments = useMoments();
   const total = pairCount(level);
 
   const [letters, setLetters] = useState(() => pickLetters(content.letters, total));
@@ -67,7 +69,7 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   const { left, right } = useMemo(() => {
     const leftItems: PairItem[] =
       variant === 'letter-picture'
-        ? letters.map((l, i) => ({ id: `L-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => sfx('tap') }))
+        ? letters.map((l, i) => ({ id: `L-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => moments.pop() }))
         : letters.map((l, i) => ({
             id: `S-${l.id}`,
             pairId: l.id,
@@ -78,7 +80,10 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
               </span>
             ),
             tone: '#2f8fd8',
-            onActivate: () => void sayLetterSound(l),
+            onActivate: () => {
+              moments.pop();
+              moments.after(() => void sayLetterSound(l), SPEECH_AFTER_SOUND_MS); // the pop first, then the sound
+            },
           }));
     const rightItems: PairItem[] =
       variant === 'letter-picture'
@@ -92,12 +97,15 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
                 <span className="text-lg sm:text-xl">{l.word.text}</span>
               </span>
             ),
-            onActivate: () => void sayWord(l.word.text, l.audio?.word),
+            onActivate: () => {
+              moments.pop();
+              moments.after(() => void sayWord(l.word.text, l.audio?.word), SPEECH_AFTER_SOUND_MS);
+            },
           }))
-        : letters.map((l, i) => ({ id: `T-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => sfx('tap') }));
+        : letters.map((l, i) => ({ id: `T-${l.id}`, pairId: l.id, label: `Letter ${l.upper}`, content: letterCard(l), tone: letterTone(l, i), onActivate: () => moments.pop() }));
     // shuffle each column independently so rows never line up with the answer
     return { left: shuffle(leftItems), right: shuffle(rightItems) };
-  }, [letters, variant, sayLetterSound, sayWord, sfx]);
+  }, [letters, variant, sayLetterSound, sayWord, moments]);
 
   const finish = useCallback(() => {
     const score = firstTry.current;
@@ -122,7 +130,7 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
     recordAnswer({ activityId: 'matching', questionId: `${variant}:${l.pairId}`, correct: ok, attempt: n, response: r.pairId, expected: l.pairId });
     if (ok) {
       if (n === 1) firstTry.current += 1;
-      sfx('correct');
+      moments.chime();
       fire('burst', { x: 50, y: 40 });
       setMessage('none');
       const next = new Set(matched).add(l.pairId);
