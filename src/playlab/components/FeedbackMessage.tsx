@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { springs } from '../motion/variants';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
+import { useEffect, useRef } from 'react';
+import { usePlayLab } from '../app/PlayLabContext';
 import { Companion } from './Companion';
 import type { MascotMood } from './Mascot';
 
@@ -31,8 +33,21 @@ interface FeedbackMessageProps {
 /** Encouraging feedback. Announced politely to screen readers; never uses red or "wrong". */
 export function FeedbackMessage({ tone, title, children, action, className = '', mood, nudge }: FeedbackMessageProps) {
   const t = TONES[tone];
+  const { reducedMotion } = usePlayLab();
+  const box = useRef<HTMLDivElement>(null);
+  // A result that appears below the fold (a short phone after a word is finished) brings its button into view, just
+  // enough to show it, so the next step is never out of reach. The idle message is not moved: the screen opens at the top.
+  useEffect(() => {
+    if (tone === 'info') return;
+    const el = box.current;
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    const r = el.getBoundingClientRect();
+    if (r.bottom > window.innerHeight || r.top < 0) el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+    // only when the result first appears: later changes of the same message do not move the page
+  }, [tone]);
   return (
     <motion.div
+      ref={box}
       role={tone === 'info' ? undefined : 'status'}
       aria-live={tone === 'info' ? undefined : 'polite'}
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
@@ -53,7 +68,7 @@ export function FeedbackMessage({ tone, title, children, action, className = '',
         {children ? <p className="mt-0.5 text-[0.95rem] leading-snug">{children}</p> : null}
       </div>
       {action ? (
-        <Button size="md" variant="primary" accent={tone === 'retry' ? 'sun' : 'brand'} icon={action.icon} onClick={action.onClick} className="shrink-0">
+        <Button size="md" variant="primary" accent={tone === 'retry' ? 'sun' : 'brand'} icon={action.icon} onClick={action.onClick} className="max-w-full whitespace-normal text-left">
           {action.label}
         </Button>
       ) : null}

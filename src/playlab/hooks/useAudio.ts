@@ -28,6 +28,8 @@ export function useSpeech() {
   );
   const sfx = useCallback((name: SfxName) => audio.sfx(name), [audio]);
   const stop = useCallback(() => audio.stop(), [audio]);
+  /** say `text` after `delayMs` (cancelled by stop()); returns a function that cancels it */
+  const speakLater = useCallback((text: string, delayMs: number) => audio.later({ text, lang }, delayMs), [audio, lang]);
 
   const sayLetterName = useCallback((l: LetterEntry) => speak(l.nameSpeech, clip(l.audio, 'name')), [speak]);
   // isolated sounds are spoken a little slower so each stays clean
@@ -37,7 +39,7 @@ export function useSpeech() {
   );
   const sayWord = useCallback((text: string, src?: string) => speak(text, src), [speak]);
 
-  return { speak, speakSequence, sfx, stop, sayLetterName, sayLetterSound, sayWord };
+  return { speak, speakSequence, speakLater, sfx, stop, sayLetterName, sayLetterSound, sayWord };
 }
 
 const clip = (audio: AudioClipSet | undefined, key: keyof AudioClipSet) => audio?.[key];

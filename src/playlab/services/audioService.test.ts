@@ -283,3 +283,57 @@ describe('sound effect timing', () => {
     expect(sfxDurationMs('chime')).toBe(390);
   });
 });
+
+describe('speech that waits for a fanfare', () => {
+  // a fake speech synthesiser that records what it was asked to say
+  function fakeSpeech() {
+    const said: string[] = [];
+    const synth = {
+      speak: (u: { text: string }) => said.push(u.text),
+      cancel: () => undefined,
+      getVoices: () => [],
+      addEventListener: () => undefined,
+    };
+    class Utterance {
+      text: string;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    return { said, env: { synth, Utterance, startTimeoutMs: 60_000 } as unknown as Parameters<typeof createAudioService>[0] };
+  }
+
+  it('says a line once its delay has passed, and not before', async () => {
+    vi.useFakeTimers();
+    try {
+      const { said, env } = fakeSpeech();
+      const { createAudioService: create } = await vi.importActual<typeof import('./audioService')>('./audioService');
+      const audio = create(env);
+      audio.later({ text: 'Hooray', lang: 'en-US' }, 720);
+      vi.advanceTimersByTime(719);
+      expect(said).toEqual([]);
+      vi.advanceTimersByTime(1);
+      expect(said).toEqual(['Hooray']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a line can be cancelled, and stop() drops every line still waiting', async () => {
+    vi.useFakeTimers();
+    try {
+      const { said, env } = fakeSpeech();
+      const { createAudioService: create } = await vi.importActual<typeof import('./audioService')>('./audioService');
+      const audio = create(env);
+      const replaced = audio.later({ text: 'old line', lang: 'en-US' }, 500);
+      audio.later({ text: 'kept line', lang: 'en-US' }, 500);
+      replaced();
+      audio.later({ text: 'left behind', lang: 'en-US' }, 500);
+      audio.stop();
+      vi.advanceTimersByTime(1000);
+      expect(said).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

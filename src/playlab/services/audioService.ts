@@ -64,6 +64,11 @@ export interface AudioService {
   play(request: PlayRequest): Promise<SpeakOutcome>;
   playSequence(requests: PlayRequest[]): Promise<SpeakOutcome>;
   stop(): void;
+  /**
+   * Say `request` after `delayMs`, unless stop() is called first. Returns a function that cancels it (a newer line can
+   * replace one that is still waiting). Used for praise that follows a fanfare, so it can be cancelled when the child leaves.
+   */
+  later(request: PlayRequest, delayMs: number): () => void;
   sfx(name: SfxName): void;
   setMuted(muted: boolean): void;
   /** Choose the voice for future speech (null = automatic). Unknown/stale ids fall back to automatic. */
@@ -135,6 +140,8 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   let ctx: AudioContext | null = null;
   let currentClip: HTMLAudioElement | null = null;
   let token = 0; // bumped by stop() so queued sequence items are dropped
+  /** lines waiting for their delay (see later()): stop() cancels them all */
+  const waiting = new Set<ReturnType<typeof setTimeout>>();
 
   const set = (patch: Partial<AudioSnapshot>) => {
     const next = { ...snapshot, ...patch };
@@ -273,6 +280,8 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
 
   const stop: AudioService['stop'] = () => {
     token += 1;
+    waiting.forEach((t) => clearTimeout(t));
+    waiting.clear();
     try {
       env.synth?.cancel();
       currentClip?.pause();
@@ -320,6 +329,17 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       return last;
     },
     stop,
+    later(request, delayMs) {
+      const t = setTimeout(() => {
+        waiting.delete(t);
+        void play(request);
+      }, delayMs);
+      waiting.add(t);
+      return () => {
+        clearTimeout(t);
+        waiting.delete(t);
+      };
+    },
     sfx(name) {
       if (snapshot.muted) return;
       try {

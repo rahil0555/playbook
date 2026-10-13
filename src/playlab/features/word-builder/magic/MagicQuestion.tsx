@@ -322,7 +322,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             {announce}
           </p>
 
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-end lg:gap-3">
             <div className="min-h-[6rem] min-w-0 flex-1">
               <AnimatePresence mode="wait">
                 {complete ? (

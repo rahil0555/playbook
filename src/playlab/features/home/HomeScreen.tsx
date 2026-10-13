@@ -70,10 +70,10 @@ export default function HomeScreen() {
               <span className="block text-brand-700">Let’s play with letters.</span>
             </h1>
             <p className="mt-3 max-w-md text-lg text-ink-soft">Tap a letter to hear it, then choose a place to play.</p>
-            <ul aria-label="Tap a letter to hear it" className="mt-5 flex gap-2.5 sm:gap-3">
+            <ul aria-label="Tap a letter to hear it" className="mt-5 flex flex-wrap gap-1.5 min-[360px]:gap-2 sm:gap-3">
               {heroLetters.map((l, i) => (
                 <li key={l.id}>
-                  <span className="pl-gem-soft grid h-[4.5rem] w-[4.5rem] place-items-center rounded-[1.6rem] sm:h-24 sm:w-24" style={{ '--gem': letterColor(i) } as CSSProperties}>
+                  <span className="pl-gem-soft grid h-[3.25rem] w-[3.25rem] place-items-center rounded-[1.4rem] min-[360px]:h-14 min-[360px]:w-14 min-[400px]:h-[4.5rem] min-[400px]:w-[4.5rem] sm:h-24 sm:w-24 sm:rounded-[1.6rem]" style={{ '--gem': letterColor(i) } as CSSProperties}>
                     <AnimatedLetter
                       ref={(h) => {
                         handles.current[l.id] = h;

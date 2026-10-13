@@ -41,7 +41,7 @@ export function useRound<T extends { id: string }>(
   buildItems: () => T[],
   variant?: string,
 ): Round<T> {
-  const { recordStart, recordAnswer, recordCompletion } = usePlayLab();
+  const { recordStart, recordAnswer, recordCompletion, audio } = usePlayLab();
   const [items, setItems] = useState<T[]>(buildItems);
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<Record<string, QuestionResult>>({});
@@ -111,6 +111,7 @@ export function useRound<T extends { id: string }>(
   }, [activityId, index, items.length, recordCompletion, variant]);
 
   const restart = useCallback(() => {
+    audio.stop(); // a new round starts in silence: nothing from the last one may still be waiting to be said
     setItems(buildRef.current());
     setIndex(0);
     setResults({});
@@ -120,7 +121,7 @@ export function useRound<T extends { id: string }>(
     movingRef.current = -1;
     startedAt.current = Date.now();
     recordStart(activityId);
-  }, [activityId, recordStart]);
+  }, [activityId, audio, recordStart]);
 
   return {
     items,

@@ -31,6 +31,7 @@ export function createFakeAudio(): AudioService {
     snapshot = { ...snapshot, ...patch };
     listeners.forEach((l) => l());
   };
+  const waiting = new Set<ReturnType<typeof setTimeout>>();
   return {
     play: async (req) => {
       audioLog.push(req);
@@ -40,7 +41,21 @@ export function createFakeAudio(): AudioService {
       audioLog.push(...reqs);
       return 'played';
     },
-    stop: () => undefined,
+    stop: () => {
+      waiting.forEach((t) => clearTimeout(t));
+      waiting.clear();
+    },
+    later: (req, delayMs) => {
+      const t = setTimeout(() => {
+        waiting.delete(t);
+        audioLog.push(req);
+      }, delayMs);
+      waiting.add(t);
+      return () => {
+        clearTimeout(t);
+        waiting.delete(t);
+      };
+    },
     sfx: (name) => {
       sfxLog.push(name);
     },

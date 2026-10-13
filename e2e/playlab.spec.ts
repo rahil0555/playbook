@@ -103,9 +103,9 @@ test.describe('alphabet', () => {
     await page.goto('/#/alphabet');
     await page.locator('[data-letter="a"]').click();
     await expect(page.locator('[data-letter="a"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByText(/Sound isn’t available/)).toBeVisible();
+    await expect(page.getByText(/Spoken words aren’t available/)).toBeVisible();
     await page.getByRole('button', { name: 'Hear the word' }).click(); // does not throw
-    await expect(page.getByText(/can’t speak out loud|Sound isn’t available/).first()).toBeVisible();
+    await expect(page.getByText(/can’t speak out loud|Spoken words aren’t available/).first()).toBeVisible();
   });
 
   test('keeps working when speech synthesis throws', async ({ page }) => {

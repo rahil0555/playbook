@@ -44,6 +44,20 @@ export function PlayLab({
     [adapter, content.letters.length],
   );
   useEffect(() => () => audio.stop(), [audio]);
+  // Nothing the previous screen was saying may carry on into the next one, however the view changed
+  // (a button, the browser's Back button in the standalone host, or the host app), and not while the page is hidden
+  // (switching apps or tabs, locking the screen).
+  useEffect(() => {
+    const hide = () => {
+      if (document.visibilityState === 'hidden') audio.stop();
+    };
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', hide);
+    return () => {
+      document.removeEventListener('visibilitychange', hide);
+      window.removeEventListener('pagehide', hide);
+    };
+  }, [audio]);
 
   /* ---- settings ---- */
   const [settings, setSettings] = useState(() => loadSettings(learnerId));
@@ -75,6 +89,12 @@ export function PlayLab({
     },
     [controlled],
   );
+  const lastView = useRef(view);
+  useEffect(() => {
+    if (lastView.current === view) return;
+    lastView.current = view;
+    audio.stop();
+  }, [view, audio]);
 
   /* ---- host callbacks (latest versions, stable identities) ---- */
   const cb = useRef({ onAnswerSubmit, onActivityComplete, onExit });

@@ -6,6 +6,7 @@ import { useAudioStatus } from '../hooks/useAudio';
 import { Icon, type IconName } from './Icon';
 import { Logo } from './Logo';
 import { Scene, type SceneName } from './Scene';
+import { ScreenBoundary } from './ScreenBoundary';
 import { SettingsPanel } from './SettingsPanel';
 import { CelebrationEffect, useBurst } from './CelebrationEffect';
 import { springs } from '../motion/variants';
@@ -106,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // the notice is information, not a task: it fades away by itself after a while (and can always be dismissed)
   useEffect(() => {
     if (!unavailable || noticeDismissed) return;
-    const t = setTimeout(() => setNoticeDismissed(true), 9000);
+    const t = setTimeout(() => setNoticeDismissed(true), 6000);
     return () => clearTimeout(t);
   }, [unavailable, noticeDismissed]);
   const prevView = useRef(view);
@@ -122,9 +123,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [view]);
 
   return (
-    <div className="relative isolate min-h-[var(--pl-min-height,100dvh)] w-full">
+    <div className="relative isolate min-h-[var(--pl-min-height,100dvh)] w-full pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
     <Scene name={SCENES[view] ?? 'meadow'} />
-    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-3 pb-10 sm:px-6">
+    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-3 pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:px-6">
       <header className="relative z-40 my-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-[2rem] bg-white/85 px-3 py-1.5 shadow-soft backdrop-blur-sm sm:my-3 sm:px-4 sm:py-2">
         <button type="button" onClick={() => navigate('home')} aria-label="Edurance PlayLab, go to home" className="rounded-2xl p-1">
           <Logo compact />
@@ -152,22 +153,23 @@ export function AppShell({ children }: { children: ReactNode }) {
           {canExit ? <NavButton icon="exit" label="Back to Edurance" showLabel onClick={exit} /> : null}
           {settingsOpen ? <SettingsPanel onClose={() => setSettingsOpen(false)} /> : null}
         </div>
+        {unavailable && !noticeDismissed ? (
+          // Spoken words only: the sound effects and pictures still work. The message sits under the header and lets every
+          // tap pass through, so it never hides an answer or the Next button; only its own dismiss button takes a tap.
+          <div role="status" className="pointer-events-none absolute right-3 top-full z-[55] mt-2 flex w-[min(16rem,calc(100%-1.5rem))] items-center gap-2 rounded-2xl border-2 border-sky-300 bg-sky-100/95 py-2 pl-3 pr-1.5 text-sm shadow-[0_12px_24px_-12px_rgba(18,49,44,0.45)]">
+            <Icon name="speaker-off" size={18} className="shrink-0 text-sky-700" />
+            <p className="flex-1 leading-snug">Spoken words aren’t available on this device or browser. Sounds and pictures still work.</p>
+            <button type="button" aria-label="Dismiss sound message" onClick={() => setNoticeDismissed(true)} className="pointer-events-auto grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full hover:bg-black/5">
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+        ) : null}
       </header>
 
-      {unavailable && !noticeDismissed ? (
-        <div role="status" className="fixed inset-x-3 bottom-3 z-[55] mx-auto flex max-w-md items-start gap-3 rounded-3xl border-2 border-sky-300 bg-sky-100 p-3 text-[0.98rem] shadow-[0_18px_36px_-14px_rgba(18,49,44,0.5)]">
-          <Icon name="speaker-off" className="mt-0.5 shrink-0 text-sky-700" />
-          <p className="flex-1">
-            Sound isn’t available on this device or browser right now. You can still play: look at the pictures and letters! Voices depend on your browser and installed voices.
-          </p>
-          <button type="button" aria-label="Dismiss sound message" onClick={() => setNoticeDismissed(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-black/5">
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-      ) : null}
-
       <main ref={mainRef} tabIndex={-1} id="pl-main" aria-label={learner?.displayName ? `PlayLab for ${learner.displayName}` : 'PlayLab'} className="flex-1 outline-none">
-        {children}
+        <ScreenBoundary resetKey={view} onHome={() => navigate('home')}>
+          {children}
+        </ScreenBoundary>
       </main>
       <BadgeToast />
     </div>

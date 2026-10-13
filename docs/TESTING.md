@@ -2,17 +2,72 @@
 
 Everything under **Executed** was actually run, in this repository (Node 22, Chromium from Playwright 1.56). Everything under **Not tested** was not, and no claim is made about it.
 
-> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The most recent full e2e run passed 85 of 86 (one known flaky test, see below), and the unit suite has one known timing-dependent failure that also fails on earlier commits. Numbers below are from specific runs and are labelled as such.
+> **The test suite is not fully green.** The unit suite has known failures that also fail on the code *before* Magic Letters was added (see [Known pre-existing failures](#known-pre-existing-failures-reproduced-on-the-baseline)). The final full e2e run for the real-device audit passed 156 of 156, and the unit suite has one known timing-dependent failure that also fails on earlier commits. Numbers below are from specific runs and are labelled as such.
+
+## Real-device audit (this pass)
+
+**What this covers and what it does not.** Everything below was checked in headless Chromium at five widths (320 × 740,
+390 × 844, 768 × 900, 1024 × 900, 1280 × 900) and with automated speech and audio recorders. **No real phone, tablet or
+child was used**, and no one listened to the audio. Items that need a device are in the last table.
+
+**Method.** A layout gate (`e2e/audit-layout.spec.ts`) visits every screen and eleven states a child reaches (a fresh
+home, alphabet, phonics, Magic Letters, Sentence Fun, matching, progress, a finished word, a wrong answer, a solved
+sentence, Settings) at each width. Each state is checked for sideways scrolling, controls off the screen, content cut
+off by its box, controls on top of each other, and touch targets under 44 px. `e2e/reliability.spec.ts` and
+`e2e/resilience.spec.ts` check the speech and navigation lifecycle, the sound message, the Next button in reach, and a
+screen whose code will not load.
+
+**Confirmed problems in the previous build (`caa2d75`), fixed in this change.**
+
+| # | Severity | What a child would see or hear | How it was confirmed | Fix | Regression tests |
+| --- | --- | --- | --- | --- | --- |
+| 1 | High | The "Sound isn't available" card covered the answer letters and the **Next word** button on phones and tablets for up to nine seconds. | Hit-tests and box overlap at 320 × 740 and 768; screenshot. | The message sits under the header and only its own dismiss button takes a tap; it is narrower, and it goes after six seconds. | `the Next button stays tappable while the sound message is showing`; `the dismiss button and the sound switch are at least 44 px high` |
+| 2 | High | Speech kept going after the child pressed **Home**, used the browser's **Back** button, or switched to another app. | Speech log: no cancel after the last line. | Leaving a screen, a change of view and a hidden page all stop the audio (`PlayLab.tsx`). | `going Home stops speech that is in progress`; `the browser Back button stops speech that is in progress`; `a hidden page … stops speech`; `quick, repeated switching between screens …` |
+| 3 | High | Praise for a finished sentence was read out on the Home screen, after the child had left. | Speech log: the sentence was spoken after **Home**. | Praise that is waiting is owned by the audio service and is dropped when the child leaves, starts another round, or turns the sound off. It is kept while the child moves to the next question. | `praise for a sentence is not read out after the child has gone Home`; `turning the sound off while praise is waiting … is dropped`; unit: `says a line once its delay has passed`, `a line can be cancelled, and stop() drops …`, `starting another round stops any speech …` |
+| 4 | High | A screen whose code could not be downloaded (unreliable school Wi-Fi) left a **blank page** with no header and no way home. | Blocked the screen's script: the whole app unmounted (`root` had no children). | A `ScreenBoundary` keeps the header on screen and offers **Try again** and **Home**. | `a screen whose code will not load shows a kind message and a way home`; `after such a failure, the child can still get back to Home`; unit: `ScreenBoundary.test.tsx` (3) |
+| 5 | Medium | On a 320 px phone the home letter row ran past its card, the fourth letter went off the screen, and the tappable letters were 42 px wide. | Layout gate and the letter-row test (lettersRight 358 > card 308). | Smaller, wrapping letter tiles below 360 px, sized so the tappable part is at least 44 px. | `the letter row stays inside the welcome card and the screen`; layout gate at 320 px |
+| 6 | Medium | After a finished word or solved sentence on a short phone (320 × 740) the **Next** button was below the fold. | The button was below the bottom edge of the 740 px screen, so the child had to scroll to find it (the test fails on `caa2d75`). | A result message that appears below the fold scrolls just enough to show its button. The idle message does not move the page. | `a finished word brings its Next button into view (320 × 740)` (and 390 × 844); `a solved sentence brings its Next button into view` |
+| 7 | Medium | At 768 px the wrong-answer message's **Start this word again** button sat on top of **Shuffle letters**; at 320 px that button ran off the right edge. | Layout gate, `magic-wrong` state. | The Magic Letters message and button stack until 1024 px; the message's button wraps inside its bubble. | layout gate (`magic-wrong` at 320 and 768 px) |
+| 8 | Low | The sound switch in Settings was 36 px high and the dismiss button 40 px. | Layout gate (touch targets). | Both are 44 px or more. | layout gate; `the dismiss button and the sound switch are at least 44 px high` |
+| 9 | Low | The message said "Sound isn't available", but only the spoken words depend on speech; the sound effects still play. | Copy review, and the speech-unavailable test. | "Spoken words aren’t available on this device or browser. Sounds and pictures still work." | `the message says that spoken words are unavailable …`; `keeps working when speech synthesis is missing` (updated) |
+| 10 | Medium (unverified here) | Content could run under the notch or home bar on a notched phone in landscape. | Code review: no `env(safe-area-inset-*)` anywhere, and `viewport-fit=cover` is set. | Side and bottom padding use the safe-area insets. | **Not testable in headless Chromium** (no notch): see the manual list. |
+
+**Behaviour checked and already correct (kept as regression guards).** Nothing is spoken until the child touches
+something (`opening a screen speaks nothing until the child touches something`); every tap on *Hear the clue* cancels
+the line before it, so speech never stacks (`every new line cancels the one before it …`); the sound switch drops
+praise that is waiting; the layout gate passes on every state at every width; the Next button stays in reach on a
+short phone.
+
+**Looked at and left alone, on purpose.**
+* The Settings panel is a modal over the header. The layout gate only checks it for touch targets.
+* The Magic Letters "Next word" button is still below the fold on a 320 × 740 screen before the feedback scrolls
+  into view. It now scrolls into view when it appears. A compact layout for very short phones would be a design change.
+* The `Alphabet playground › selects each of the 26 letters…` unit test expects the second badge toast within one second,
+  while the first badge toast is queued for five seconds (`PlayLab` shows badges one at a time). This is the known
+  timing failure below. It is a test expectation that does not match the queue, not a broken feature; it was not changed.
+
+**Manual checks that automated tests cannot give (see `docs/CHILD-TESTING-GUIDE.md`).**
+
+| Area | Why it needs a real device | What to look for |
+| --- | --- | --- |
+| Touch feel, drag, scrolling | Headless Chromium emulates touch; it does not show real finger feel or scroll inertia. | Drags start at once, nothing scrolls when a tile is dragged, a tap is not missed. |
+| Notches, home bar, rotation | No notch exists in headless Chromium. | Landscape on an iPhone or Android: nothing hidden under the notch; the bottom buttons are above the home bar. |
+| iOS Safari speech | Safari may refuse speech that does not start from a tap, and may give no error. The app then waits 2.5 s and shows the "spoken words" message. | Does *Hear the clue* speak on the first tap? Does the message appear wrongly? |
+| Android Chrome speech | Some voices are online only and need the internet; a cancel followed at once by speech can be dropped on some versions. | Speech on a school network with the internet switched off. |
+| Audio level and voice quality | Nobody has listened to the output. | Are the fanfare and chime too loud? Is the voice clear for a 4-year-old? |
+| Screen readers | Not run. | VoiceOver / TalkBack read the Magic Letters feedback and the completion message in a sensible order. |
+| Returning from another app | Browser timers are throttled in the background. | After switching apps and coming back, no sentence is read out of place. |
+| Reduce motion at the OS level | Only emulated here. | The movement goes; the sounds and words stay. |
 
 ## Executed
 
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript, strict mode (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`) | `npx tsc -b` | no errors |
-| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **199 tests in 23 files. Final run for the quality pass: 199 of 199 passed.** (Earlier runs: 193 of 193 for the Magic Moments change.) The alphabet "26 letters" test is timing-dependent: in this session it failed when run alone, both on this branch and on `1ee0718` (checked in a separate worktree), and passed in the final full run (see Known pre-existing failures). |
+| Unit + component tests (Vitest 3, jsdom, React Testing Library, user-event) | `npm test` | **205 tests in 24 files. Final run for the real-device audit: 204 of 205 passed.** The one failure is the known timing-dependent alphabet "26 letters" test (see the audit section and Known pre-existing failures). Earlier: 199 of 199 for the quality pass. The alphabet "26 letters" test is timing-dependent: in this session it failed when run alone, both on this branch and on `1ee0718` (checked in a separate worktree), and passed in the final full run (see Known pre-existing failures). |
 | Production build | `npm run build` | succeeds; main JS 339 kB (110.9 kB gzip) |
 | Integration package build | `npm run build:lib` | succeeds |
-| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **134 tests; the final full run passed 134 of 134.** New in the quality pass: `e2e/quality.spec.ts` (22 tests, phone and desktop; see the Quality pass section). Magic Moments: `e2e/moments.spec.ts` (11 tests). Earlier: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
+| End-to-end, real Chromium against the **production build** (Playwright) | `npm run test:e2e` | **156 tests; the final full run passed 156 of 156.** New in the real-device audit: `e2e/reliability.spec.ts` (16), `e2e/resilience.spec.ts` (2), and the layout gate `e2e/audit-layout.spec.ts` (5, one per width). Earlier: 134 of 134 for the quality pass, with `e2e/quality.spec.ts` (22 tests, phone and desktop; see the Quality pass section). Magic Moments: `e2e/moments.spec.ts` (11 tests). Earlier: `e2e/magic-feel.spec.ts` (7 tests: the tap response, the phonics sound order, rapid taps, the picture wiggle, reduced motion, sound off, keyboard). |
 | Integration package consumed by a **separate scratch app** (tarball install → strict `tsc` → `vite build` → Chromium) | manual, scripted, run before Magic Letters was added | typechecks, builds, renders; no console errors |
 | Deployment under a deep sub-path (`/deep/er/playlab/`) incl. refresh | manual, scripted, run before Magic Letters was added | all assets load; refresh keeps the screen |
 

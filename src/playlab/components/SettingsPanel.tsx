@@ -73,9 +73,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           aria-checked={soundEnabled}
           aria-labelledby="pl-sound-label"
           onClick={() => setSoundEnabled(!soundEnabled)}
-          className={`relative h-9 w-16 rounded-full transition-colors ${soundEnabled ? 'bg-brand-700' : 'bg-black/20'}`}
+          className={`relative h-11 w-[4.25rem] rounded-full transition-colors ${soundEnabled ? 'bg-brand-700' : 'bg-black/20'}`}
         >
-          <span className={`absolute top-1 h-7 w-7 rounded-full bg-white shadow transition-all ${soundEnabled ? 'left-8' : 'left-1'}`} />
+          <span className={`absolute left-1.5 top-1.5 h-8 w-8 rounded-full bg-white shadow transition-transform ${soundEnabled ? 'translate-x-6' : ''}`} />
           <span className="sr-only">{soundEnabled ? 'On' : 'Off'}</span>
         </button>
       </div>

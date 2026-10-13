@@ -23,8 +23,8 @@ npm run dev          # http://localhost:5173
 | `npm run build` | Type-check (`tsc -b`) + production build into `dist/` (works from any URL sub-path) |
 | `npm run preview` | Serve the production build at http://localhost:4173 |
 | `npm run typecheck` | TypeScript only |
-| `npm test` | Unit + component tests (Vitest, jsdom). 199 tests; the final run passed all 199. One alphabet test is timing-dependent, see docs/TESTING.md |
-| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically). 134 tests; the final run passed all 134 |
+| `npm test` | Unit + component tests (Vitest, jsdom). 205 tests; the final run passed 204. One alphabet test is timing-dependent, see docs/TESTING.md |
+| `npm run test:e2e` | End-to-end tests in real Chromium against the production build (Playwright; builds and serves automatically). 156 tests; the final run passed all 156 |
 | `npm run build:lib` | **Integration package**: builds `dist-lib/` (ESM + precompiled CSS + `.d.ts` + `package.json`) for the main app |
 
 Handy URLs while developing:
@@ -34,6 +34,8 @@ Handy URLs while developing:
 * `/?gallery` every bundled illustration, for design review
 
 Playwright uses its own Chromium. If your machine already has one, set `PW_CHROMIUM=/path/to/chromium`.
+
+**Testing on real devices and with children:** see [docs/CHILD-TESTING-GUIDE.md](docs/CHILD-TESTING-GUIDE.md) (a step-by-step checklist, the bug-report template and the scorecard). What the automated tests cover, and what still needs a real device, is in the real-device audit section of [docs/TESTING.md](docs/TESTING.md).
 
 ### Deploying under a sub-path
 

@@ -7,10 +7,11 @@ const mocks = vi.hoisted(() => ({
   recordStart: vi.fn(),
   recordAnswer: vi.fn((answer: Record<string, unknown>) => ({ ...answer, timestamp: 1 })),
   recordCompletion: vi.fn((completion: Record<string, unknown>) => ({ ...completion, level: 'adventurer', timestamp: 1 })),
+  audioStop: vi.fn(),
 }));
 
 vi.mock('../app/PlayLabContext', () => ({
-  usePlayLab: () => ({ recordStart: mocks.recordStart, recordAnswer: mocks.recordAnswer, recordCompletion: mocks.recordCompletion }),
+  usePlayLab: () => ({ recordStart: mocks.recordStart, recordAnswer: mocks.recordAnswer, recordCompletion: mocks.recordCompletion, audio: { stop: mocks.audioStop } }),
 }));
 
 type Item = { id: string };
@@ -66,6 +67,13 @@ describe('useRound double taps', () => {
     expect(mocks.recordCompletion).toHaveBeenCalledTimes(1);
     expect(result.current.finished).toBe(true);
     expect(mocks.recordCompletion.mock.calls[0]?.[0]).toMatchObject({ score: 1, total: 1 });
+  });
+
+  it('starting another round stops any speech still waiting from the last one', () => {
+    mocks.audioStop.mockClear();
+    const { result } = renderHook(() => useRound<Item>('sentences', () => three));
+    act(() => result.current.restart());
+    expect(mocks.audioStop).toHaveBeenCalledTimes(1);
   });
 
   it('a restarted round can be finished again, and counts once', () => {
