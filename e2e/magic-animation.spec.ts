@@ -253,6 +253,7 @@ test.describe('drag: the bubble travels on from where it was let go', () => {
     const tile = realTile(page, w.text[0]!);
     const f = center((await tile.boundingBox())!);
     const to = center((await slot(page, wrong).boundingBox())!);
+    const scrollBefore = await page.evaluate(() => window.scrollY);
     await startSampler(page);
     await page.mouse.move(f.x, f.y);
     await page.mouse.down();
@@ -263,8 +264,11 @@ test.describe('drag: the bubble travels on from where it was let go', () => {
     expect(airborne(await stopSampler(page))).toHaveLength(0);
     await expect(slot(page, wrong)).not.toHaveAttribute('data-state', 'filled');
     await expect(tile).toBeVisible();
+    // compared on the page: the page may scroll a little to show the retry message (bounded below)
+    const scrollAfter = await page.evaluate(() => window.scrollY);
     const back = center((await tile.boundingBox())!);
-    expect(Math.hypot(back.x - f.x, back.y - f.y)).toBeLessThan(8); // sprang back to its spot
+    expect(scrollAfter - scrollBefore).toBeLessThan(80);
+    expect(Math.hypot(back.x - f.x, back.y + scrollAfter - (f.y + scrollBefore))).toBeLessThan(8); // sprang back to its spot
   });
 });
 

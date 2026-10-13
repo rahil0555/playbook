@@ -13,7 +13,7 @@ import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
 import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
 import { FlyingTile, type Flight } from '../../../moments/FlyingTile';
-import { CharacterReveal } from '../../../moments/CharacterReveal';
+import { CompletionCreature, WordSplash } from './CompletionCreature';
 import { useMoments } from '../../../moments/useMoments';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
@@ -60,8 +60,16 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const speechTimer = useRef<ReturnType<typeof setTimeout>>();
   const [phonicsGate] = useState(() => createRepeatGate(PHONICS_GAP_MS));
   const [picks, setPicks] = useState(0);
-  /** counts each completed word: the picture hops and a star burst marks it (see land) */
-  const [reveal, setReveal] = useState(0);
+  /** Pip's hop onto the word: a counter (each completion) and where the picture is, relative to the perch */
+  const [creature, setCreature] = useState<{ n: number; from: { x: number; y: number } }>({ n: 0, from: { x: 0, y: -90 } });
+  /** the completed word's gold finish, switched on when Pip lands (in turn, left to right) */
+  const [celebrated, setCelebrated] = useState(false);
+  /** a gold splash under the word, from the moment the last letter lands */
+  const [splash, setSplash] = useState(0);
+  const pictureRef = useRef<HTMLSpanElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const perchRef = useRef<HTMLSpanElement>(null);
+  const stripRing = useAnimationControls();
   const animal = useAnimationControls();
   useEffect(
     () => () => {
@@ -88,7 +96,26 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     [round, sfx, word.text],
   );
 
-  /** A letter has arrived visually: show it in its slot with the glow and burst, and celebrate if it was the last. */
+  /** Pip's starting point: from the picture to the perch on the word (both measured now, before anything moves). */
+  const launchOffset = (): { x: number; y: number } => {
+    const pic = pictureRef.current?.getBoundingClientRect();
+    const perch = perchRef.current?.getBoundingClientRect();
+    if (!pic || !perch || !pic.width || !perch.width) return { x: 0, y: -90 };
+    return { x: pic.left + pic.width / 2 - (perch.left + perch.width / 2), y: pic.top + pic.height / 2 - (perch.top + perch.height / 2) };
+  };
+
+  /**
+   * Pip has landed on the word: one event. The letters take their gold finish, the strip shows a green ring, the
+   * confetti bursts, and the fanfare plays now with the spoken cheer after it. (Scheduled by Pip's hop in CompletionCreature.)
+   */
+  const onCreatureLand = useCallback(() => {
+    setCelebrated(true);
+    void stripRing.start({ opacity: [0, 0.95, 0], scale: [0.985, 1.015, 1.03], transition: { duration: 0.75, ease: 'easeOut' } });
+    fire('burst', { x: 50, y: 30 });
+    moments.celebrateThenSay(`Hooray! You spelled ${word.text}!`);
+  }, [fire, moments, stripRing, word.text]);
+
+  /** A letter has arrived visually: show it in its slot, and on the last one start the completion (Pip's hop, then the landing). */
   const land = useCallback(
     (slotIndex: number) => {
       if (landedRef.current.has(slotIndex)) return;
@@ -100,19 +127,17 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       clearTimeout(freshTimer.current);
       freshTimer.current = setTimeout(() => setFresh(null), 1200);
       if (last) {
-        fire('burst', { x: 50, y: 42 });
-        // the picture of the word hops out of its frame, a little star burst marks it: connected to the word, and
-        // nothing waits for it (Next word is already there)
-        if (!reducedMotion) void animal.start({ y: [0, -28, 0, -12, 0], rotate: [0, -8, 8, -4, 0], scale: [1, 1.14, 1, 1.06, 1], transition: { duration: 0.9, ease: 'easeOut' } });
-        setReveal((n) => n + 1);
-        // the fanfare first, then the spoken cheer once it has finished (the duration comes from the sound itself)
-        clearTimeout(speechTimer.current);
-        moments.celebrateThenSay(`Hooray! You spelled ${word.text}!`);
+        // beat 1: the last letter lands, a gold splash spreads under the word and the picture gives a small shake as Pip
+        // leaps off it. Beat 2 (about half a second later): Pip lands on the word and the landing happens (onCreatureLand).
+        sfx('sparkle');
+        setSplash((n) => n + 1);
+        if (!reducedMotion) void animal.start({ rotate: [0, -7, 6, -3, 0], scale: [1, 1.06, 1], transition: { duration: 0.5, ease: 'easeOut' } });
+        setCreature((c) => ({ n: c.n + 1, from: launchOffset() }));
       } else {
         sfx('chime');
       }
     },
-    [target.length, fire, sfx, moments, word.text, reducedMotion, animal],
+    [target.length, sfx, reducedMotion, animal],
   );
 
   const onFlightLand = useCallback(
@@ -225,6 +250,10 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const startAgain = () => {
     clearTimeout(speechTimer.current); // nothing from the old word may speak over the new one
     moments.cancelSpeech();
+    setCreature((c) => ({ n: 0, from: c.from })); // Pip goes back to the picture's side of the board
+    setCelebrated(false);
+    setSplash(0);
+    stripRing.set({ opacity: 0 });
     generation.current += 1; // flights still in the air belong to the old round
     landedRef.current = new Set();
     setLanded(new Set());
@@ -251,6 +280,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       <div className="relative grid items-center gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8">
         <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
           <motion.span
+            ref={pictureRef}
             initial={{ scale: 0.85, rotate: -4, opacity: 0 }}
             animate={{ scale: 1, rotate: 0, opacity: 1 }}
             transition={springs.bouncy}
@@ -259,8 +289,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             <motion.button type="button" onClick={wiggleAnimal} animate={animal} aria-label={complete ? word.text : 'Picture clue. Tap to wiggle it'} className="grid h-full w-full place-items-center rounded-[1.6rem]">
               <Illustration name={word.illustration} className="h-[78%] w-[78%]" label={complete ? word.text : 'Picture clue'} />
             </motion.button>
-            {/* Pip hops in on the picture's corner once the word is finished, with a little burst (beside, never on, the letters) */}
-            <CharacterReveal trigger={reveal} className="-right-5 -top-6 h-16 w-16 sm:h-20 sm:w-20" />
+            {/* decorative sparkles only: Pip now lands on the completed word, not on the picture */}
             <span aria-hidden="true" className="pl-twinkle absolute -right-3 -top-3 text-2xl text-sun-500">✦</span>
             <span aria-hidden="true" className="pl-twinkle absolute -bottom-2 -left-3 text-xl text-brand-400" style={{ animationDelay: '1.2s' }}>✦</span>
           </motion.span>
@@ -272,7 +301,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
         <div className="flex min-w-0 flex-col items-center gap-4">
           {/* the target word: glowing outlines on a parchment strip */}
-          <div role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper flex w-full flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 py-4 sm:gap-3.5 sm:px-5 sm:py-5">
+          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper relative flex w-full flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:gap-3.5 sm:px-5 sm:pb-5 sm:pt-[5rem]">
+            {/* Pip's perch: a band above the letters that is always there, so nothing moves when the word is finished */}
+            <CompletionCreature trigger={creature.n} from={creature.from} perchRef={perchRef} reducedMotion={reducedMotion} onLand={onCreatureLand} />
+            {splash > 0 && !reducedMotion ? <WordSplash key={splash} /> : null}
+            <motion.span aria-hidden="true" initial={{ opacity: 0 }} animate={stripRing} className="pointer-events-none absolute inset-0 rounded-[2rem] border-4 border-brand-500" />
             {target.map((letter, i) => (
               <OutlineSlot
                 key={i}
@@ -286,7 +319,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
                 over={over === i}
                 hinted={hint?.slotIndex === i}
                 next={nextSlot === i && !done}
-                done={complete}
+                done={celebrated}
+                celebrated={celebrated}
                 armed={selected !== null}
                 onActivate={tapSlot}
               />

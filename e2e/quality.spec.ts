@@ -182,30 +182,33 @@ for (const [device, viewport] of [
       expect(saved.answered, 'one answer for the word, however fast it was typed').toBe(1);
     });
 
-    test('finishing a word: Pip appears beside the picture, the cheer waits for the fanfare, and nothing covers the letters', async ({ page }) => {
+    test('finishing a word: Pip lands on the completed word, the fanfare starts with the landing, and nothing covers the letters', async ({ page }) => {
       await instrument(page);
       const word = await openMagic(page);
-      await page.keyboard.type(word.text, { delay: 0 });
+      await page.keyboard.type(word.text.slice(0, -1), { delay: 0 });
+      const lastLetterAt = await page.evaluate(() => performance.now());
+      await page.keyboard.press(word.text.at(-1)!);
       await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 8000 });
-      const reveal = page.getByTestId('character-reveal');
-      await expect(reveal).toBeAttached();
-      // Pip does not sit on any letter slot or on the Next button
-      const overlaps = await page.evaluate(() => {
-        const r = document.querySelector('[data-testid="character-reveal"]')!.getBoundingClientRect();
+      // Pip has landed on the word once the cheer is spoken: it sits above the letters, and covers no letter and no control
+      await expect.poll(async () => (await speech(page)).some((x) => x.text.startsWith('Hooray! You spelled')), { timeout: 3000 }).toBe(true);
+      const geometry = await page.evaluate(() => {
+        const creature = document.querySelector('[data-testid="completion-creature"]')!.getBoundingClientRect();
         const hit = (el: Element) => {
           const b = el.getBoundingClientRect();
-          return b.width > 0 && !(b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom);
+          return b.width > 0 && !(b.right <= creature.left || b.left >= creature.right || b.bottom <= creature.top || b.top >= creature.bottom);
         };
+        const firstSlot = document.querySelector('[data-magic-slot]')!.getBoundingClientRect();
         return {
+          aboveLetters: creature.bottom <= firstSlot.top + 1,
           slots: [...document.querySelectorAll('[data-magic-slot]')].filter(hit).length,
           buttons: [...document.querySelectorAll('button')].filter((b) => /Next word|Finish/.test(b.textContent ?? '') && hit(b)).length,
         };
       });
-      expect(overlaps, 'Pip covers no letter slot and no control').toEqual({ slots: 0, buttons: 0 });
-      // the fanfare starts with the last letter; the spoken cheer starts only once the fanfare has finished
-      const fanfare = (await tones(page)).find((x) => x.f === 523);
+      expect(geometry, 'Pip sits above the word and covers no letter slot and no control').toEqual({ aboveLetters: true, slots: 0, buttons: 0 });
+      // the fanfare is not on the drop: it starts with Pip's landing, well after the last letter
+      const fanfare = (await tones(page)).find((x) => x.f === 523 && x.t >= lastLetterAt);
       expect(fanfare, 'a fanfare plays').toBeTruthy();
-      await expect.poll(async () => (await speech(page)).some((x) => x.text.startsWith('Hooray! You spelled')), { timeout: 2000 }).toBe(true);
+      expect(fanfare!.t - lastLetterAt, 'the fanfare waits for Pip to land on the word').toBeGreaterThanOrEqual(400);
       const cheer = (await speech(page)).find((x) => x.text.startsWith('Hooray! You spelled'));
       expect(cheer!.t - fanfare!.t, 'the cheer waits for the whole fanfare').toBeGreaterThanOrEqual(600);
       expect((await speech(page)).filter((x) => x.text.startsWith('Hooray')).length).toBe(1);
@@ -221,9 +224,10 @@ for (const [device, viewport] of [
       const word = await openMagic(page);
       await page.keyboard.type(word.text, { delay: 0 });
       await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 8000 });
-      await expect(page.getByTestId('character-reveal')).toBeAttached();
-      // reduced motion: no burst and no hop on the reveal
-      await expect(page.getByTestId('character-reveal').locator('[data-testid="star-burst"]')).toHaveCount(0);
+      await expect(page.getByTestId('completion-creature')).toBeAttached();
+      // reduced motion: Pip simply fades in on the word, with no burst and no gold splash
+      await expect(page.getByTestId('completion-creature').locator('[data-testid="star-burst"]')).toHaveCount(0);
+      await expect(page.getByTestId('word-splash')).toHaveCount(0);
       expect(await tones(page)).toEqual([]);
       expect(await speech(page)).toEqual([]);
     });

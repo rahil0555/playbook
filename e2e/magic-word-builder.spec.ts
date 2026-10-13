@@ -73,13 +73,17 @@ test.describe('dragging', () => {
     test.skip(wrongSlot < 0, 'word has one repeated letter only');
     const tile = realTile(page, w.text[0]!);
     const before = (await tile.boundingBox())!;
+    const scrollBefore = await page.evaluate(() => window.scrollY);
     await dragTo(page, tile, wrongSlot);
     await expect(page.getByText(/different spot/)).toBeVisible();
     await expect(page.locator(`[data-magic-slot="${wrongSlot}"]`)).toHaveAttribute('data-state', 'empty');
     await page.waitForTimeout(900);
     const after = (await realTile(page, w.text[0]!).boundingBox())!;
+    // compared on the page, not the screen: the page may scroll a little to show the retry message (bounded below)
+    const scrollAfter = await page.evaluate(() => window.scrollY);
+    expect(scrollAfter - scrollBefore).toBeLessThan(80);
     expect(Math.abs(after.x - before.x)).toBeLessThan(6);
-    expect(Math.abs(after.y - before.y)).toBeLessThan(6);
+    expect(Math.abs(after.y + scrollAfter - (before.y + scrollBefore))).toBeLessThan(6);
     expect(await page.getByText(/wrong/i).count()).toBe(0);
   });
 

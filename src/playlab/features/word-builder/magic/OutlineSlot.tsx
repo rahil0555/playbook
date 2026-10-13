@@ -25,6 +25,8 @@ interface OutlineSlotProps {
   next: boolean;
   /** word finished: letters hop in a wave */
   done: boolean;
+  /** the word has landed its celebration: each letter takes the gold, dotted finish (in turn, left to right) */
+  celebrated: boolean;
   /** is a tile currently picked up (tap fallback)? */
   armed: boolean;
   onActivate: (index: number) => void;
@@ -37,7 +39,7 @@ const TILE = 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]';
  * when it arrives the slot turns into the same glossy tile, squashing and springing in with a glow flash and a
  * small star burst. The slot is a real button so the tap-to-place fallback works with mouse, touch and keyboard.
  */
-export function OutlineSlot({ index, letter, color, landedId, landed, fresh, grand, over, hinted, next, done, armed, onActivate }: OutlineSlotProps) {
+export function OutlineSlot({ index, letter, color, landedId, landed, fresh, grand, over, hinted, next, done, celebrated, armed, onActivate }: OutlineSlotProps) {
   const { reducedMotion } = usePlayLab();
   const filled = landedId !== null;
   const label = filled ? `Slot ${index + 1}: ${letter.toUpperCase()}, done` : `Slot ${index + 1}, empty${armed ? '. Tap to place the letter you picked up' : ''}`;
@@ -84,13 +86,24 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
             {/* squash-and-stretch as it snaps in */}
             <motion.span
               aria-hidden="true"
-              className="pl-gem grid h-full w-full place-items-center rounded-[1.6rem]"
+              className="pl-gem relative grid h-full w-full place-items-center overflow-hidden rounded-[1.6rem]"
               style={{ '--gem': color } as CSSProperties}
               initial={squash ? { scaleX: 1.25, scaleY: 0.74 } : false}
               animate={squash ? { scaleX: [1.25, 0.88, 1.05, 1], scaleY: [0.74, 1.2, 0.96, 1], y: [4, -12, 0, -3, 0] } : { scaleX: 1, scaleY: 1, y: 0 }}
               transition={{ duration: 0.46, ease: 'easeOut' }}
             >
-              <span className="font-display text-[2.6rem] font-bold uppercase leading-none sm:text-[3.2rem]">{letter}</span>
+              {/* the completed word's finish: a gold, dotted gem (the reference reel turns the finished word orange with dots) */}
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-[1.6rem]"
+                style={{ background: 'radial-gradient(rgba(138,90,0,0.32) 1.5px, transparent 2px) 0 0 / 9px 9px, radial-gradient(circle at 32% 26%, #fff7d9 0 12%, #f5b82e 58%, #d98a12 100%)' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: celebrated ? 1 : 0 }}
+                transition={{ duration: 0.3, delay: celebrated ? index * 0.07 : 0 }}
+              />
+              <span className={`relative font-display text-[2.6rem] font-bold uppercase leading-none transition-colors duration-300 sm:text-[3.2rem] ${celebrated ? 'text-[#12312c]' : ''}`} style={celebrated ? { textShadow: '0 2px 0 rgba(255,255,255,0.55)' } : undefined}>
+                {letter}
+              </span>
             </motion.span>
           </motion.span>
           {fresh ? <StarBurst seed={index + 1} count={grand ? 14 : 8} spread={grand ? 90 : 56} /> : null}

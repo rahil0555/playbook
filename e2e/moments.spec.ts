@@ -198,8 +198,8 @@ test.describe('Letter–Picture matching: pops and a chime', () => {
   });
 });
 
-test.describe('Magic Letters: the word\'s picture reacts when the word is finished', () => {
-  test('finishing a word makes the picture hop and throw stars, and Next word works at once', async ({ page }) => {
+test.describe('Magic Letters: the word reacts when it is finished', () => {
+  test('finishing a word splashes gold under it, Pip lands on it with stars, and Next word works at once', async ({ page }) => {
     await recordMoments(page);
     await page.goto('/#/word-builder');
     await page.locator('[data-magic-clue]').waitFor();
@@ -209,7 +209,7 @@ test.describe('Magic Letters: the word\'s picture reacts when the word is finish
     // let React attach the keyboard listener for the new question (two frames + a tick), as solveWord does
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 0)))));
     for (const ch of word.text.slice(0, -1)) await page.keyboard.press(ch);
-    // sample the picture's transform from just before the last letter, so the hop is caught whatever its timing
+    // sample the picture's transform from just before the last letter, so its small shake is caught whatever its timing
     await page.evaluate(() => {
       const w = window as unknown as { __hop?: string[] };
       const el = document.querySelector<HTMLElement>('.pl-frame button');
@@ -224,8 +224,11 @@ test.describe('Magic Letters: the word\'s picture reacts when the word is finish
     });
     await page.keyboard.press(word.text.at(-1)!);
     await expect(page.getByText(/You spelled/)).toBeVisible();
-    // stars burst from the picture's own frame
-    await expect(page.locator('.pl-frame [data-testid="star-burst"]')).toHaveCount(1);
+    // a gold splash spreads under the word as the last letter lands
+    await expect(page.getByTestId('word-splash')).toBeAttached();
+    // then Pip lands on the word and throws its stars from there, never from the picture's frame
+    await expect(page.getByTestId('completion-creature').locator('[data-testid="star-burst"]')).toHaveCount(1, { timeout: 2000 });
+    await expect(page.locator('.pl-frame [data-testid="star-burst"]')).toHaveCount(0);
     await expect
       .poll(() => page.evaluate(() => ((window as unknown as { __hop?: string[] }).__hop ?? []).some((t) => t !== 'none')), { timeout: 2500 })
       .toBe(true);

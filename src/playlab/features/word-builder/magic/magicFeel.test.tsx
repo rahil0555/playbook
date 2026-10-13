@@ -65,7 +65,10 @@ describe('Magic Letters feel: tapping a tile', () => {
     await user.click(slot(1));
     await user.click(realTile('g'));
     await user.click(slot(2));
-    expect(sfxLog).toContain('celebrate');
+    // the last letter sparkles at the drop; the fanfare waits for Pip to land on the word
+    expect(sfxLog).toContain('sparkle');
+    expect(sfxLog).not.toContain('celebrate');
+    await vi.waitFor(() => expect(sfxLog).toContain('celebrate'), { timeout: 2000 });
     await vi.waitFor(() => expect(spokenTexts().some((t) => t.startsWith('Hooray! You spelled pig'))).toBe(true), { timeout: 2000 });
   });
 });
