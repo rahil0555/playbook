@@ -18,6 +18,7 @@ import { useMoments } from '../../../moments/useMoments';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
+import { PHONEMES } from '../../../data/en/phonemes';
 import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
@@ -27,7 +28,7 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
   const { content, level, reducedMotion } = usePlayLab();
-  const { speak, sfx, sayLetterSound, stop } = useSpeech();
+  const { speak, sfx, sayLetterSound, sayPhoneme, stop } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
@@ -139,8 +140,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       } else {
         sfx('chime');
       }
+      // the letter's own sound for this word, after its chime; not repeated if it was just said when the letter was picked up
+      const id = word.sounds[slotIndex];
+      if (id && phonicsGate.allow(id)) moments.sayPhoneme(PHONEMES[id]);
     },
-    [target.length, sfx, reducedMotion, animal],
+    [target.length, sfx, reducedMotion, animal, word.sounds, moments, phonicsGate],
   );
 
   const onFlightLand = useCallback(
@@ -208,10 +212,19 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     setSelected((s) => (s === tileId ? null : tileId));
     setPicks((n) => n + 1);
     if (picking && t) {
-      const letter = content.letters.find((l) => l.id === t.value);
-      if (letter && phonicsGate.allow(t.value)) {
+      // the sound this letter makes in THIS word: the spot it is heading for is the first empty one with that letter.
+      // A letter that fits nowhere (a decoy, or a spare copy) gets its usual letter sound.
+      const slot = slotFor(target, slotsRef.current, t.value);
+      const id = slot !== null ? word.sounds[slot] : null;
+      const letter = slot === null ? content.letters.find((l) => l.id === t.value) : undefined;
+      const key = id ?? (letter ? `letter:${t.value}` : null); // null: this letter is silent here
+      // a sound that was just said for this letter is not repeated, and the first one carries on
+      if (key === null || phonicsGate.allow(key)) {
+        // a different sound (or silence) takes over from anything still being said or waiting to be said
         clearTimeout(speechTimer.current);
-        speechTimer.current = setTimeout(() => void sayLetterSound(letter), PHONICS_DELAY_MS);
+        stop();
+        if (id) speechTimer.current = setTimeout(() => void sayPhoneme(PHONEMES[id]), PHONICS_DELAY_MS);
+        else if (letter) speechTimer.current = setTimeout(() => void sayLetterSound(letter), PHONICS_DELAY_MS);
       }
     }
     setAnnounce(picking ? `${t?.value.toUpperCase()} picked up. Now choose a spot.` : 'Put the letter down.');

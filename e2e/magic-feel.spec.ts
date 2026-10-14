@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { getContentPack } from '../src/playlab/data/registry';
 import { englishWords } from '../src/playlab/data/en/words';
+import { PHONEMES } from '../src/playlab/data/en/phonemes';
 import { expect, installFakeSpeech, spoken, test } from './helpers';
 
 // The touch feel of Magic Letters: the response starts at the tap, the pop and the phonics sound never overlap,
@@ -40,11 +41,19 @@ async function openMagic(page: Page) {
   await page.waitForTimeout(700); // tiles finish their staggered entrance
 }
 
-/** a real (not decoy) tile for the first letter of the current word, plus that word's first letter */
+/**
+ * a real (not decoy) tile for the first letter of the current word, plus that word's first letter and the sound that
+ * letter makes in this word (not its generic alphabet sound: the g in goat and in mango, or the m in moon and in mango, differ)
+ */
 async function firstRealTile(page: Page) {
   const clue = await page.locator('[data-magic-clue]').innerText();
   const word = englishWords.find((w) => w.clue === clue)!;
-  return { value: word.text[0]!, tile: page.locator(`[data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first() };
+  const id = word.sounds[0]!;
+  return {
+    value: word.text[0]!,
+    sound: PHONEMES[id].speech,
+    tile: page.locator(`[data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first(),
+  };
 }
 
 type Ev = { t: number; f?: number; text?: string };
@@ -102,23 +111,23 @@ test.describe('Magic Letters feel', () => {
   test('the letter SOUND is spoken after the pop, never the letter name, and not on top of the pop', async ({ page }) => {
     await recordFeel(page);
     await openMagic(page);
-    const { value, tile } = await firstRealTile(page);
+    const { value, tile, sound } = await firstRealTile(page);
     await tile.click();
     await expect.poll(async () => (await spoken(page)).length, { timeout: 2000 }).toBeGreaterThan(0);
     const said = await spoken(page);
-    expect(said, 'the phonics sound is spoken').toContain(soundOf(value));
+    expect(said, 'the phonics sound for this word is spoken').toContain(sound);
     expect(said, 'the letter NAME is not spoken on pick-up').not.toContain(nameOf(value));
     const pop = (await tones(page)).find((t) => t.f === 392);
-    const sound = (await speech(page)).find((s) => s.text === soundOf(value));
+    const soundEvent = (await speech(page)).find((s) => s.text === sound);
     expect(pop).toBeTruthy();
-    expect(sound).toBeTruthy();
-    expect(sound!.t - pop!.t, 'the sound waits a moment after the pop').toBeGreaterThan(100);
+    expect(soundEvent).toBeTruthy();
+    expect(soundEvent!.t - pop!.t, 'the sound waits a moment after the pop').toBeGreaterThan(100);
   });
 
   test('rapid taps on one letter do not stack: one spoken sound, and only a short run of pops', async ({ page }) => {
     await recordFeel(page);
     await openMagic(page);
-    const { value, tile } = await firstRealTile(page);
+    const { value, tile, sound } = await firstRealTile(page);
     // six taps in one burst (dispatched back to back, far faster than the 1.4 s gap)
     await page.evaluate((v) => {
       const el = document.querySelector<HTMLElement>(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
@@ -126,7 +135,7 @@ test.describe('Magic Letters feel', () => {
     }, value);
     await page.waitForTimeout(1500);
     const said = await spoken(page);
-    expect(said.filter((t) => t === soundOf(value)).length, 'the sound is spoken at most once').toBeLessThanOrEqual(1);
+    expect(said.filter((t) => t === sound).length, 'the sound is spoken at most once').toBeLessThanOrEqual(1);
     expect((await tones(page)).length, 'a burst of taps makes a few pops, not dozens').toBeLessThan(12);
   });
 
@@ -179,5 +188,4 @@ test.describe('Magic Letters feel', () => {
 });
 
 /** what the child hears for a letter's sound and its name, from the same content pack the app uses */
-const soundOf = (v: string) => getContentPack('en').letters.find((l) => l.id === v)!.sound.speech;
 const nameOf = (v: string) => getContentPack('en').letters.find((l) => l.id === v)!.nameSpeech;

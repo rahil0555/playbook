@@ -96,4 +96,55 @@ describe('Magic Letters feel: tapping a tile', () => {
     await new Promise((r) => setTimeout(r, 400)); // long enough for any duplicate cheer to be queued and said
     expect(timeline.filter((e) => e.kind === 'say' && e.what.startsWith('Hooray')), 'one cheer for the one completion').toHaveLength(1);
   });
+
+  // Letter sounds for THIS word: PIG is p "puh", i "in" (a short i, said with an n), g "guh".
+  it('picking a letter says the sound it makes in this word, not its name: the i of PIG is "in", not "eye"', async () => {
+    const { user } = await openPig();
+    await user.click(realTile('i'));
+    await vi.waitFor(() => expect(spokenTexts()).toContain('in'), { timeout: 1000 });
+    expect(spokenTexts()).not.toContain('eye');
+  });
+
+  it('a letter placed by typing says its sound after its landing chime, and only once', async () => {
+    const { user } = await openPig();
+    await user.keyboard('p');
+    await vi.waitFor(() => expect(timeline.some((e) => e.kind === 'say' && e.what === 'puh')).toBe(true), { timeout: 1500 });
+    const chime = timeline.findIndex((e) => e.kind === 'sfx' && e.what === 'chime');
+    const said = timeline.findIndex((e) => e.kind === 'say' && e.what === 'puh');
+    expect(chime, 'the chime comes first, on the landing').toBeGreaterThanOrEqual(0);
+    expect(said, 'the sound follows the chime').toBeGreaterThan(chime);
+    expect(spokenTexts().filter((t) => t === 'puh')).toHaveLength(1);
+  });
+
+  it('picking a letter and then placing it says its sound once, not twice', async () => {
+    const { user } = await openPig();
+    await user.click(realTile('p'));
+    await user.click(slot(0));
+    await new Promise((r) => setTimeout(r, 900));
+    expect(spokenTexts().filter((t) => t === 'puh')).toHaveLength(1);
+  });
+
+  it('picking another letter cancels the sound of the letter before it, so the two never overlap', async () => {
+    const { user } = await openPig();
+    await user.click(realTile('p'));
+    await user.click(realTile('i')); // before p's sound has had its moment
+    await new Promise((r) => setTimeout(r, 500));
+    expect(spokenTexts()).toContain('in');
+    expect(spokenTexts(), 'the p sound was cancelled before it was said').not.toContain('puh');
+  });
+
+  it('the last letter\'s sound is said before the cheer, and the cheer does not start on top of it', async () => {
+    const { user } = await openPig();
+    await user.click(realTile('p'));
+    await user.click(slot(0));
+    await user.click(realTile('i'));
+    await user.click(slot(1));
+    await user.click(realTile('g'));
+    await user.click(slot(2));
+    await vi.waitFor(() => expect(timeline.some((e) => e.kind === 'say' && e.what.startsWith('Hooray'))).toBe(true), { timeout: 2000 });
+    const lastSound = timeline.find((e) => e.kind === 'say' && e.what === 'guh')!;
+    const cheer = timeline.find((e) => e.kind === 'say' && e.what.startsWith('Hooray'))!;
+    expect(lastSound, 'the g of PIG is said as "guh"').toBeTruthy();
+    expect(cheer.t - lastSound.t, 'the cheer comes after the last sound has had time to finish').toBeGreaterThanOrEqual(300);
+  });
 });

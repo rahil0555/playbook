@@ -1,7 +1,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
 import { SPEECH_STYLE, type PlayRequest, type SfxName, type SpeakOutcome } from '../services/audioService';
-import type { AudioClipSet, LetterEntry } from '../types/learning';
+import { phonemeRequest } from '../services/phonics';
+import type { AudioClipSet, LetterEntry, Phoneme } from '../types/learning';
 
 /** Live audio status (speaking / unavailable / voice name). */
 export function useAudioStatus() {
@@ -38,8 +39,12 @@ export function useSpeech() {
     [audio, lang],
   );
   const sayWord = useCallback((text: string, src?: string) => speak(text, src), [speak]);
+  /** a Magic Letters sound for this word, now */
+  const sayPhoneme = useCallback((phoneme: Phoneme) => audio.play(phonemeRequest(phoneme, lang)), [audio, lang]);
+  /** a Magic Letters sound for this word, after `delayMs` (cancelled by stop()) */
+  const laterPhoneme = useCallback((phoneme: Phoneme, delayMs: number) => audio.later(phonemeRequest(phoneme, lang), delayMs), [audio, lang]);
 
-  return { speak, speakSequence, speakLater, sfx, stop, sayLetterName, sayLetterSound, sayWord };
+  return { speak, speakSequence, speakLater, sfx, stop, sayLetterName, sayLetterSound, sayWord, sayPhoneme, laterPhoneme };
 }
 
 const clip = (audio: AudioClipSet | undefined, key: keyof AudioClipSet) => audio?.[key];

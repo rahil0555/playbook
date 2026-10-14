@@ -52,6 +52,29 @@ export interface LetterEntry {
   audio?: AudioClipSet;
 }
 
+/**
+ * A sound that Magic Letters teaches. Each sound is one entry in data/en/phonemes.ts, shared by every word that uses it.
+ * Vowels say which vowel it is (short or long); consonants are the consonant. 'sh' and 'ng' are two-letter sounds.
+ */
+export type PhonemeId =
+  | 'b' | 'd' | 'f' | 'g' | 'h' | 'k' | 'l' | 'm' | 'n' | 'ng' | 'p' | 'r' | 's' | 'sh' | 't' | 'w' | 'z'
+  | 'a-short' | 'e-short' | 'i-short' | 'o-short' | 'u-short' | 'oo-short'
+  | 'a-long' | 'i-long' | 'o-long' | 'oo-long' | 'schwa';
+
+export interface Phoneme {
+  id: PhonemeId;
+  /** the sound, for teachers, e.g. "/k/" or "/æ/" */
+  symbol: string;
+  /** what the browser voice is asked to say (a respelling, chosen by testing; see docs/PHONICS-AUDIO.md) */
+  speech: string;
+  /** how close the browser voice is expected to get: 'clean', 'approximate' (a short extra sound is added) or 'unreliable' */
+  quality: 'clean' | 'approximate' | 'unreliable';
+  /** a word that has this sound, for teachers (never spoken, so it cannot give an answer away) */
+  example: string;
+  /** a recorded clip, when one is supplied; PlayLab ships none */
+  clip?: string;
+}
+
 export interface WordEntry {
   id: string;
   /** lowercase, letters only */
@@ -59,6 +82,11 @@ export interface WordEntry {
   level: 1 | 2 | 3;
   clue: string;
   illustration: IllustrationId;
+  /**
+   * The sound each letter makes in THIS word, one entry per letter, in order. `null` means the letter has no sound of its
+   * own here: the second letter of a two-letter sound (the h in fish, the second o in book) or a silent letter (the e in kite).
+   */
+  sounds: readonly (PhonemeId | null)[];
 }
 
 export type SentenceMode = 'arrange' | 'fill';
