@@ -118,6 +118,15 @@ async function sentenceOnScreen(page: Page) {
   return englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === key)!;
 }
 
+/**
+ * Where a sentence stands once its words are in: still on the board (a wrong order, judged as wrong), or judged right and
+ * shown whole (the board is replaced by the sentence). null while neither is true.
+ */
+async function judgedOrPlaced(page: Page, s: { words: string[]; punctuation: string }) {
+  if ((await page.getByRole('img', { name: `${s.words.join(' ')}${s.punctuation}` }).count()) > 0) return 'solved';
+  return (await page.locator('[data-slot] [data-tile]').count()) === s.words.length ? 'placed' : null;
+}
+
 /** Place every word in the right order, with no pause between taps (the fastest a child could go). */
 async function arrangeFast(page: Page) {
   const s = await sentenceOnScreen(page);
@@ -240,22 +249,22 @@ for (const [device, viewport] of [
       const s = await sentenceOnScreen(page);
       // every tap fires with no pause, faster than the pick-up and glide take
       for (let i = 0; i < s.words.length; i++) await page.locator('[data-tile][data-placed="false"]:not(.ring-4)').first().click();
-      await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(s.words.length, { timeout: 4000 });
+      // the sentence is judged by itself once every word is in: still on the board, or judged right and shown whole
+      await expect.poll(() => judgedOrPlaced(page, s), { timeout: 4000 }).not.toBeNull();
       await page.waitForTimeout(900); // a late commit would show up here
-      await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(s.words.length);
-      const placed = await page.locator('[data-slot] [data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string).sort());
-      expect(placed).toEqual([...s.words].sort());
-      await expect(page.getByRole('button', { name: 'Check my sentence' })).toBeEnabled();
+      if ((await judgedOrPlaced(page, s)) === 'placed') {
+        const placed = await page.locator('[data-slot] [data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string).sort());
+        expect(placed, 'every word is there once').toEqual([...s.words].sort());
+      }
+      expect(await judgedOrPlaced(page, s), 'no word is lost or doubled').not.toBeNull();
     });
 
-    test('a double tap on Check is one answer, one fanfare and one spoken sentence', async ({ page }) => {
+    test('the last word judges the sentence once: one answer, one fanfare and one spoken sentence', async ({ page }) => {
       await instrument(page);
       await openArrangeSentence(page);
-      const s = await arrangeFast(page);
-      await expect(page.getByRole('button', { name: 'Check my sentence' })).toBeEnabled({ timeout: 3000 });
       const fanfaresBefore = (await tones(page)).filter((x) => x.f === 1047).length;
       const answeredBefore = (await savedActivity(page, 'sentences')).answered;
-      await page.getByRole('button', { name: 'Check my sentence' }).dblclick();
+      const s = await arrangeFast(page);
       await expect(page.getByTestId('key-word-reward')).toBeVisible({ timeout: 3000 });
       await page.waitForTimeout(1200);
       const fanfares = (await tones(page)).filter((x) => x.f === 1047).length - fanfaresBefore;
@@ -327,7 +336,6 @@ for (const [device, viewport] of [
       await openArrangeSentence(page);
       const s = await arrangeFast(page);
       const toneCount = (await tones(page)).length;
-      await page.getByRole('button', { name: 'Check my sentence' }).click();
       await expect(page.getByTestId('key-word-reward')).toBeVisible({ timeout: 3000 });
       const fanfare = (await tones(page)).slice(toneCount).find((x) => x.f === 1047);
       const sentence = `${s.words.join(' ')}${s.punctuation}`;
@@ -345,8 +353,6 @@ for (const [device, viewport] of [
       await instrument(page);
       await openArrangeSentence(page);
       const s = await arrangeFast(page);
-      await expect(page.getByRole('button', { name: 'Check my sentence' })).toBeEnabled({ timeout: 3000 });
-      await page.getByRole('button', { name: 'Check my sentence' }).click();
       await expect(page.getByRole('button', { name: /^(Next sentence|Finish)$/ })).toBeVisible({ timeout: 3000 });
       expect(s.words.length).toBeGreaterThan(0);
       expect(await tones(page)).toEqual([]);

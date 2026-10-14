@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { LikeButton } from '../../components/LikeButton';
@@ -142,11 +142,8 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
   const [slots, setSlots] = useState<Slots>(() => emptySlots(target.length));
   const [states, setStates] = useState<SlotState[] | undefined>(undefined);
   const complete = isComplete(slots);
-  /** set by a Check until the child changes the sentence again: a double tap checks once */
-  const checking = useRef(false);
 
   const touched = () => {
-    checking.current = false;
     if (status === 'wrong') setStatus('building');
     setStates(undefined);
   };
@@ -163,9 +160,9 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
     setSlots((s) => removeTile(s, id));
     touched();
   };
-  const check = () => {
-    if (solved || !isComplete(slots) || checking.current) return;
-    checking.current = true;
+  /** the sentence is judged the moment its last word is in place: a right order is celebrated, a wrong one is shown at once */
+  const judge = () => {
+    if (solved) return;
     const ok = isCorrect(slots, tiles, target);
     round.submit(slotValues(slots, tiles).join(' '), target.join(' '), ok);
     setStates(slotStates(slots, tiles, target));
@@ -175,8 +172,12 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
       onWrong();
     }
   };
+  // runs once per completion: it fires when the slots go from incomplete to complete, not on every render (judge reads
+  // the slots of the render in which the sentence became complete)
+  useEffect(() => {
+    if (complete) judge();
+  }, [complete]);
   const retry = () => {
-    checking.current = false;
     setSlots((s) => s.map((id, i) => (states?.[i] === 'correct' ? id : null)));
     setStatus('building');
     setStates(undefined);
@@ -203,9 +204,6 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
         <Button variant="secondary" accent="sun" icon="undo" onClick={() => { setSlots((s) => clearSlots(s)); touched(); }} disabled={filledCount(slots) === 0}>
           Clear
         </Button>
-        <Button variant="primary" accent="sun" size="lg" icon="check" onClick={check} disabled={!complete}>
-          Check my sentence
-        </Button>
       </div>
       <AnimatePresence mode="wait">
         {status === 'wrong' ? (
@@ -217,8 +215,8 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
             The sentence starts with “{target[0]}”.
           </FeedbackMessage>
         ) : (
-          <FeedbackMessage key="idle" tone="info" nudge={filledCount(slots)} title={complete ? 'Ready to check?' : 'Let’s build it!'}>
-            {complete ? 'Press “Check my sentence” to see how it reads.' : 'Tap the words in order, or drag them into the glowing spots.'}
+          <FeedbackMessage key="idle" tone="info" nudge={filledCount(slots)} title="Let’s build it!">
+            Tap the words in order, or drag them into the glowing spots.
           </FeedbackMessage>
         )}
       </AnimatePresence>

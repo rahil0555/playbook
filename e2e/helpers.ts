@@ -85,7 +85,7 @@ export async function solveSentence(page: Page) {
   const tiles = await page.locator('[data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string));
   const key = [...tiles].sort().join('|');
   const s = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === key)!;
+  // the last word judges the sentence by itself: there is no check button
   for (const w of s.words) await page.locator(`[data-tile][data-value="${w}"][data-placed="false"]`).first().click();
-  await page.getByRole('button', { name: 'Check my sentence' }).click();
   return s.id;
 }

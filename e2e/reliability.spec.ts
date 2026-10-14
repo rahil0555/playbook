@@ -75,7 +75,6 @@ test.describe('nothing is spoken on its own', () => {
     const tiles = await page.locator('[data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string));
     arranged = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === [...tiles].sort().join('|'));
     for (const w of arranged!.words) await page.locator(`[data-tile][data-value="${w}"][data-placed="false"]`).first().click();
-    await page.getByRole('button', { name: 'Check my sentence' }).click();
     await page.getByTestId('key-word-reward').waitFor();
     // the praise is still waiting for its fanfare to finish: switch the sound off now
     await page.getByRole('button', { name: /Sound is on. Turn sound off/ }).click();
@@ -143,7 +142,6 @@ test.describe('speech stops when the child leaves', () => {
     const tiles = await page.locator('[data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string));
     const s = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === [...tiles].sort().join('|'))!;
     for (const w of s.words) await page.locator(`[data-tile][data-value="${w}"][data-placed="false"]`).first().click();
-    await page.getByRole('button', { name: 'Check my sentence' }).click();
     await page.getByTestId('key-word-reward').waitFor();
     await mainNav(page).getByRole('button', { name: 'Home' }).click();
     await page.waitForTimeout(1500);
@@ -266,7 +264,6 @@ test.describe('the next step is in reach on a short phone', () => {
       const tiles = await page.locator('[data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string));
       const s = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === [...tiles].sort().join('|'))!;
       for (const w of s.words) await page.locator(`[data-tile][data-value="${w}"][data-placed="false"]`).first().click();
-      await page.getByRole('button', { name: 'Check my sentence' }).click();
     }
     await expect(page.getByRole('button', { name: /^(Next sentence|Finish)$/ })).toBeInViewport({ timeout: 3000 });
   });

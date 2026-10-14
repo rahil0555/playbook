@@ -124,7 +124,6 @@ async function visitStates(page: Page, w: number) {
     const tiles = await page.locator('[data-tile]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.value as string));
     const arr = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === [...tiles].sort().join('|'))!;
     for (const word of arr.words) await page.locator(`[data-tile][data-value="${word}"][data-placed="false"]`).first().click({ timeout: 3000 }).catch(() => undefined);
-    await page.getByRole('button', { name: 'Check my sentence' }).click({ timeout: 3000 }).catch(() => undefined);
   }
   await page.waitForTimeout(1300);
   report['sentence-solved'] = await page.evaluate(AUDIT);
