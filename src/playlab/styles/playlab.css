@@ -417,8 +417,14 @@
 }
 @media (min-width: 640px) {
   .pl-root.pl-root .pl-slot-row {
-    grid-template-columns: repeat(var(--n, 4), minmax(0, 5.8rem));
+    grid-template-columns: repeat(var(--n, 4), minmax(0, 5.4rem));
     gap: 0.875rem;
+  }
+}
+/* very narrow phones: five spots in a row would be under 44 px each, so they wrap into rows of three */
+@media (max-width: 359px) {
+  .pl-root.pl-root .pl-slot-row {
+    grid-template-columns: repeat(3, minmax(0, 4.4rem));
   }
 }
 /* a letter held over (or close to) an empty spot: its dashed outline pulses so the child sees where it will go */

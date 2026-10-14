@@ -382,7 +382,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
               {tiles.map((tile, i) => (
                 <li key={tile.id}>
                   {isTilePlaced(slots, tile.id) ? (
-                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.8rem] sm:w-[5.8rem]" />
+                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.4rem] sm:w-[5.4rem]" />
                   ) : (
                     <LooseLetter
                       tile={tile}

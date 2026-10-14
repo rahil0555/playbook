@@ -189,7 +189,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         feelTap();
         onTap(tile.id);
       }}
-      className="pl-draggable relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.8rem] sm:w-[5.8rem]"
+      className="pl-draggable relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem]"
     >
       {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
       {/* selected / hinted ring (a separate layer, so the monster keeps its shadow) */}
