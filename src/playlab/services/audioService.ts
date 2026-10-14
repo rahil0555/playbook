@@ -50,6 +50,8 @@ export interface PlayRequest {
    * never turn into a made-up sound. Then `text` is only a label (for logs and tests), never read aloud.
    */
   clipOnly?: boolean;
+  /** with `clipOnly`: repeat the recording until stop() (a sound that is held down) */
+  loop?: boolean;
   rate?: number;
   pitch?: number;
   /**
@@ -301,7 +303,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   };
 
   /** Play a recording. One clip at a time: a new clip replaces the one playing. Resolves when it has finished. */
-  const playClip = (src: string): Promise<boolean> => {
+  const playClip = (src: string, loop = false): Promise<boolean> => {
     const { AudioElement } = env;
     stopClip();
     if (!AudioElement) return Promise.resolve(false);
@@ -323,6 +325,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       };
       try {
         clip = new AudioElement(src);
+        clip.loop = loop;
         currentClip = clip;
         endClip = () => end(true); // replaced or stopped: not a failure
         clip.onended = () => end(true);
@@ -343,7 +346,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
         // a recording only: with no recording there is nothing to play, and nothing is spoken instead
         if (!req.src) return 'unsupported';
         cancelSpeech();
-        return (await playClip(req.src)) ? 'played' : 'error';
+        return (await playClip(req.src, req.loop)) ? 'played' : 'error';
       }
       if (req.src && (await playClip(req.src))) return 'played';
       // speech never starts on top of a recording that is still playing; with none playing, a line is spoken at once

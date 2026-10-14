@@ -7,6 +7,7 @@ const { createAudioService } = await vi.importActual<typeof import('./audioServi
 class FakeRecording {
   static made: FakeRecording[] = [];
   paused = false;
+  loop = false;
   onended?: () => void;
   onerror?: () => void;
   constructor(public src: string) {
@@ -164,3 +165,35 @@ describe('recordings: one at a time, and speech waits for them', () => {
     expect(speak).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('recordings: a held sound repeats until it is let go', () => {
+  beforeEach(() => {
+    FakeRecording.made = [];
+  });
+
+  it('a looping recording is set to loop, keeps going on its own, and ends only when stopped', async () => {
+    const { audio } = setup();
+    let settled = false;
+    const p = audio.play({ text: 'p', clipOnly: true, src: '/p.ogg', loop: true }).then((o) => {
+      settled = true;
+      return o;
+    });
+    await wait(5);
+    const clip = FakeRecording.made[0]!;
+    expect(clip.loop).toBe(true);
+    await wait(30);
+    expect(settled, 'it repeats until it is stopped').toBe(false);
+    audio.stop();
+    await expect(p).resolves.toBe('played');
+    expect(clip.paused).toBe(true);
+  });
+
+  it('a recording that is not a loop is not set to loop', async () => {
+    const { audio } = setup();
+    void audio.play({ text: 't', clipOnly: true, src: '/t.ogg' });
+    await wait(5);
+    expect(FakeRecording.made[0]!.loop).toBe(false);
+    audio.stop();
+  });
+});
+

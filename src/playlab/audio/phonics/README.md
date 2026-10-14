@@ -50,7 +50,8 @@ are never said in the app.
 ### How each clip should be
 
 - Only the sound: no letter name, no example word, no "the sound of".
-- Short: about 0.2 to 0.6 seconds, with the sound starting almost at once and no long tail.
+- Short: about 0.2 to 0.6 seconds, with the sound starting almost at once and no long tail. While a letter is held down, its
+  recording repeats, so it should also loop cleanly: little or no silence at the start and the end.
 - Clean and steady: a single voice, a quiet room, no music, no echo.
 - Consonants: say the sound itself (`/b/`, `/t/`), with no vowel added. A stop such as /t/ cannot be said without a vowel
   in speech, so record the sound as cleanly as a person can make it, and check it by ear.

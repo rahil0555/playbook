@@ -32,7 +32,8 @@ interface OutlineSlotProps {
   onActivate: (index: number) => void;
 }
 
-const TILE = 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]';
+/** a square that fills its column of the word's row (the row sets the size, see .pl-slot-row) */
+const TILE = 'aspect-square w-full';
 
 /**
  * A magical, softly glowing EMPTY outline (it never shows its target letter). The right tile flies in on its own layer (FlyingLetter);
@@ -55,7 +56,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
       className={`relative grid place-items-center rounded-[1.6rem] transition-[transform,background-color,border-color] ${TILE} ${
         landed
           ? ''
-          : `border-[3px] border-dashed ${over ? 'scale-105 border-sky-500 bg-sky-100' : armed ? 'border-sky-500 bg-white' : 'border-amber-400/80 bg-white/75'}`
+          : `border-[3px] border-dashed ${over ? 'pl-drop-pulse scale-105 border-sky-500 bg-sky-100' : armed ? 'border-sky-500 bg-white' : 'border-amber-400/80 bg-white/75'}`
       }`}
       style={landed ? undefined : { boxShadow: over || armed ? undefined : 'inset 0 0 18px rgba(255,200,80,0.55), 0 0 0 4px rgba(255,255,255,0.55)' }}
     >
@@ -101,7 +102,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
                 animate={{ opacity: celebrated ? 1 : 0 }}
                 transition={{ duration: 0.3, delay: celebrated ? index * 0.07 : 0 }}
               />
-              <span className={`relative font-display text-[2.6rem] font-bold uppercase leading-none transition-colors duration-300 sm:text-[3.2rem] ${celebrated ? 'text-[#12312c]' : ''}`} style={celebrated ? { textShadow: '0 2px 0 rgba(255,255,255,0.55)' } : undefined}>
+              <span className={`relative font-display text-[clamp(1.9rem,6.4vw,2.6rem)] font-bold uppercase leading-none transition-colors duration-300 sm:text-[3.2rem] ${celebrated ? 'text-[#12312c]' : ''}`} style={celebrated ? { textShadow: '0 2px 0 rgba(255,255,255,0.55)' } : undefined}>
                 {letter}
               </span>
             </motion.span>

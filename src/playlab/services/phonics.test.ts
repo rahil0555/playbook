@@ -5,7 +5,7 @@ import type { PhonicClip } from '../audio/phonics';
 const manifest = vi.hoisted(() => ({ PHONIC_CLIPS: {} as Record<string, PhonicClip> }));
 vi.mock('../audio/phonics', () => manifest);
 
-import { phonicRequest } from './phonics';
+import { phonicLoopRequest, phonicRequest } from './phonics';
 
 afterEach(() => {
   for (const key of Object.keys(manifest.PHONIC_CLIPS)) delete manifest.PHONIC_CLIPS[key];
@@ -31,3 +31,17 @@ describe('phonicRequest: a sound asks for its own recording', () => {
     expect(req.clipOnly, 'so the audio service will not fall back to speech').toBe(true);
   });
 });
+
+describe('phonicLoopRequest: a held sound is the same recording, set to repeat', () => {
+  it('asks for the sound\'s own file, looping, and never for speech', () => {
+    manifest.PHONIC_CLIPS.p = { url: './assets/p.ogg', source: 'test', license: 'test' };
+    expect(phonicLoopRequest('p')).toEqual({ text: 'p', clipOnly: true, src: './assets/p.ogg', loop: true });
+  });
+
+  it('a sound with no recording loops nothing, and is never spoken', () => {
+    const req = phonicLoopRequest('t');
+    expect(req.src).toBeUndefined();
+    expect(req.clipOnly).toBe(true);
+  });
+});
+

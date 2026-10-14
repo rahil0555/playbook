@@ -407,6 +407,27 @@
 }
 /* gloss on buttons */
 .pl-root.pl-root .pl-gel { background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 58%); }
+/* the word's slots: one row for every word (the longest is five letters); the squares shrink to fit a phone */
+.pl-root.pl-root .pl-slot-row {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  grid-template-columns: repeat(var(--n, 4), minmax(0, 4.4rem));
+  gap: 0.625rem;
+}
+@media (min-width: 640px) {
+  .pl-root.pl-root .pl-slot-row {
+    grid-template-columns: repeat(var(--n, 4), minmax(0, 5.4rem));
+    gap: 0.875rem;
+  }
+}
+/* a letter held over (or close to) an empty spot: its dashed outline pulses so the child sees where it will go */
+@keyframes pl-drop-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.6); }
+  50% { box-shadow: 0 0 0 12px rgba(14, 165, 233, 0); }
+}
+.pl-drop-pulse { animation: pl-drop-pulse 0.9s ease-in-out infinite; }
+.pl-root[data-motion='reduce'] .pl-drop-pulse { animation: none; }
 /* magical target outline */
 @keyframes pl-aura {
   0%, 100% { opacity: 0.45; transform: scale(0.94); }

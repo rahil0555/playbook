@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { Button } from '../../../components/Button';
@@ -28,7 +28,7 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
   const { level, reducedMotion } = usePlayLab();
-  const { speak, sfx, stop } = useSpeech();
+  const { speak, sfx, stop, loopPhonic } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
@@ -249,6 +249,16 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     if (slotIndex === null) return; // dropped in empty space: it just springs back
     attempt(tileId, slotIndex, pose);
   };
+  /** A letter held down repeats the sound it makes in this word, until it is let go (only one sound at a time). */
+  const holdTile = (tileId: string) => {
+    const t = tiles.find((x) => x.id === tileId);
+    const slot = t ? slotFor(target, slotsRef.current, t.value) : null;
+    const id = slot !== null ? (word.sounds[slot] ?? null) : null;
+    stop();
+    if (id) loopPhonic(id);
+  };
+  /** Let go: the repeating sound stops at once. A drop then says the letter's sound once, from the landing. */
+  const releaseTile = () => stop();
 
   // Typing a letter places it in the first matching empty slot (keyboard / screen-reader friendly).
   useEffect(() => {
@@ -324,7 +334,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
         <div className="flex min-w-0 flex-col items-center gap-4">
           {/* the target word: glowing outlines on a parchment strip */}
-          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper relative flex w-full flex-wrap items-center justify-center gap-2.5 rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:gap-3.5 sm:px-5 sm:pb-5 sm:pt-[5rem]">
+          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper pl-slot-row relative w-full rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]" style={{ '--n': target.length } as CSSProperties}>
             {/* Pip's perch: a band above the letters that is always there, so nothing moves when the word is finished */}
             <CompletionCreature trigger={creature.n} from={creature.from} perchRef={perchRef} reducedMotion={reducedMotion} onLand={onCreatureLand} />
             {splash > 0 && !reducedMotion ? <WordSplash key={splash} /> : null}
@@ -368,6 +378,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
                       onTap={tapTile}
                       onHover={setOver}
                       onDrop={dropTile}
+                      onHoldStart={holdTile}
+                      onHoldEnd={releaseTile}
                     />
                   )}
                 </li>

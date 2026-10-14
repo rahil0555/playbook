@@ -174,5 +174,100 @@ test.describe('Magic Letters feel', () => {
   });
 });
 
+/** reload until the round is the word with this text, so a test can rely on its letters */
+async function openRoundWith(page: Page, word: string) {
+  const clueOf = englishWords.find((w) => w.text === word)!.clue;
+  for (let i = 0; i < 60; i++) {
+    await openMagic(page);
+    if ((await page.locator('[data-magic-clue]').innerText()) === clueOf) return;
+    await page.reload();
+  }
+  throw new Error(`no round with ${word}`);
+}
+
+test.describe('dragging a five-letter word', () => {
+  for (const [name, viewport] of [
+    ['desktop', { width: 1280, height: 800 }],
+    ['phone', { width: 390, height: 844 }],
+  ] as const) {
+    test(`${name}: all five letters of APPLE sit on one row, glow before the drop, and each one lands on its spot`, async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize(viewport);
+      await openRoundWith(page, 'apple');
+      await page.locator('[data-magic-slot="4"]').scrollIntoViewIfNeeded();
+      const tops = await page.evaluate(() => [...document.querySelectorAll('[data-magic-slot]')].map((x) => Math.round(x.getBoundingClientRect().top)));
+      expect(new Set(tops).size, 'the five spots are in one row').toBe(1);
+
+      for (const [k, letter] of [...'apple'].entries()) {
+        // on a phone the tray sits below the fold: bring the spots to the top, so the spots and the tray are both on screen
+        await page.evaluate(() => document.querySelector('[data-magic-slot="0"]')!.scrollIntoView({ block: 'start' }));
+        const tile = page.locator(`[data-magic-tile][data-value="${letter}"][data-decoy="false"]`).first();
+        const tb = (await tile.boundingBox())!;
+        const sb = (await page.locator(`[data-magic-slot="${k}"]`).boundingBox())!;
+        const start = { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 };
+        const end = { x: sb.x + sb.width / 2, y: sb.y + sb.height / 2 };
+        await page.mouse.move(start.x, start.y);
+        await page.mouse.down();
+        const offsets: number[] = [];
+        const glowing: boolean[] = [];
+        for (let step = 1; step <= 14; step++) {
+          const x = start.x + ((end.x - start.x) * step) / 14;
+          const y = start.y + ((end.y - start.y) * step) / 14;
+          await page.mouse.move(x, y);
+          // let the drag render this move (two frames) before reading where the letter is
+          await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+          const seen = await page.evaluate(
+            ([v, slot]) => {
+              const b = document.querySelector(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!.getBoundingClientRect();
+              return {
+                cx: b.left + b.width / 2,
+                cy: b.top + b.height / 2,
+                glowing: document.querySelector(`[data-magic-slot="${slot}"]`)?.getAttribute('data-state') === 'over',
+              };
+            },
+            [letter, k] as const,
+          );
+          offsets.push(Math.hypot(seen.cx - x, seen.cy - y));
+          glowing.push(seen.glowing);
+        }
+        await page.mouse.up();
+        expect(Math.max(...offsets), `the ${letter} stays under the pointer (within a fingertip, allowing for frame timing)`).toBeLessThan(4);
+        expect(glowing.some(Boolean), `the spot for ${letter} glows as the letter comes close`).toBe(true);
+        await expect(page.locator(`[data-magic-slot="${k}"]`), `${letter} lands on spot ${k + 1}`).toHaveAttribute('data-state', 'filled', { timeout: 3000 });
+      }
+    });
+  }
+
+  test('a press makes the letter giggle at once, before it is let go', async ({ page }) => {
+    await recordFeel(page);
+    await openMagic(page);
+    const { value, tile } = await firstRealTile(page);
+    const box = (await tile.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    const moves = await page.evaluate(
+      (v) =>
+        new Promise<number>((resolve) => {
+          const el = document.querySelector<HTMLElement>(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
+          const inner = [...el.children].find((c) => c.classList.contains('block') && c.getAttribute('aria-hidden') === 'true') as HTMLElement;
+          let last = getComputedStyle(inner).transform;
+          let count = 0;
+          const start = performance.now();
+          const tick = () => {
+            const now = getComputedStyle(inner).transform;
+            if (now !== last) count += 1;
+            last = now;
+            if (performance.now() - start < 450) requestAnimationFrame(tick);
+            else resolve(count);
+          };
+          requestAnimationFrame(tick);
+        }),
+      value,
+    );
+    await page.mouse.up();
+    expect(moves, 'the letter shakes several times while it is pressed').toBeGreaterThanOrEqual(4);
+  });
+});
+
 /** what the child hears for a letter's sound and its name, from the same content pack the app uses */
 const nameOf = (v: string) => getContentPack('en').letters.find((l) => l.id === v)!.nameSpeech;

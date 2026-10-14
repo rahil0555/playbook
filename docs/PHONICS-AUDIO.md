@@ -29,9 +29,13 @@ a in WHALE says its name, the o in MOON is a long oo, and the o in LION is the s
 
 - **Picking up a letter** (tap): the sound it makes in this word, asked for after the pop (about 170 ms), so it never sits on
   top of it. The sound is for the spot the letter is heading for: the first empty spot with that letter.
+- **Holding a letter** (drag): its sound for this word repeats until the letter is let go, and stops at once on release.
+  A drop then says the letter's sound once, from its landing.
 - **Placing a letter** (drop or type): its sound, after its landing chime. A letter that was picked first has already had its
   sound, so placing it does not say it again.
 - **One sound at a time.** Picking another letter cancels the sound still waiting, and cuts short the one still playing.
+- **Dropping near a spot**: the empty spot a dragged letter is over or close to glows and pulses. The glow and the drop use the
+  same spot (the nearest empty one, within most of a spot's width).
 - **Silent letters** (the h in FISH, the e in KITE): picking or placing them asks for no sound, and picking one still cancels
   the sound that was on its way.
 - **Decoys and spare letters** (a tile that fits no spot): no letter sound.

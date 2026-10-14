@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
 import { SPEECH_STYLE, type PlayRequest, type Scheduled, type SfxName, type SpeakOutcome } from '../services/audioService';
-import { phonicRequest } from '../services/phonics';
+import { phonicLoopRequest, phonicRequest } from '../services/phonics';
 import type { AudioClipSet, LetterEntry, PhonemeId } from '../types/learning';
 
 /** Live audio status (speaking / unavailable / voice name). */
@@ -41,8 +41,10 @@ export function useSpeech() {
   const sayWord = useCallback((text: string, src?: string) => speak(text, src), [speak]);
   /** a Magic Letters sound (its recording), after `delayMs`; cancelled by stop() or by a newer sound */
   const laterPhonic = useCallback((id: PhonemeId, delayMs: number): Scheduled => audio.later(phonicRequest(id), delayMs), [audio]);
+  /** the sound repeats until stop() (a letter held down); the caller stops it when the letter is let go */
+  const loopPhonic = useCallback((id: PhonemeId) => void audio.play(phonicLoopRequest(id)), [audio]);
 
-  return { speak, speakSequence, speakLater, sfx, stop, sayLetterName, sayLetterSound, sayWord, laterPhonic };
+  return { speak, speakSequence, speakLater, sfx, stop, sayLetterName, sayLetterSound, sayWord, laterPhonic, loopPhonic };
 }
 
 const clip = (audio: AudioClipSet | undefined, key: keyof AudioClipSet) => audio?.[key];

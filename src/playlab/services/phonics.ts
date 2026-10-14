@@ -10,3 +10,8 @@ import type { PlayRequest } from './audioService';
 export function phonicRequest(id: PhonemeId): PlayRequest {
   return { text: id, clipOnly: true, src: PHONIC_CLIPS[id]?.url };
 }
+
+/** The same sound, repeating until it is stopped: used while a letter is held down (no recording, no sound). */
+export function phonicLoopRequest(id: PhonemeId): PlayRequest {
+  return { ...phonicRequest(id), loop: true };
+}

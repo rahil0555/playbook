@@ -4,9 +4,9 @@ import { usePlayLab } from '../../../app/PlayLabContext';
 import { useSpeech } from '../../../hooks/useAudio';
 import { StarBurst } from '../../../moments/StarBurst';
 import { tapSoundGate } from './magicFeel';
-import { elementUnder } from '../../../lib/dom';
 import { springs } from '../../../motion/variants';
 import { measurePose, type Pose } from '../../../moments/flightPath';
+import { nearestOpenSlot } from '../../../lib/dom';
 
 /** kept under its old name for Magic Letters: where a tile is right now */
 export const measureTile = measurePose;
@@ -26,6 +26,10 @@ interface LooseLetterProps {
   onHover: (slot: number | null) => void;
   /** pointer released; slot under it or null, plus where the bubble was when let go (viewport coordinates) */
   onDrop: (tileId: string, slot: number | null, pose: Pose | null) => void;
+  /** the letter is picked up by a drag: its sound starts repeating */
+  onHoldStart: (tileId: string) => void;
+  /** the letter is let go (before it is dropped): its sound stops at once */
+  onHoldEnd: () => void;
 }
 
 /** Where the bubble was when let go: the pointer position plus the grab offset, with the scale/tilt it had. */
@@ -35,17 +39,18 @@ function releasePose(el: Element | null, info: PanInfo, grab: { dx: number; dy: 
   return { ...m, cx: info.point.x - window.scrollX + grab.dx, cy: info.point.y - window.scrollY + grab.dy };
 }
 
-const slotAt = (info: PanInfo): number | null => {
-  const el = elementUnder(info, '[data-magic-slot]');
-  return el ? Number(el.dataset.magicSlot) : null;
-};
+/** The empty spot this bubble is over or close to. The glow and the drop both use it, so what the child sees is where it lands. */
+function nearestSlot(el: HTMLElement | null): number | null {
+  const slot = nearestOpenSlot(el, '[data-magic-slot]');
+  return slot ? Number(slot.dataset.magicSlot) : null;
+}
 
 /**
  * A loose letter bubble. Drag it onto a slot, or tap it to select (then tap a slot).
  * The drag target is the outer button; the miss-wobble runs on an inner span so it
  * never fights the drag transform.
  */
-export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop }: LooseLetterProps) {
+export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop, onHoldStart, onHoldEnd }: LooseLetterProps) {
   const { reducedMotion } = usePlayLab();
   const { sfx } = useSpeech();
   const wobble = useAnimationControls();
@@ -56,25 +61,27 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
   const ref = useRef<HTMLButtonElement>(null);
   /** pointer → bubble-centre offset, taken when the drag starts (so the release point never depends on render timing) */
   const grab = useRef<{ dx: number; dy: number } | null>(null);
+  /** a press that already giggled (so the click that follows it does not giggle again) */
+  const pressed = useRef(false);
 
   /**
-   * The touch response, started straight from the tap (not after a re-render) so it feels instant:
-   * a playful jelly wiggle with squash and stretch, a short pop sound and a tiny sparkle. Reduced motion keeps the
-   * sound and drops the movement. Rapid taps share one short pop, so they never stack into noise.
+   * The press: the letter giggles the moment it is pressed (a quick, squishy shake that dies away), before any release.
+   * Reduced motion drops the movement. A tap then also plays a short pop and a tiny sparkle; rapid taps share one pop.
    */
+  const giggle = () => {
+    if (reducedMotion) return;
+    void jiggle.start({
+      x: [0, -5, 5, -5, 5, -3, 3, 0],
+      rotate: [0, -8, 8, -8, 8, -4, 4, 0],
+      scaleX: [0.9, 1.1, 0.95, 1.05, 0.98, 1],
+      scaleY: [1.08, 0.9, 1.04, 0.96, 1],
+      transition: { duration: 0.6, ease: 'easeOut' },
+    });
+  };
   const feelTap = () => {
     if (!selected) {
       if (tapSoundGate.allow('tap')) sfx('boing');
-      if (!reducedMotion) {
-        void jiggle.start({
-          x: [0, -6, 6, -4, 3, 0],
-          rotate: [0, -9, 8, -5, 3, 0],
-          scaleX: [0.9, 1.12, 0.95, 1.04, 1],
-          scaleY: [1.08, 0.9, 1.05, 0.98, 1],
-          transition: { duration: 0.46, ease: 'easeOut' },
-        });
-        setSparkle((n) => n + 1);
-      }
+      if (!reducedMotion) setSparkle((n) => n + 1);
     } else if (tapSoundGate.allow('tap')) {
       sfx('pop');
     }
@@ -104,19 +111,31 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
       dragMomentum={false}
       dragElastic={0.2}
       whileDrag={{ scale: 1.22, rotate: -6, zIndex: 50 }}
+      onPointerDown={() => {
+        if (disabled) return;
+        pressed.current = true;
+        giggle();
+      }}
       onDragStart={(_, info) => {
         dragging.current = true;
+        onHoldStart(tile.id);
         const m = measureTile(ref.current);
         grab.current = m ? { dx: m.cx - (info.point.x - window.scrollX), dy: m.cy - (info.point.y - window.scrollY) } : null;
       }}
-      onDrag={(_, info) => onHover(slotAt(info))}
+      onDrag={() => onHover(nearestSlot(ref.current))}
       onDragEnd={(_, info) => {
+        const slot = nearestSlot(ref.current);
+        onHoldEnd(); // the sound stops before the drop can say the letter's own sound
         onHover(null);
-        onDrop(tile.id, slotAt(info), releasePose(ref.current, info, grab.current));
+        onDrop(tile.id, slot, releasePose(ref.current, info, grab.current));
+        pressed.current = false;
         setTimeout(() => (dragging.current = false), 0); // swallow the click that follows pointer-up
       }}
       onClick={() => {
+        const wasPressed = pressed.current;
+        pressed.current = false;
         if (dragging.current) return;
+        if (!wasPressed) giggle(); // keyboard, or a click without a press
         feelTap();
         onTap(tile.id);
       }}

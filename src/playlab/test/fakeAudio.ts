@@ -50,13 +50,16 @@ export function createFakeAudio(): AudioService {
       note('clip', req.text);
       if (!req.src) return Promise.resolve('unsupported'); // no recording: nothing is said in its place
       return new Promise((resolve) => {
-        const t = setTimeout(() => {
-          waiting.delete(cancel);
-          note('clipEnd', req.text);
-          resolve('played');
-        }, FAKE_CLIP_MS);
+        // a looping recording has no end: it plays until it is cancelled (stopped, or let go)
+        const t = req.loop
+          ? undefined
+          : setTimeout(() => {
+              waiting.delete(cancel);
+              note('clipEnd', req.text);
+              resolve('played');
+            }, FAKE_CLIP_MS);
         const cancel = () => {
-          clearTimeout(t);
+          if (t !== undefined) clearTimeout(t);
           waiting.delete(cancel);
           resolve('cancelled');
         };
