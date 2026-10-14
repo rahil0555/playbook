@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSpeech } from '../hooks/useAudio';
-import { sfxDurationMs } from '../services/audioService';
-import type { Phoneme } from '../types/learning';
+import { sfxDurationMs, type Scheduled } from '../services/audioService';
+import type { PhonemeId } from '../types/learning';
 import { createRepeatGate } from './gate';
 
 /** A spoken line starts this long after the pop or chime before it, so the two never overlap. */
@@ -23,7 +23,7 @@ export const POP_GAP_MS = 110;
  * Sound effects respect the sound toggle (the audio service mutes them); speech does too.
  */
 export function useMoments() {
-  const { sfx, speakLater, laterPhoneme } = useSpeech();
+  const { sfx, speakLater, laterPhonic } = useSpeech();
   const [pops] = useState(() => createRepeatGate(POP_GAP_MS));
   const pending = useRef(new Set<ReturnType<typeof setTimeout>>());
   /** the spoken line that is waiting for its sound to finish: cancel it to drop it */
@@ -55,9 +55,11 @@ export function useMoments() {
    * line share this slot, so a newer one always replaces an older one that has not started yet.
    */
   const queueWith = useCallback(
-    (schedule: () => () => void) => {
+    (schedule: () => Scheduled): Scheduled => {
       dropWaitingLine();
-      waitingLine.current = schedule();
+      const line = schedule();
+      waitingLine.current = line;
+      return line;
     },
     [dropWaitingLine],
   );
@@ -84,11 +86,11 @@ export function useMoments() {
       after,
       /** speak a line after the sound before it; a newer line replaces one still waiting */
       say: (text: string, delayMs = SPEECH_AFTER_SOUND_MS) => queueLine(text, delayMs),
-      /** a letter's sound for the word (its own voice and slow rate); replaces a line still waiting */
-      sayPhoneme: (phoneme: Phoneme, delayMs = SPEECH_AFTER_SOUND_MS) => queueWith(() => laterPhoneme(phoneme, delayMs)),
+      /** a letter's sound (its recording), after `delayMs`; replaces a line still waiting. Returns a handle: `done` settles when it has played */
+      sayPhonic: (id: PhonemeId, delayMs = SPEECH_AFTER_SOUND_MS): Scheduled => queueWith(() => laterPhonic(id, delayMs)),
       /** forget a line that is still waiting (e.g. "Start again": nothing from the old round may speak) */
       cancelSpeech: dropWaitingLine,
     }),
-    [after, pops, queueLine, queueWith, laterPhoneme, dropWaitingLine, sfx],
+    [after, pops, queueLine, queueWith, laterPhonic, dropWaitingLine, sfx],
   );
 }

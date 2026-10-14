@@ -1,15 +1,33 @@
-import { describe, expect, it } from 'vitest';
-import { PHONEMES } from '../data/en/phonemes';
-import { SPEECH_STYLE } from './audioService';
-import { phonemeRequest } from './phonics';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { PhonicClip } from '../audio/phonics';
 
-describe('phonemeRequest: how a letter sound is asked of the browser', () => {
-  it('says the phoneme\'s own speech, slowly, in the lesson language, with the shared rate', () => {
-    expect(phonemeRequest(PHONEMES.t, 'en-US')).toEqual({ text: 'tuh', lang: 'en-US', rate: SPEECH_STYLE.soundRate, src: undefined });
-    expect(SPEECH_STYLE.soundRate).toBe(0.8);
+// The recordings manifest is replaced here, so the mapping from sound to file can be checked with and without a file.
+const manifest = vi.hoisted(() => ({ PHONIC_CLIPS: {} as Record<string, PhonicClip> }));
+vi.mock('../audio/phonics', () => manifest);
+
+import { phonicRequest } from './phonics';
+
+afterEach(() => {
+  for (const key of Object.keys(manifest.PHONIC_CLIPS)) delete manifest.PHONIC_CLIPS[key];
+});
+
+describe('phonicRequest: a sound asks for its own recording', () => {
+  it('a sound with a recording plays exactly that file, as a recording only', () => {
+    manifest.PHONIC_CLIPS.t = { url: './assets/t.ogg', source: 'test', license: 'test' };
+    expect(phonicRequest('t')).toEqual({ text: 't', clipOnly: true, src: './assets/t.ogg' });
   });
 
-  it('uses a recorded clip instead of speech when one is supplied (no clips ship today)', () => {
-    expect(phonemeRequest({ ...PHONEMES.t, clip: '/clips/t.mp3' }, 'en-US').src).toBe('/clips/t.mp3');
+  it('each sound maps to its own file, not to another sound\'s', () => {
+    manifest.PHONIC_CLIPS.k = { url: './assets/k.ogg', source: 'test', license: 'test' };
+    manifest.PHONIC_CLIPS['a-short'] = { url: './assets/a-short.ogg', source: 'test', license: 'test' };
+    expect(phonicRequest('k').src).toBe('./assets/k.ogg');
+    expect(phonicRequest('a-short').src).toBe('./assets/a-short.ogg');
+    expect(phonicRequest('i-short').src, 'no recording for i-short').toBeUndefined();
+  });
+
+  it('a sound with no recording gets no file, and is never spoken in its place', () => {
+    const req = phonicRequest('t');
+    expect(req.src).toBeUndefined();
+    expect(req.clipOnly, 'so the audio service will not fall back to speech').toBe(true);
   });
 });

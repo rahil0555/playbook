@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PhonemeId } from '../../types/learning';
-import { englishLetters } from './alphabet';
 import { PHONEMES } from './phonemes';
+import { PHONIC_CLIPS, PHONIC_SOUNDS_WITHOUT_RECORDING } from '../../audio/phonics';
 import { englishWords } from './words';
 
 const word = (text: string) => englishWords.find((w) => w.text === text)!;
@@ -60,32 +60,33 @@ describe('Magic Letters: the sound of each letter in each word', () => {
   });
 });
 
-describe('Magic Letters: the sounds themselves', () => {
-  /** the consonant sounds, listed out so the check says exactly which sounds it covers */
-  const CONSONANTS: PhonemeId[] = ['b', 'd', 'f', 'g', 'h', 'k', 'l', 'm', 'n', 'ng', 'p', 'r', 's', 'sh', 't', 'w', 'z'];
+describe('Magic Letters: the recording for each sound', () => {
+  it('every sound in the catalogue is either recorded, or listed as still needing a recording (none is left out)', () => {
+    const recorded = Object.keys(PHONIC_CLIPS);
+    const listed = new Set(PHONIC_SOUNDS_WITHOUT_RECORDING);
+    for (const id of Object.keys(PHONEMES) as PhonemeId[]) {
+      expect(recorded.includes(id) || listed.has(id), `${id} has no recording status`).toBe(true);
+    }
+    for (const id of recorded) expect(listed.has(id as PhonemeId), `${id} is recorded and listed as missing`).toBe(false);
+  });
 
-  it('every sound has a speech text, a quality and a teacher example', () => {
-    for (const p of Object.values(PHONEMES)) {
-      expect(p.speech.length, p.id).toBeGreaterThan(0);
-      expect(['clean', 'approximate', 'unreliable'], p.id).toContain(p.quality);
-      expect(p.example.length, p.id).toBeGreaterThan(0);
+  it('every recording names its source and licence, so it can be checked and credited', () => {
+    for (const [id, clip] of Object.entries(PHONIC_CLIPS)) {
+      expect(clip!.url.length, `${id} url`).toBeGreaterThan(0);
+      expect(clip!.source.length, `${id} source`).toBeGreaterThan(0);
+      expect(clip!.license.length, `${id} licence`).toBeGreaterThan(0);
     }
   });
 
-  it('no consonant sound is said as a letter name (browser speech would say "ef", "em", "tee"...)', () => {
-    const names = new Set(englishLetters.map((l) => l.nameSpeech));
-    for (const id of CONSONANTS) expect(names.has(PHONEMES[id].speech), `${id} is said as a letter name`).toBe(false);
+  it('no sound has a spelling-based stand-in: a sound is a recording or it is nothing', () => {
+    // the catalogue holds names and examples only; no spoken text exists for a sound
+    for (const p of Object.values(PHONEMES)) expect(Object.keys(p).sort()).toEqual(['example', 'id', 'symbol']);
   });
 
-  it('no sound is said as a word that is one of the answers, so a sound can never give the word away', () => {
-    const answers = new Set(englishWords.map((w) => w.text));
-    for (const p of Object.values(PHONEMES)) expect(answers.has(p.speech), `${p.id} would say the answer`).toBe(false);
-  });
-
-  it('clean sounds are the ones the browser voice is expected to make without an extra sound', () => {
-    expect(PHONEMES['u-short'].quality).toBe('clean');
-    expect(PHONEMES['i-long'].speech).toBe('eye');
-    expect(PHONEMES['oo-long'].speech).toBe('oo');
-    expect(PHONEMES.t.quality, 'the /t/ is the sound most worth listening to on a real device').toBe('approximate');
+  it('every sound has a symbol and a teacher example word', () => {
+    for (const p of Object.values(PHONEMES)) {
+      expect(p.symbol.length, p.id).toBeGreaterThan(0);
+      expect(p.example.length, p.id).toBeGreaterThan(0);
+    }
   });
 });

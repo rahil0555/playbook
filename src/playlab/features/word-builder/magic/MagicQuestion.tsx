@@ -18,7 +18,7 @@ import { useMoments } from '../../../moments/useMoments';
 import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
-import { PHONEMES } from '../../../data/en/phonemes';
+import type { Scheduled } from '../../../services/audioService';
 import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
@@ -27,8 +27,8 @@ const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
 
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
-  const { content, level, reducedMotion } = usePlayLab();
-  const { speak, sfx, sayLetterSound, sayPhoneme, stop } = useSpeech();
+  const { level, reducedMotion } = usePlayLab();
+  const { speak, sfx, stop } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
   const target = useMemo(() => word.text.split(''), [word.text]);
@@ -57,9 +57,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const generation = useRef(0);
   const scene = useRef<HTMLDivElement>(null);
   const freshTimer = useRef<ReturnType<typeof setTimeout>>();
-  /** the spoken phonics sound / the spoken cheer: scheduled a moment after the pop or chime, so they never overlap */
-  const speechTimer = useRef<ReturnType<typeof setTimeout>>();
   const [phonicsGate] = useState(() => createRepeatGate(PHONICS_GAP_MS));
+  /** tiles whose sound was already said when they were picked up: placing them does not say it again */
+  const soundedTiles = useRef(new Set<string>());
+  /** the most recent letter sound: the cheer waits for it to finish */
+  const lastSound = useRef<Scheduled | null>(null);
   const [picks, setPicks] = useState(0);
   /** Pip's hop onto the word: a counter (each completion) and where the picture is, relative to the perch */
   const [creature, setCreature] = useState<{ n: number; from: { x: number; y: number } }>({ n: 0, from: { x: 0, y: -90 } });
@@ -75,7 +77,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   useEffect(
     () => () => {
       clearTimeout(freshTimer.current);
-      clearTimeout(speechTimer.current);
+      generation.current += 1; // a cheer still waiting for its letter sound does not play after the question is gone
     },
     [],
   );
@@ -115,13 +117,17 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     void stripRing.start({ opacity: [0, 0.95, 0], scale: [0.985, 1.015, 1.03], transition: { duration: 0.75, ease: 'easeOut' } });
     fire('burst', { x: 50, y: 30 });
     moments.celebrate();
-    // say() replaces a cheer still waiting, so one landing can never queue two
-    moments.say(`Hooray! You spelled ${word.text}!`);
+    // the cheer waits for the last letter's sound to finish (or is said at once when there is none still playing)
+    const round = generation.current;
+    const lastDone: Promise<unknown> = lastSound.current?.done ?? Promise.resolve();
+    void lastDone.then(() => {
+      if (round === generation.current) moments.say(`Hooray! You spelled ${word.text}!`);
+    });
   }, [fire, moments, stripRing, word.text]);
 
   /** A letter has arrived visually: show it in its slot, and on the last one start the completion (Pip's hop, then the landing). */
   const land = useCallback(
-    (slotIndex: number) => {
+    (slotIndex: number, tileId: string) => {
       if (landedRef.current.has(slotIndex)) return;
       landedRef.current.add(slotIndex);
       setLanded(new Set(landedRef.current));
@@ -140,16 +146,17 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       } else {
         sfx('chime');
       }
-      // the letter's own sound for this word, after its chime; not repeated if it was just said when the letter was picked up
+      // the letter's own sound for this word, after its chime; not said again if it was said when the tile was picked up
+      const alreadySaid = soundedTiles.current.delete(tileId);
       const id = word.sounds[slotIndex];
-      if (id && phonicsGate.allow(id)) moments.sayPhoneme(PHONEMES[id]);
+      if (id && !alreadySaid && phonicsGate.allow(id)) lastSound.current = moments.sayPhonic(id);
     },
     [target.length, sfx, reducedMotion, animal, word.sounds, moments, phonicsGate],
   );
 
   const onFlightLand = useCallback(
     (f: Flight) => {
-      if (f.generation === generation.current) land(f.slotIndex);
+      if (f.generation === generation.current) land(f.slotIndex, f.id);
     },
     [land],
   );
@@ -193,7 +200,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
         setAnnounce(`${tile.value.toUpperCase()} placed in slot ${slotIndex + 1}.`);
         const flight = reducedMotion ? null : planFlight(tile, slotIndex, pose);
         if (flight) setFlights((all) => [...all, flight]);
-        else land(slotIndex); // reduced motion (or nothing to measure): appear in place, no travel
+        else land(slotIndex, tileId); // reduced motion (or nothing to measure): appear in place, no travel
       } else if (result.kind === 'wrong') {
         miss(tile, slotIndex);
       } else if (result.kind === 'occupied') {
@@ -213,18 +220,16 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     setPicks((n) => n + 1);
     if (picking && t) {
       // the sound this letter makes in THIS word: the spot it is heading for is the first empty one with that letter.
-      // A letter that fits nowhere (a decoy, or a spare copy) gets its usual letter sound.
+      // A decoy, a spare copy, or a silent letter has no sound here: picking it still stops the sound before it.
       const slot = slotFor(target, slotsRef.current, t.value);
-      const id = slot !== null ? word.sounds[slot] : null;
-      const letter = slot === null ? content.letters.find((l) => l.id === t.value) : undefined;
-      const key = id ?? (letter ? `letter:${t.value}` : null); // null: this letter is silent here
-      // a sound that was just said for this letter is not repeated, and the first one carries on
-      if (key === null || phonicsGate.allow(key)) {
-        // a different sound (or silence) takes over from anything still being said or waiting to be said
-        clearTimeout(speechTimer.current);
-        stop();
-        if (id) speechTimer.current = setTimeout(() => void sayPhoneme(PHONEMES[id]), PHONICS_DELAY_MS);
-        else if (letter) speechTimer.current = setTimeout(() => void sayLetterSound(letter), PHONICS_DELAY_MS);
+      const id = slot !== null ? (word.sounds[slot] ?? null) : null;
+      // a sound just said for this letter is not repeated (rapid taps)
+      if (id === null || phonicsGate.allow(id)) {
+        stop(); // a different sound (or silence) takes over from anything still being said or waiting
+        if (id) {
+          soundedTiles.current.add(tileId); // placing this tile will not say it again
+          lastSound.current = moments.sayPhonic(id, PHONICS_DELAY_MS);
+        }
       }
     }
     setAnnounce(picking ? `${t?.value.toUpperCase()} picked up. Now choose a spot.` : 'Put the letter down.');
@@ -264,9 +269,10 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   }, [tiles, target, done, attempt, miss]);
 
   const startAgain = () => {
-    clearTimeout(speechTimer.current); // nothing from the old word may speak over the new one
     moments.cancelSpeech(); // a line still waiting to be said
     stop(); // and a line already being said (a cheer or a letter sound)
+    soundedTiles.current.clear();
+    lastSound.current = null;
     setCreature((c) => ({ n: 0, from: c.from })); // Pip goes back to the picture's side of the board
     setCelebrated(false);
     setSplash(0);

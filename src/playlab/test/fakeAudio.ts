@@ -1,15 +1,17 @@
-import type { AudioService, AudioSnapshot, PlayRequest } from '../services/audioService';
+import type { AudioService, AudioSnapshot, PlayRequest, Scheduled, SpeakOutcome } from '../services/audioService';
 import { listEnglishVoices, type VoiceLike } from '../services/voiceCatalog';
 
-/** Every request that reached the (fake) audio service, in order. */
+/** Every request that reached the (fake) audio service, in order. Clip-only requests are here too (see `clipOnly`). */
 export const audioLog: PlayRequest[] = [];
 export const sfxLog: string[] = [];
+/** How long a fake recording takes to play, in ms. Lines that wait for a recording wait this long. */
+export const FAKE_CLIP_MS = 400;
 /**
- * Everything the audio made, with the time (performance.now) it happened: a sound effect, a line said, or a stop.
- * Timing tests read this, so they can check what came first and how far apart.
+ * Everything the audio made, with the time (performance.now) it happened: a sound effect, a line said, a recording
+ * started or ended, or a stop. Timing tests read this, so they can check what came first and how far apart.
  */
-export const timeline: { t: number; kind: 'sfx' | 'say' | 'stop'; what: string }[] = [];
-const note = (kind: 'sfx' | 'say' | 'stop', what: string) => timeline.push({ t: performance.now(), kind, what });
+export const timeline: { t: number; kind: 'sfx' | 'say' | 'clip' | 'clipEnd' | 'stop'; what: string }[] = [];
+const note = (kind: (typeof timeline)[number]['kind'], what: string) => timeline.push({ t: performance.now(), kind, what });
 /** Ids passed to setVoice, in order. */
 export const voiceLog: (string | null)[] = [];
 
@@ -37,34 +39,67 @@ export function createFakeAudio(): AudioService {
     snapshot = { ...snapshot, ...patch };
     listeners.forEach((l) => l());
   };
-  const waiting = new Set<ReturnType<typeof setTimeout>>();
+  /** lines and recordings waiting for their moment: each one is its cancel function */
+  const waiting = new Set<() => void>();
+
+  /** Plays one request the way the real service does: a recording (for `clipOnly`, never speech), or a spoken line. */
+  const playNow = (req: PlayRequest): Promise<SpeakOutcome> => {
+    audioLog.push(req);
+    if (snapshot.muted) return Promise.resolve('muted');
+    if (req.clipOnly) {
+      note('clip', req.text);
+      if (!req.src) return Promise.resolve('unsupported'); // no recording: nothing is said in its place
+      return new Promise((resolve) => {
+        const t = setTimeout(() => {
+          waiting.delete(cancel);
+          note('clipEnd', req.text);
+          resolve('played');
+        }, FAKE_CLIP_MS);
+        const cancel = () => {
+          clearTimeout(t);
+          waiting.delete(cancel);
+          resolve('cancelled');
+        };
+        waiting.add(cancel);
+      });
+    }
+    note('say', req.text);
+    return Promise.resolve('played');
+  };
+
   return {
-    play: async (req) => {
-      audioLog.push(req);
-      note('say', req.text);
-      return snapshot.muted ? 'muted' : 'played';
-    },
+    play: async (req) => playNow(req),
     playSequence: async (reqs) => {
-      audioLog.push(...reqs);
-      reqs.forEach((r) => note('say', r.text));
-      return 'played';
+      let last: SpeakOutcome = 'played';
+      for (const r of reqs) {
+        last = await playNow(r);
+        if (last !== 'played') break;
+      }
+      return last;
     },
     stop: () => {
       note('stop', '');
-      waiting.forEach((t) => clearTimeout(t));
+      [...waiting].forEach((cancel) => cancel());
       waiting.clear();
     },
-    later: (req, delayMs) => {
-      const t = setTimeout(() => {
-        waiting.delete(t);
-        audioLog.push(req);
-        note('say', req.text);
-      }, delayMs);
-      waiting.add(t);
-      return () => {
-        clearTimeout(t);
-        waiting.delete(t);
+    later: (req, delayMs): Scheduled => {
+      let resolveDone: (outcome: SpeakOutcome) => void = () => undefined;
+      const done = new Promise<SpeakOutcome>((resolve) => (resolveDone = resolve));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const cancel = () => {
+        if (timer === undefined) return;
+        clearTimeout(timer);
+        timer = undefined;
+        waiting.delete(cancel);
+        resolveDone('cancelled');
       };
+      timer = setTimeout(() => {
+        timer = undefined;
+        waiting.delete(cancel);
+        void playNow(req).then(resolveDone);
+      }, delayMs);
+      waiting.add(cancel);
+      return Object.assign(cancel, { done });
     },
     sfx: (name) => {
       sfxLog.push(name);

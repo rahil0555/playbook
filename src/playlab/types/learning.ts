@@ -65,14 +65,8 @@ export interface Phoneme {
   id: PhonemeId;
   /** the sound, for teachers, e.g. "/k/" or "/æ/" */
   symbol: string;
-  /** what the browser voice is asked to say (a respelling, chosen by testing; see docs/PHONICS-AUDIO.md) */
-  speech: string;
-  /** how close the browser voice is expected to get: 'clean', 'approximate' (a short extra sound is added) or 'unreliable' */
-  quality: 'clean' | 'approximate' | 'unreliable';
   /** a word that has this sound, for teachers (never spoken, so it cannot give an answer away) */
   example: string;
-  /** a recorded clip, when one is supplied; PlayLab ships none */
-  clip?: string;
 }
 
 export interface WordEntry {

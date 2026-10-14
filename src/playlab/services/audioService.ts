@@ -33,7 +33,9 @@ export const SPEECH_STYLE = {
 export const START_TIMEOUT_MS = 2500;
 export const ONLINE_START_TIMEOUT_MS = 6000;
 
-export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error';
+export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error' | 'cancelled';
+/** Calling it cancels the line or sound; `done` settles once it has been played, or dropped. */
+export type Scheduled = (() => void) & { readonly done: Promise<SpeakOutcome> };
 /** 'boing' = a soft playful pop when a tile is picked up; 'chime' = a gentle landing; 'sparkle' = a tiny shimmer. */
 export type SfxName = 'tap' | 'pop' | 'place' | 'correct' | 'oops' | 'celebrate' | 'boing' | 'chime' | 'sparkle';
 
@@ -43,6 +45,11 @@ export interface PlayRequest {
   lang?: string;
   /** Optional URL of a recorded clip. Used before speech synthesis. */
   src?: string;
+  /**
+   * A recording only: it is played from `src`, or not at all. Nothing is spoken in its place, so a missing recording can
+   * never turn into a made-up sound. Then `text` is only a label (for logs and tests), never read aloud.
+   */
+  clipOnly?: boolean;
   rate?: number;
   pitch?: number;
   /**
@@ -75,7 +82,7 @@ export interface AudioService {
    * Say `request` after `delayMs`, unless stop() is called first. Returns a function that cancels it (a newer line can
    * replace one that is still waiting). Used for praise that follows a fanfare, so it can be cancelled when the child leaves.
    */
-  later(request: PlayRequest, delayMs: number): () => void;
+  later(request: PlayRequest, delayMs: number): Scheduled;
   sfx(name: SfxName): void;
   setMuted(muted: boolean): void;
   /** Choose the voice for future speech (null = automatic). Unknown/stale ids fall back to automatic. */
@@ -146,9 +153,13 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   const listeners = new Set<() => void>();
   let ctx: AudioContext | null = null;
   let currentClip: HTMLAudioElement | null = null;
+  /** ends the clip that is playing now (replaced or stopped count as played); null when none is */
+  let endClip: (() => void) | null = null;
+  /** settles when the playing clip has finished, or at once when none is playing */
+  let clipIdle: Promise<void> = Promise.resolve();
   let token = 0; // bumped by stop() so queued sequence items are dropped
-  /** lines waiting for their delay (see later()): stop() cancels them all */
-  const waiting = new Set<ReturnType<typeof setTimeout>>();
+  /** lines waiting for their delay (see later()): calling one cancels it; stop() cancels them all */
+  const waiting = new Set<() => void>();
   /**
    * Utterances the browser is still speaking. Kept referenced until they end: some browsers stop speaking, and never report
    * the end, when the only reference to an utterance is garbage-collected mid-sentence.
@@ -267,21 +278,60 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     });
   };
 
+  /** Stop the clip that is playing, if any, and release whatever is waiting for it. */
+  const stopClip = () => {
+    const end = endClip;
+    endClip = null;
+    try {
+      currentClip?.pause();
+    } catch {
+      /* ignore */
+    }
+    currentClip = null;
+    end?.();
+  };
+
+  /** Speech that must not be heard over a sound: cancel it (a letter sound replaces anything being said). */
+  const cancelSpeech = () => {
+    try {
+      env.synth?.cancel();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  /** Play a recording. One clip at a time: a new clip replaces the one playing. Resolves when it has finished. */
   const playClip = (src: string): Promise<boolean> => {
     const { AudioElement } = env;
+    stopClip();
     if (!AudioElement) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
+      let release: () => void = () => undefined;
+      clipIdle = new Promise<void>((r) => (release = r));
+      let clip: HTMLAudioElement | null = null;
+      let settled = false;
+      const end = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (clip && currentClip === clip) {
+          currentClip = null;
+          endClip = null;
+        }
+        set({ speaking: false });
+        resolve(ok);
+        release();
+      };
       try {
-        const clip = new AudioElement(src);
+        clip = new AudioElement(src);
         currentClip = clip;
-        clip.onended = () => resolve(true);
-        clip.onerror = () => resolve(false);
+        endClip = () => end(true); // replaced or stopped: not a failure
+        clip.onended = () => end(true);
+        clip.onerror = () => end(false);
         const p = clip.play();
-        if (p && typeof p.catch === 'function') p.catch(() => resolve(false));
+        if (p && typeof p.catch === 'function') p.catch(() => end(false));
         set({ speaking: true });
-        clip.addEventListener('ended', () => set({ speaking: false }));
       } catch {
-        resolve(false);
+        end(false);
       }
     });
   };
@@ -289,7 +339,15 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   const play: AudioService['play'] = async (req) => {
     if (snapshot.muted) return 'muted';
     try {
+      if (req.clipOnly) {
+        // a recording only: with no recording there is nothing to play, and nothing is spoken instead
+        if (!req.src) return 'unsupported';
+        cancelSpeech();
+        return (await playClip(req.src)) ? 'played' : 'error';
+      }
       if (req.src && (await playClip(req.src))) return 'played';
+      // speech never starts on top of a recording that is still playing; with none playing, a line is spoken at once
+      if (endClip) await clipIdle;
       return await speak(req);
     } catch {
       return 'error';
@@ -298,14 +356,10 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
 
   const stop: AudioService['stop'] = () => {
     token += 1;
-    waiting.forEach((t) => clearTimeout(t));
+    [...waiting].forEach((cancel) => cancel());
     waiting.clear();
-    try {
-      env.synth?.cancel();
-      currentClip?.pause();
-    } catch {
-      /* ignore */
-    }
+    cancelSpeech();
+    stopClip();
     set({ speaking: false });
   };
 
@@ -348,15 +402,23 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     },
     stop,
     later(request, delayMs) {
-      const t = setTimeout(() => {
-        waiting.delete(t);
-        void play(request);
-      }, delayMs);
-      waiting.add(t);
-      return () => {
-        clearTimeout(t);
-        waiting.delete(t);
+      let resolveDone: (outcome: SpeakOutcome) => void = () => undefined;
+      const done = new Promise<SpeakOutcome>((resolve) => (resolveDone = resolve));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const cancel = () => {
+        if (timer === undefined) return; // already played or already cancelled
+        clearTimeout(timer);
+        timer = undefined;
+        waiting.delete(cancel);
+        resolveDone('cancelled');
       };
+      timer = setTimeout(() => {
+        timer = undefined;
+        waiting.delete(cancel);
+        void play(request).then(resolveDone);
+      }, delayMs);
+      waiting.add(cancel);
+      return Object.assign(cancel, { done });
     },
     sfx(name) {
       if (snapshot.muted) return;
