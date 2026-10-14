@@ -417,7 +417,7 @@
 }
 @media (min-width: 640px) {
   .pl-root.pl-root .pl-slot-row {
-    grid-template-columns: repeat(var(--n, 4), minmax(0, 5.4rem));
+    grid-template-columns: repeat(var(--n, 4), minmax(0, 5.8rem));
     gap: 0.875rem;
   }
 }
@@ -434,3 +434,190 @@
   50% { opacity: 1; transform: scale(1.08); }
 }
 .pl-aura { animation: pl-aura 1.6s ease-in-out infinite; }
+
+/* ---------- Magic Letters: the letter monsters and the storybook ---------- */
+
+@keyframes pl-eye-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.1); }
+}
+
+/* a letter is a squishy, glossy monster. Everything inside is sized in em: the font size is the monster's size. */
+.pl-root.pl-root .pl-monster {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  font-size: 1.36rem;
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.95) 0 7%, rgba(255, 255, 255, 0) 20%),
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--gem) 55%, white) 0%, var(--gem) 58%, color-mix(in srgb, var(--gem) 66%, black) 100%);
+  box-shadow:
+    inset 0 -0.42em 0 rgba(0, 0, 0, 0.13),
+    inset 0 0.16em 0.22em rgba(255, 255, 255, 0.38),
+    0 0.26em 0 color-mix(in srgb, var(--gem) 52%, black),
+    0 0.7em 0.9em -0.35em rgba(40, 20, 60, 0.42);
+}
+@media (min-width: 640px) {
+  .pl-root.pl-root .pl-monster {
+    font-size: 1.8rem;
+  }
+}
+/* two little feet */
+.pl-root.pl-root .pl-monster::before,
+.pl-root.pl-root .pl-monster::after {
+  content: '';
+  position: absolute;
+  bottom: -0.3em;
+  width: 0.9em;
+  height: 0.46em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--gem) 60%, black);
+  box-shadow: inset 0 -0.1em 0 rgba(0, 0, 0, 0.15);
+}
+.pl-root.pl-root .pl-monster::before { left: 18%; }
+.pl-root.pl-root .pl-monster::after { right: 18%; }
+
+.pl-root.pl-root .pl-monster-eyes {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  top: 14%;
+  height: 40%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pl-root.pl-root .pl-monster-eye {
+  position: relative;
+  width: 40%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 34%, #ffffff 0 52%, #e6edf8 100%);
+  box-shadow: inset 0 -0.12em 0 rgba(20, 30, 60, 0.14), 0 0.07em 0 rgba(0, 0, 0, 0.18);
+  transform-origin: center 60%;
+  animation: pl-eye-blink 4.6s ease-in-out infinite;
+  transition: scale 0.15s ease-out;
+}
+/* googly pupils: they roll toward the way the monster is moving (--lx / --ly, set by the component) */
+.pl-root.pl-root .pl-monster-pupil {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 46%;
+  aspect-ratio: 1;
+  margin: -23% 0 0 -23%;
+  border-radius: 50%;
+  background: #1f1733;
+  transform: translate(calc(var(--lx, 0) * 0.16em), calc(var(--ly, 0) * 0.12em));
+  transition: transform 0.12s linear;
+}
+.pl-root.pl-root .pl-monster-pupil::after {
+  content: '';
+  position: absolute;
+  left: 22%;
+  top: 18%;
+  width: 26%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* the mouth: a smile, unless the mood says otherwise */
+.pl-root.pl-root .pl-monster-mouth {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 34%;
+  height: 0.2em;
+  transform: translateX(-50%);
+  border-bottom: 0.14em solid #2a1838;
+  border-radius: 0 0 999px 999px;
+}
+.pl-root.pl-root .pl-monster--scream .pl-monster-mouth {
+  top: 54%;
+  width: 0.46em;
+  height: 0.46em;
+  border: 0;
+  border-radius: 50%;
+  background: #2a1838;
+}
+.pl-root.pl-root .pl-monster--cheer .pl-monster-mouth {
+  top: 53%;
+  width: 46%;
+  height: 0.5em;
+  border: 0;
+  background: #2a1838;
+  border-radius: 0 0 999px 999px;
+}
+.pl-root.pl-root .pl-monster--think .pl-monster-mouth {
+  top: 58%;
+  width: 24%;
+  border-radius: 0;
+}
+.pl-root.pl-root .pl-monster--oops .pl-monster-mouth {
+  top: 58%;
+  width: 26%;
+  border-bottom-width: 0.12em;
+  transform: translateX(-50%) rotate(-10deg);
+}
+.pl-root.pl-root .pl-monster--scream .pl-monster-eye { scale: 1.18; }
+.pl-root.pl-root .pl-monster--scream .pl-monster-pupil { scale: 0.62; }
+.pl-root.pl-root .pl-monster--oops .pl-monster-eye { scale: 0.9; }
+.pl-root.pl-root .pl-monster--cheer .pl-monster-eye { scale: 1.06; }
+
+.pl-root.pl-root .pl-monster-letter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3%;
+  text-align: center;
+  font-size: 1.12em;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0.12em 0 rgba(40, 20, 60, 0.3);
+}
+.pl-root[data-motion='reduce'] .pl-monster-eye { animation: none; }
+
+/* storybook canvas: a pastel page with soft shadows, for the board, the word strip and the letter tray */
+.pl-root.pl-root .pl-story-board {
+  background:
+    radial-gradient(circle at 1.5px 1.5px, rgba(255, 255, 255, 0.75) 1.4px, transparent 1.9px) 0 0 / 20px 20px,
+    linear-gradient(180deg, #fff9ee 0%, #ffe9f2 52%, #e8f4ff 100%);
+  border: 6px solid #ffffff;
+  box-shadow: 0 0 0 4px #ffd7a1, 0 12px 0 rgba(150, 110, 200, 0.2), 0 30px 50px -22px rgba(90, 70, 150, 0.45);
+}
+.pl-root.pl-root .pl-story-strip {
+  background: linear-gradient(180deg, #f8fff9 0%, #e3f8ee 100%);
+  border: 3px solid #ffffff;
+  box-shadow: inset 0 0 0 2px #cdeedd, 0 8px 0 rgba(90, 170, 130, 0.18), 0 18px 26px -16px rgba(40, 110, 90, 0.35);
+}
+.pl-root.pl-root .pl-story-tray {
+  background: linear-gradient(180deg, #f3ebff 0%, #ffe6f3 100%);
+  border: 3px solid #ffffff;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.9), inset 0 -6px 0 rgba(160, 110, 200, 0.14), 0 8px 0 rgba(160, 110, 200, 0.2), 0 18px 26px -16px rgba(90, 60, 150, 0.35);
+}
+
+/* the storybook page that opens over the finished word */
+.pl-root.pl-root .pl-storybook-overlay {
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.94), rgba(255, 238, 248, 0.96) 70%);
+}
+.pl-root.pl-root .pl-storybook-page {
+  background: linear-gradient(170deg, #fffdf6 0%, #fff0e0 100%);
+  border: 6px solid #f6c77a;
+  box-shadow: 0 0.6rem 0 rgba(150, 100, 40, 0.25), 0 2rem 3rem -1rem rgba(60, 40, 90, 0.45);
+}
+.pl-root.pl-root .pl-storybook-title {
+  color: #6a2fb0;
+  text-shadow: 0 3px 0 #ffd36b, 0 6px 0 rgba(0, 0, 0, 0.08);
+}
+.pl-root.pl-root .pl-storybook-line {
+  color: #3b2d56;
+}
+.pl-root.pl-root .pl-storybook-close {
+  background: linear-gradient(180deg, #8ef0c4 0%, #33c489 100%);
+  box-shadow: 0 5px 0 #1e8a5e, 0 10px 16px -8px rgba(20, 80, 60, 0.5);
+  color: #0c3b2a;
+}
+

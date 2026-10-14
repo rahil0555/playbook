@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { motion, useAnimationControls, type PanInfo } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useAnimationControls, useMotionValue, useSpring, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { useSpeech } from '../../../hooks/useAudio';
 import { StarBurst } from '../../../moments/StarBurst';
 import { tapSoundGate } from './magicFeel';
 import { springs } from '../../../motion/variants';
-import { measurePose, type Pose } from '../../../moments/flightPath';
+import { clamp, measurePose, type Pose } from '../../../moments/flightPath';
 import { nearestOpenSlot } from '../../../lib/dom';
+import { LetterMonster, type MonsterMood } from '../../../components/LetterMonster';
+import type { MagicTile } from './magicBoard';
 
 /** kept under its old name for Magic Letters: where a tile is right now */
 export const measureTile = measurePose;
-import type { MagicTile } from './magicBoard';
 
 interface LooseLetterProps {
   tile: MagicTile;
@@ -22,9 +23,9 @@ interface LooseLetterProps {
   /** increments each time this tile should wobble (a miss) */
   wobbleKey: number;
   onTap: (tileId: string) => void;
-  /** slot under the pointer while dragging (null = none) */
+  /** slot under the letter while dragging (null = none) */
   onHover: (slot: number | null) => void;
-  /** pointer released; slot under it or null, plus where the bubble was when let go (viewport coordinates) */
+  /** pointer released; slot it is over or close to, or null, plus where the bubble was when let go (viewport coordinates) */
   onDrop: (tileId: string, slot: number | null, pose: Pose | null) => void;
   /** the letter is picked up by a drag: its sound starts repeating */
   onHoldStart: (tileId: string) => void;
@@ -32,52 +33,73 @@ interface LooseLetterProps {
   onHoldEnd: () => void;
 }
 
-/** Where the bubble was when let go: the pointer position plus the grab offset, with the scale/tilt it had. */
+/** Where the monster was when let go: the pointer position plus the grab offset, with the scale/tilt it had. */
 function releasePose(el: Element | null, info: PanInfo, grab: { dx: number; dy: number } | null): Pose | null {
   const m = measureTile(el);
   if (!m || !grab) return m;
   return { ...m, cx: info.point.x - window.scrollX + grab.dx, cy: info.point.y - window.scrollY + grab.dy };
 }
 
-/** The empty spot this bubble is over or close to. The glow and the drop both use it, so what the child sees is where it lands. */
+/** The empty spot this monster is over or close to. The glow and the drop both use it, so what the child sees is where it lands. */
 function nearestSlot(el: HTMLElement | null): number | null {
   const slot = nearestOpenSlot(el, '[data-magic-slot]');
   return slot ? Number(slot.dataset.magicSlot) : null;
 }
 
 /**
- * A loose letter bubble. Drag it onto a slot, or tap it to select (then tap a slot).
- * The drag target is the outer button; the miss-wobble runs on an inner span so it
- * never fights the drag transform.
+ * A letter monster: a squishy character with googly eyes. Press it and it squishes; drag it and it stretches, wobbles with
+ * its motion, and screams; let it go and it snaps back. A miss makes it wobble. Drag it onto a spot, or tap it to pick it
+ * up (then tap a spot). The drag target is the outer button; the reactions run on inner spans so they never fight the drag.
  */
 export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop, onHoldStart, onHoldEnd }: LooseLetterProps) {
   const { reducedMotion } = usePlayLab();
   const { sfx } = useSpeech();
+  const squish = useAnimationControls();
   const wobble = useAnimationControls();
-  const jiggle = useAnimationControls();
+  const lookX = useMotionValue(0);
+  const lookY = useMotionValue(0);
+  const tilt = useSpring(0, { stiffness: 240, damping: 13 });
+  const stretchX = useSpring(1, { stiffness: 320, damping: 14 });
+  const stretchY = useSpring(1, { stiffness: 320, damping: 14 });
   /** changes on every pick-up, so the sparkle plays again each time (and only the latest one is kept in the DOM) */
   const [sparkle, setSparkle] = useState(0);
+  /** held down by a drag: the face screams */
+  const [held, setHeld] = useState(false);
+  /** pressed a moment ago: the face screams briefly */
+  const [reacting, setReacting] = useState(false);
+  /** missed a moment ago: the face is worried */
+  const [missed, setMissed] = useState(false);
   const dragging = useRef(false);
-  const ref = useRef<HTMLButtonElement>(null);
-  /** pointer → bubble-centre offset, taken when the drag starts (so the release point never depends on render timing) */
-  const grab = useRef<{ dx: number; dy: number } | null>(null);
-  /** a press that already giggled (so the click that follows it does not giggle again) */
   const pressed = useRef(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  /** pointer → monster-centre offset, taken when the drag starts (so the release point never depends on render timing) */
+  const grab = useRef<{ dx: number; dy: number } | null>(null);
+  const reactTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  /**
-   * The press: the letter giggles the moment it is pressed (a quick, squishy shake that dies away), before any release.
-   * Reduced motion drops the movement. A tap then also plays a short pop and a tiny sparkle; rapid taps share one pop.
-   */
-  const giggle = () => {
+  useEffect(() => () => clearTimeout(reactTimer.current), []);
+
+  const react = () => {
+    setReacting(true);
+    clearTimeout(reactTimer.current);
+    reactTimer.current = setTimeout(() => setReacting(false), 520);
+  };
+
+  /** the press: the monster squishes and stretches the moment it is pressed, before any release */
+  const squishNow = () => {
     if (reducedMotion) return;
-    void jiggle.start({
-      x: [0, -5, 5, -5, 5, -3, 3, 0],
-      rotate: [0, -8, 8, -8, 8, -4, 4, 0],
-      scaleX: [0.9, 1.1, 0.95, 1.05, 0.98, 1],
-      scaleY: [1.08, 0.9, 1.04, 0.96, 1],
-      transition: { duration: 0.6, ease: 'easeOut' },
+    void squish.start({
+      x: [0, -4, 4, -3, 3, 0],
+      scaleX: [1, 1.2, 0.88, 1.08, 0.97, 1],
+      scaleY: [1, 0.8, 1.12, 0.96, 1.02, 1],
+      transition: { duration: 0.55, ease: 'easeOut' },
     });
   };
+  const giggle = () => {
+    squishNow();
+    react();
+  };
+
+  /** A tap also plays a short pop (or a pop for a letter that is put down) and a tiny sparkle; rapid taps share one pop. */
   const feelTap = () => {
     if (!selected) {
       if (tapSoundGate.allow('tap')) sfx('boing');
@@ -88,8 +110,14 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
   };
 
   useEffect(() => {
-    if (wobbleKey > 0) void wobble.start({ rotate: [0, -12, 10, -6, 3, 0], x: [0, -6, 6, -3, 2, 0], transition: { duration: 0.55, ease: 'easeInOut' } });
-  }, [wobbleKey, wobble]);
+    if (wobbleKey === 0) return;
+    setMissed(true);
+    const timer = setTimeout(() => setMissed(false), 700);
+    if (!reducedMotion) void wobble.start({ rotate: [0, -12, 10, -6, 3, 0], x: [0, -6, 6, -3, 2, 0], transition: { duration: 0.55, ease: 'easeInOut' } });
+    return () => clearTimeout(timer);
+  }, [wobbleKey, wobble, reducedMotion]);
+
+  const mood: MonsterMood = held || reacting ? 'scream' : missed ? 'oops' : selected ? 'think' : 'idle';
 
   return (
     <motion.button
@@ -110,7 +138,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
       dragSnapToOrigin
       dragMomentum={false}
       dragElastic={0.2}
-      whileDrag={{ scale: 1.22, rotate: -6, zIndex: 50 }}
+      whileDrag={{ scale: 1.2, zIndex: 50 }}
       onPointerDown={() => {
         if (disabled) return;
         pressed.current = true;
@@ -118,17 +146,39 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
       }}
       onDragStart={(_, info) => {
         dragging.current = true;
+        setHeld(true);
         onHoldStart(tile.id);
         const m = measureTile(ref.current);
         grab.current = m ? { dx: m.cx - (info.point.x - window.scrollX), dy: m.cy - (info.point.y - window.scrollY) } : null;
       }}
-      onDrag={() => onHover(nearestSlot(ref.current))}
+      onDrag={(_, info) => {
+        if (!reducedMotion) {
+          // the eyes lag toward the way it is moving; the body leans into the motion and stretches with its speed
+          const vx = info.velocity.x;
+          const vy = info.velocity.y;
+          lookX.set(clamp(vx / 900, -1, 1));
+          lookY.set(clamp(vy / 900, -1, 1));
+          tilt.set(clamp(vx / 80, -16, 16));
+          const stretch = clamp(Math.hypot(vx, vy) / 2600, 0, 0.2);
+          stretchX.set(1 + stretch * 0.6);
+          stretchY.set(1 - stretch * 0.5);
+        }
+        onHover(nearestSlot(ref.current));
+      }}
       onDragEnd={(_, info) => {
         const slot = nearestSlot(ref.current);
         onHoldEnd(); // the sound stops before the drop can say the letter's own sound
         onHover(null);
         onDrop(tile.id, slot, releasePose(ref.current, info, grab.current));
+        setHeld(false);
+        setReacting(false);
         pressed.current = false;
+        tilt.set(0);
+        stretchX.set(1);
+        stretchY.set(1);
+        lookX.set(0);
+        lookY.set(0);
+        if (!reducedMotion) void squish.start({ scaleX: [1.2, 0.86, 1], scaleY: [0.8, 1.14, 1], transition: { duration: 0.4, ease: 'easeOut' } });
         setTimeout(() => (dragging.current = false), 0); // swallow the click that follows pointer-up
       }}
       onClick={() => {
@@ -139,16 +189,15 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         feelTap();
         onTap(tile.id);
       }}
-      className="pl-draggable pl-gem relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:text-[3.2rem]"
-      style={{ '--gem': color } as CSSProperties}
+      className="pl-draggable relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.8rem] sm:w-[5.8rem]"
     >
       {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
-      {/* selected / hinted ring (a separate layer, so the tile keeps its glossy shadow) */}
+      {/* selected / hinted ring (a separate layer, so the monster keeps its shadow) */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute -inset-1.5 rounded-[2rem] border-4 transition-opacity duration-150 ${hinted ? 'border-sky-300 opacity-100' : selected ? 'border-white opacity-100' : 'opacity-0'}`}
+        className={`pointer-events-none absolute -inset-1.5 rounded-[2.2rem] border-4 transition-opacity duration-150 ${hinted ? 'border-sky-300 opacity-100' : selected ? 'border-white opacity-100' : 'opacity-0'}`}
       />
-      {/* lifted-off-the-tray look: a soft glow and a cast shadow, faded in with opacity only */}
+      {/* lifted-off-the-tray look: a soft glow and a ground shadow, faded in with opacity only */}
       <motion.span
         aria-hidden="true"
         className="pointer-events-none absolute -inset-3 -z-10 rounded-full"
@@ -164,9 +213,20 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         animate={{ opacity: selected ? 1 : 0 }}
         transition={{ duration: 0.18 }}
       />
-      <motion.span animate={jiggle} aria-hidden="true" className="block">
-        <motion.span animate={wobble} className="block">
-          {tile.value}
+      <motion.span animate={squish} aria-hidden="true" className="block h-full w-full">
+        <motion.span animate={wobble} className="block h-full w-full">
+          <motion.span style={{ rotate: tilt, scaleX: stretchX, scaleY: stretchY }} className="block h-full w-full">
+            <LetterMonster
+              letter={tile.value}
+              color={color}
+              mood={mood}
+              lookX={lookX}
+              lookY={lookY}
+              bounce={!reducedMotion && !selected && !held}
+              phase={index * 0.23}
+              blinkDelay={(index * 1.3) % 4}
+            />
+          </motion.span>
         </motion.span>
       </motion.span>
       {hinted ? <span aria-hidden="true" className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-sky-700 text-xs text-white">★</span> : null}

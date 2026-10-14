@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { animate, motion, useMotionValue, useTransform, type MotionStyle } from 'framer-motion';
 import { bezier, clamp, controlPoint, flightDuration, flightRotation, flightScale, LANDING_SCALE, type Point, type Pose } from './flightPath';
+import { LetterMonster } from '../components/LetterMonster';
 
 export interface Flight {
   /** the tile that is travelling */
@@ -13,6 +14,8 @@ export interface Flight {
   from: Pose;
   /** centre of the target slot, relative to the scene */
   to: Point;
+  /** what the travelling copy looks like: the plain tile (the default), or the letter's monster */
+  face?: 'tile' | 'monster';
 }
 
 /** Trail copies behind the bubble: how far behind (in flight progress) and how faint. */
@@ -78,12 +81,18 @@ export function FlyingTile({ flight, onLand, onDone }: FlyingTileProps) {
       {TRAIL.map((t, i) => (
         <TrailCopy key={i} p={p} lag={t.lag} opacity={t.opacity} scale={t.scale} start={start} control={control} to={to} from={from} color={color} />
       ))}
-      <motion.span
-        className="pl-gem absolute left-0 top-0 grid place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none will-change-transform sm:text-[3.2rem]"
-        style={{ ...box, x, y, scale, rotate, opacity: fade, '--gem': color } as unknown as MotionStyle}
-      >
-        {value}
-      </motion.span>
+      {flight.face === 'monster' ? (
+        <motion.span className="absolute left-0 top-0 will-change-transform" style={{ ...box, x, y, scale, rotate, opacity: fade } as unknown as MotionStyle}>
+          <LetterMonster letter={value} color={color} mood="idle" />
+        </motion.span>
+      ) : (
+        <motion.span
+          className="pl-gem absolute left-0 top-0 grid place-items-center rounded-[1.6rem] font-display text-[2.6rem] font-bold uppercase leading-none will-change-transform sm:text-[3.2rem]"
+          style={{ ...box, x, y, scale, rotate, opacity: fade, '--gem': color } as unknown as MotionStyle}
+        >
+          {value}
+        </motion.span>
+      )}
     </span>
   );
 }

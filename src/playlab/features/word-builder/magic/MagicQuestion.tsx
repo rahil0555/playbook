@@ -21,6 +21,7 @@ import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel'
 import type { Scheduled } from '../../../services/audioService';
 import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
+import { StorybookCutscene } from './StorybookCutscene';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
 
 const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
@@ -69,6 +70,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const [celebrated, setCelebrated] = useState(false);
   /** a gold splash under the word, from the moment the last letter lands */
   const [splash, setSplash] = useState(0);
+  /** the storybook cutscene for the finished word: it turns over a moment after Pip lands, and clears itself after a few seconds */
+  const [story, setStory] = useState(false);
   const pictureRef = useRef<HTMLSpanElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const perchRef = useRef<HTMLSpanElement>(null);
@@ -81,6 +84,17 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     },
     [],
   );
+
+  useEffect(() => {
+    if (!celebrated) return;
+    const start = reducedMotion ? 0 : 1100;
+    const open = setTimeout(() => setStory(true), start);
+    const close = setTimeout(() => setStory(false), start + 4200);
+    return () => {
+      clearTimeout(open);
+      clearTimeout(close);
+    };
+  }, [celebrated, reducedMotion]);
 
   const done = isMagicDone(slots);
   /** every letter is in place AND has finished landing: now the word is "complete" */
@@ -181,6 +195,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       generation: generation.current,
       from: { ...from, cx: from.cx - box.left, cy: from.cy - box.top },
       to: { x: s.left + s.width / 2 - box.left, y: s.top + s.height / 2 - box.top },
+      face: 'monster',
     };
   };
 
@@ -285,6 +300,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     lastSound.current = null;
     setCreature((c) => ({ n: 0, from: c.from })); // Pip goes back to the picture's side of the board
     setCelebrated(false);
+    setStory(false);
     setSplash(0);
     stripRing.set({ opacity: 0 });
     generation.current += 1; // flights still in the air belong to the old round
@@ -304,11 +320,12 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const mood = complete ? 'cheer' : missed ? 'oops' : selected ? 'think' : 'happy';
 
   return (
-    <div ref={scene} className="pl-board relative overflow-clip rounded-[2.4rem] p-3 sm:p-6">
+    <div ref={scene} className="pl-story-board relative overflow-clip rounded-[2.6rem] p-3 sm:p-6">
       <CelebrationEffect burst={burst} onDone={clear} />
       {flights.map((f) => (
         <FlyingTile key={`${f.generation}-${f.id}`} flight={f} onLand={onFlightLand} onDone={onFlightDone} />
       ))}
+      <StorybookCutscene word={word} open={story} />
 
       <div className="relative grid items-center gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8">
         <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
@@ -334,7 +351,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
         <div className="flex min-w-0 flex-col items-center gap-4">
           {/* the target word: glowing outlines on a parchment strip */}
-          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-paper pl-slot-row relative w-full rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]" style={{ '--n': target.length } as CSSProperties}>
+          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-story-strip pl-slot-row relative w-full rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]" style={{ '--n': target.length } as CSSProperties}>
             {/* Pip's perch: a band above the letters that is always there, so nothing moves when the word is finished */}
             <CompletionCreature trigger={creature.n} from={creature.from} perchRef={perchRef} reducedMotion={reducedMotion} onLand={onCreatureLand} />
             {splash > 0 && !reducedMotion ? <WordSplash key={splash} /> : null}
@@ -361,11 +378,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
           </div>
 
           {!complete ? (
-            <ul aria-label="Loose letters" className="pl-wood flex w-full flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
+            <ul aria-label="Loose letters" className="pl-story-tray flex w-full flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
               {tiles.map((tile, i) => (
                 <li key={tile.id}>
                   {isTilePlaced(slots, tile.id) ? (
-                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.6rem] bg-black/20 shadow-[inset_0_4px_8px_rgba(60,25,5,0.45)] sm:h-[5.4rem] sm:w-[5.4rem]" />
+                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.8rem] sm:w-[5.8rem]" />
                   ) : (
                     <LooseLetter
                       tile={tile}

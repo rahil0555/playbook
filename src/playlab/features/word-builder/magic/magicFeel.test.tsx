@@ -254,3 +254,17 @@ describe('Magic Letters feel: sound off', () => {
     expect(timeline.filter((e) => e.kind === 'clipEnd' || e.kind === 'say'), 'nothing audible').toEqual([]);
   }, 10_000);
 });
+
+describe('Magic Letters feel: the storybook reward', () => {
+  it('a finished word turns over its storybook page after Pip lands, with the sentence, and the page clears itself', async () => {
+    const { user } = await openRound();
+    await letter(user, 'p', 0);
+    await letter(user, 'i', 1);
+    await user.click(realTile('g'));
+    await user.click(slot(2));
+    await vi.waitFor(() => expect(screen.getByTestId('storybook')).toBeTruthy(), { timeout: 4000 });
+    expect(screen.getByTestId('storybook').textContent).toContain('A pink farm animal that says oink.');
+    await vi.waitFor(() => expect(screen.queryByTestId('storybook')).toBeNull(), { timeout: 8000 });
+  }, 20_000);
+});
+

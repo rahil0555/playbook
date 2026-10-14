@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
+import { LetterMonster } from '../../../components/LetterMonster';
 import { wave } from '../../../motion/variants';
+import { SnapBurst } from '../../../moments/SnapBurst';
 import { StarBurst } from '../../../moments/StarBurst';
 
 interface OutlineSlotProps {
@@ -13,19 +14,19 @@ interface OutlineSlotProps {
   landedId: string | null;
   /** the flying letter has arrived: only now does the slot show its own letter (logic is already filled) */
   landed: boolean;
-  /** just landed: play glow + burst */
+  /** just landed: play the snap, the squash and the burst */
   fresh: boolean;
   /** this landing completed the word: a slightly bigger sparkle */
   grand: boolean;
-  /** a tile is hovering over this slot while dragging */
+  /** a letter is held over (or close to) this spot while dragging */
   over: boolean;
   /** hint: pulse this slot */
   hinted: boolean;
   /** the next empty slot in reading order: it glows a little brighter */
   next: boolean;
-  /** word finished: letters hop in a wave */
+  /** word finished: the monsters hop in a wave */
   done: boolean;
-  /** the word has landed its celebration: each letter takes the gold, dotted finish (in turn, left to right) */
+  /** the word has landed its celebration: each monster cheers, in turn, left to right */
   celebrated: boolean;
   /** is a tile currently picked up (tap fallback)? */
   armed: boolean;
@@ -36,15 +37,15 @@ interface OutlineSlotProps {
 const TILE = 'aspect-square w-full';
 
 /**
- * A magical, softly glowing EMPTY outline (it never shows its target letter). The right tile flies in on its own layer (FlyingLetter);
- * when it arrives the slot turns into the same glossy tile, squashing and springing in with a glow flash and a
- * small star burst. The slot is a real button so the tap-to-place fallback works with mouse, touch and keyboard.
+ * A soft, glowing EMPTY outline (it never shows its target letter). The right letter flies in on its own layer (FlyingTile);
+ * when it arrives the outline becomes that letter's monster, which snaps in with a squash, a glow flash, a burst of dots and
+ * stars. The slot is a real button so the tap-to-place fallback works with mouse, touch and keyboard.
  */
 export function OutlineSlot({ index, letter, color, landedId, landed, fresh, grand, over, hinted, next, done, celebrated, armed, onActivate }: OutlineSlotProps) {
   const { reducedMotion } = usePlayLab();
   const filled = landedId !== null;
   const label = filled ? `Slot ${index + 1}: ${letter.toUpperCase()}, done` : `Slot ${index + 1}, empty${armed ? '. Tap to place the letter you picked up' : ''}`;
-  const squash = fresh && !reducedMotion;
+  const snap = fresh && !reducedMotion;
   return (
     <button
       type="button"
@@ -53,12 +54,12 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
       aria-label={label}
       aria-disabled={filled}
       onClick={() => !filled && onActivate(index)}
-      className={`relative grid place-items-center rounded-[1.6rem] transition-[transform,background-color,border-color] ${TILE} ${
+      className={`relative grid place-items-center rounded-[1.8rem] transition-[transform,background-color,border-color] ${TILE} ${
         landed
           ? ''
-          : `border-[3px] border-dashed ${over ? 'pl-drop-pulse scale-105 border-sky-500 bg-sky-100' : armed ? 'border-sky-500 bg-white' : 'border-amber-400/80 bg-white/75'}`
+          : `border-[3px] border-dashed ${over ? 'pl-drop-pulse scale-105 border-sky-500 bg-sky-100' : armed ? 'border-sky-500 bg-white' : 'border-amber-400/90 bg-white/80'}`
       }`}
-      style={landed ? undefined : { boxShadow: over || armed ? undefined : 'inset 0 0 18px rgba(255,200,80,0.55), 0 0 0 4px rgba(255,255,255,0.55)' }}
+      style={landed ? undefined : { boxShadow: over || armed ? undefined : 'inset 0 0 18px rgba(255,200,80,0.45), 0 0 0 4px rgba(255,255,255,0.6), 0 6px 0 rgba(160,110,60,0.12)' }}
     >
       {!landed && (next || hinted || armed) ? (
         <span
@@ -84,29 +85,18 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
           ) : null}
           {/* hop wave when the word is finished */}
           <motion.span initial="idle" animate={done ? 'go' : 'idle'} custom={index} variants={wave} className="block h-full w-full">
-            {/* squash-and-stretch as it snaps in */}
+            {/* squash-and-stretch as the monster snaps in */}
             <motion.span
               aria-hidden="true"
-              className="pl-gem relative grid h-full w-full place-items-center overflow-hidden rounded-[1.6rem]"
-              style={{ '--gem': color } as CSSProperties}
-              initial={squash ? { scaleX: 1.25, scaleY: 0.74 } : false}
-              animate={squash ? { scaleX: [1.25, 0.88, 1.05, 1], scaleY: [0.74, 1.2, 0.96, 1], y: [4, -12, 0, -3, 0] } : { scaleX: 1, scaleY: 1, y: 0 }}
+              className="relative block h-full w-full"
+              initial={snap ? { scaleX: 1.25, scaleY: 0.74 } : false}
+              animate={snap ? { scaleX: [1.25, 0.88, 1.05, 1], scaleY: [0.74, 1.2, 0.96, 1], y: [4, -12, 0, -3, 0] } : { scaleX: 1, scaleY: 1, y: 0 }}
               transition={{ duration: 0.46, ease: 'easeOut' }}
             >
-              {/* the completed word's finish: a gold, dotted gem (the reference reel turns the finished word orange with dots) */}
-              <motion.span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-[1.6rem]"
-                style={{ background: 'radial-gradient(rgba(138,90,0,0.32) 1.5px, transparent 2px) 0 0 / 9px 9px, radial-gradient(circle at 32% 26%, #fff7d9 0 12%, #f5b82e 58%, #d98a12 100%)' }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: celebrated ? 1 : 0 }}
-                transition={{ duration: 0.3, delay: celebrated ? index * 0.07 : 0 }}
-              />
-              <span className={`relative font-display text-[clamp(1.9rem,6.4vw,2.6rem)] font-bold uppercase leading-none transition-colors duration-300 sm:text-[3.2rem] ${celebrated ? 'text-[#12312c]' : ''}`} style={celebrated ? { textShadow: '0 2px 0 rgba(255,255,255,0.55)' } : undefined}>
-                {letter}
-              </span>
+              <LetterMonster letter={letter} color={color} mood={celebrated ? 'cheer' : 'idle'} bounce={celebrated && !reducedMotion} phase={index * 0.2} blinkDelay={(index * 0.9) % 4} />
             </motion.span>
           </motion.span>
+          {fresh ? <SnapBurst color={color} seed={index + 1} count={grand ? 16 : 10} /> : null}
           {fresh ? <StarBurst seed={index + 1} count={grand ? 14 : 8} spread={grand ? 90 : 56} /> : null}
         </span>
       ) : null}
