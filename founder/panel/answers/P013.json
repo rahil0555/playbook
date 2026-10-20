@@ -1,0 +1,13 @@
+{
+  "id": "P013",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "I already paid for a big learning app and my son stopped opening it within weeks, so I will not pay ₹299 a month again until I see him actually using this one on his own. The free report is useful, but YouTube and free apps can cover those gap topics.",
+  "objection": "After the pilot ends and the teacher stops pushing it in class, my child will stop using it at home and I will be paying for nothing, just like last time.",
+  "would_change_my_mind": "If the teacher shows me at the parent-teacher meeting that his weak topics actually improved during the free pilot, and the school keeps using it in class so he keeps practising.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 249,
+  "price_too_expensive": 399
+}

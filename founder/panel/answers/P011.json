@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "price",
+  "reason": "I already pay fees for more than one child, and ₹299 a month for each of them turns into a new bill every month for something the school should be teaching anyway. The free report is useful, so I'll use the pilot, but I won't pay to keep it going.",
+  "objection": "It's another monthly charge per child, and it puts my child on the phone even more. I'd rather sit with them for an hour or ask the teacher about the weak topics the report shows.",
+  "would_change_my_mind": "If the school included it in the fees, or there was one low family price for all my children, and the teacher or my relative's family showed me real marks going up after the pilot.",
+  "price_too_cheap": 29,
+  "price_cheap": 79,
+  "price_expensive": 149,
+  "price_too_expensive": 249
+}

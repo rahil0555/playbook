@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "The school itself is running it and the report already shows exactly which topics my son is weak in, so for ₹299 a month next to what I pay for tuition, I will keep it going for the exam term. If the school is backing it, the other parents will continue too and I don't want him to fall behind.",
+  "objection": "Nothing in this says it follows his board syllabus and the school's exam pattern. If the practice questions are generic and not what comes in the unit tests and finals, it is just more screen time on top of tuition.",
+  "would_change_my_mind": "If his unit test marks don't move during the pilot, or his tuition teacher says the questions don't match the syllabus, I would cancel.",
+  "price_too_cheap": 49,
+  "price_cheap": 150,
+  "price_expensive": 600,
+  "price_too_expensive": 1200
+}

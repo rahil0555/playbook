@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "My child already goes to tuition and I am paying for that every month; ₹299 more for an app on my phone that we only share in the evenings feels like one more thing we won't keep up with. If the school asked us to pay for it with the fees I might, but this is a separate payment to some company.",
+  "objection": "The school only says it is a pilot, not that it is needed. Tuition already covers the weak topics, and my child only gets my phone for a little while in the evening.",
+  "would_change_my_mind": "If the class teacher said every child should continue with it and it was being used for homework, so it replaces some tuition and isn't extra.",
+  "price_too_cheap": 29,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 349
+}

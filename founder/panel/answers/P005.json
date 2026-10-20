@@ -1,0 +1,13 @@
+{
+  "id": "P005",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I'll let my son use it during the free pilot since the school chose it, but I'm not paying to keep feeding his test results and learning data to an AI company I know nothing about. I already use ChatGPT and YouTube with him for free, so ₹299 isn't buying me something I can't roughly do myself.",
+  "objection": "Who owns my child's data, where it is stored, and whether it gets used to train their AI or shared with anyone. Nothing in the offer tells me that.",
+  "would_change_my_mind": "A clear written data policy, signed off by the school, saying my child's data is not sold or used for training and is deleted if I cancel, plus the weekly parent view actually showing his weak topics improving during the pilot.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 399,
+  "price_too_expensive": 699
+}

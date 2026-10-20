@@ -1,0 +1,13 @@
+{
+  "id": "P012",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "The school itself picked this and the report shows exactly which topics my child is weak in, so if the teacher says at the PTM that it helps marks, ₹299 is less than one tuition class. I'll pay for a month and watch the parent view closely.",
+  "objection": "Will my child actually open it after the first week, or will it become one more app on the phone that I pay for and nobody uses? If the weekly report doesn't show practice and better test scores, I will cancel.",
+  "would_change_my_mind": "If the parent view shows my child stopped using it after the pilot, or the next unit test marks don't move, I would cancel.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 499,
+  "price_too_expensive": 999
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "We already pay a tuition teacher who sits with my child and knows exactly where she is weak, so another app on the phone is just one more thing to check. If the school thinks this is so useful, it should be part of the fees we already pay.",
+  "objection": "The school should pay for this, not me. I don't trust an app to fix gaps better than a person sitting next to my child, and I doubt she will open it without being pushed.",
+  "would_change_my_mind": "If the school covered it in the fees, or if the teacher or our tuition sir actually used the report and assigned work from it so it replaced something we already pay for.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 349
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "I already pay the tuition teacher and she sits with my child face to face, and my parents watch over homework while I am at work. I will look at the free report and give it to the tuition teacher, but I won't pay another ₹299 a month for one more thing on the phone.",
+  "objection": "More screen time is the last thing my child needs, and with me at work and the grandparents at home, nobody will check whether he is really learning on the app or just playing on the phone.",
+  "would_change_my_mind": "If the school made it part of the homework and the class teacher checked the progress, and the report showed it actually closed the gaps during the free pilot so I could cut down on extra tuition hours.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 350
+}

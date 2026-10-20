@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "trust",
+  "reason": "The school brought this in and the report already showed me where my child is behind, so if the teachers say continue, I will pay. ₹299 is less than one tuition session and I don't have time to sit with homework myself.",
+  "objection": "Will it match my child's syllabus and exams? If the practice is not the same chapters the school is teaching this term, it is wasted money and wasted time for the child.",
+  "would_change_my_mind": "If the class teacher tells me it does not follow their syllabus or that they are not continuing with it after the pilot, I would stop.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 499,
+  "price_too_expensive": 999
+}

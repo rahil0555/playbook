@@ -1,0 +1,13 @@
+{
+  "id": "P016",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "The school itself is running this and the report shows exactly where my child is behind, so for ₹299 I will try one month alongside tuition. If the next unit test marks don't move, I cancel.",
+  "objection": "My child already has tuition and homework; I'm not sure there's time for one more app, or that it will show up in exam marks and rank rather than just progress bars.",
+  "would_change_my_mind": "If after the pilot the school or other parents (including my relative) say it made no difference to test scores, I would not continue.",
+  "price_too_cheap": 49,
+  "price_cheap": 199,
+  "price_expensive": 599,
+  "price_too_expensive": 1200
+}
