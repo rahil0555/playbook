@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "habit",
+  "reason": "If the school is already using it as homework and the teacher checks it in class, I'll just keep paying. ₹249 a month is nothing next to the fees, and I don't want my child to be the only one dropping off it.",
+  "objection": "Will it actually follow my child's syllabus and exam pattern, or is it generic practice? And if the school stops assigning it after the pilot, I'm not sure we'd keep using it at home.",
+  "would_change_my_mind": "If the school stopped recommending it or the teacher stopped checking it in class after the pilot, I would cancel.",
+  "price_too_cheap": 99,
+  "price_cheap": 249,
+  "price_expensive": 799,
+  "price_too_expensive": 1500
+}

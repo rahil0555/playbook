@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I paid for a big learning app once and my son dropped it in three weeks, so I'm not paying for another one yet. The pilot is free, so let him use it through the school, and I'll decide after I see the end-of-term re-test.",
+  "objection": "A 'data promise' on paper is easy to sign. I don't know Edurance, and I don't want my child's answers sitting with some AI company I can't check on.",
+  "would_change_my_mind": "If the re-test shows his weak topics really improved and the school gives me a copy of the signed data agreement, I would pay the ₹249 rate.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 349,
+  "price_too_expensive": 600
+}

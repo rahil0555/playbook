@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I'll let my child use it while the pilot is free, but I won't sign up to pay until I see the end-of-term re-test, because I don't yet trust that the AI is teaching things correctly. With two kids, ₹299 plus ₹149 every month is another fee on top of school fees, and I count every one of those.",
+  "objection": "AI can give wrong answers, and nothing here tells me who checks the practice questions and explanations my child sees. If the teacher is only checking progress, not the content, mistakes could slip through.",
+  "would_change_my_mind": "The class teacher telling us on the WhatsApp group that she has reviewed the content against the syllabus, and the re-test actually showing my child's gap topics improved.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 499
+}

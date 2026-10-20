@@ -1,4 +1,5 @@
-Your child's school is piloting Edurance, an AI learning app, for your child's class this term.
-In week 1 your child took a short diagnostic test in class. You have received a free report showing which topics they have mastered and which they are behind on.
-Edurance gives your child a personal learning path for those gaps, explanations they can read or listen to, and practice that adjusts to their level. It works in a web browser on a phone, tablet or computer. You see progress each week in a parent view.
-To continue after the free pilot: ₹299 per month, paid by you to Edurance. Cancel any time.
+Your child's school is using Edurance this term as part of homework: the class teacher assigns 20 minutes a day of practice on each child's own gap topics, mapped to the school's syllabus chapters, and checks progress in class.
+In week 1 your child took a diagnostic in class and you received a free report showing which topics they have mastered and which they are behind on. Use is free during the school's pilot.
+You see progress every week in a parent view, you choose a daily time limit, and at the end of term your child re-takes the diagnostic so you and the teacher can see whether the gaps closed. If the gap topics show no improvement on that re-test, your next term is free.
+Your child's data: the school and Edurance sign a written data promise. Data is not sold, not used to train AI models, is visible only to you and the class teacher, and is deleted within 30 days if you cancel.
+To continue after the pilot: ₹299 per month (cancel any time), or ₹999 per school term. Each extra child: ₹149 per month. Families at the first pilot schools who join before the pilot ends keep ₹249 per month for the rest of this academic year.

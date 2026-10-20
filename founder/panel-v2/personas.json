@@ -1,0 +1,222 @@
+[
+ {
+  "id": "P001",
+  "name": "Abdul",
+  "age": 41,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 662000,
+  "behaviour": "Burned by an edtech app",
+  "behaviour_how": "Paid for a big-brand learning app before; the child stopped using it within weeks.",
+  "objection": "I don't want my child's data going to some AI company",
+  "habit": "you work long hours and your parents help with the children"
+ },
+ {
+  "id": "P002",
+  "name": "Kavitha",
+  "age": 39,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 688000,
+  "behaviour": "Screen-time worrier",
+  "behaviour_how": "Limits the child's phone and tablet use and is wary of anything that adds more.",
+  "objection": "Will it match my child's syllabus and exams?",
+  "habit": "you attend every parent-teacher meeting"
+ },
+ {
+  "id": "P003",
+  "name": "Harish",
+  "age": 43,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 632000,
+  "behaviour": "Follows the school",
+  "behaviour_how": "Pays for what the school recommends, rarely researches alternatives.",
+  "objection": "Will it match my child's syllabus and exams?",
+  "habit": "you work long hours and your parents help with the children"
+ },
+ {
+  "id": "P004",
+  "name": "Ayesha",
+  "age": 35,
+  "segment": "Parent at a premium or international-curriculum school",
+  "income": 4887000,
+  "behaviour": "Follows the school",
+  "behaviour_how": "Pays for what the school recommends, rarely researches alternatives.",
+  "objection": "Will it match my child's syllabus and exams?",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P005",
+  "name": "Imran",
+  "age": 35,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 926000,
+  "behaviour": "Tech-curious",
+  "behaviour_how": "Uses ChatGPT or YouTube to help the child already and likes trying new tools.",
+  "objection": "I don't want my child's data going to some AI company",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P006",
+  "name": "Venkat",
+  "age": 35,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 1271000,
+  "behaviour": "Screen-time worrier",
+  "behaviour_how": "Limits the child's phone and tablet use and is wary of anything that adds more.",
+  "objection": "Will it match my child's syllabus and exams?",
+  "habit": "you work long hours and your parents help with the children"
+ },
+ {
+  "id": "P007",
+  "name": "Suresh",
+  "age": 49,
+  "segment": "Parent at a premium or international-curriculum school",
+  "income": 2995000,
+  "behaviour": "Marks-focused",
+  "behaviour_how": "Judges everything by exam marks and rank; buys whatever the school or other parents say improves scores.",
+  "objection": "The school should pay for this, not me",
+  "habit": "your child shares one smartphone with you in the evenings"
+ },
+ {
+  "id": "P008",
+  "name": "Farah",
+  "age": 40,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 1263000,
+  "behaviour": "Tuition-first",
+  "behaviour_how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps.",
+  "objection": "More screen time is the last thing my child needs",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P009",
+  "name": "Mohammed",
+  "age": 32,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 628000,
+  "behaviour": "Tuition-first",
+  "behaviour_how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps.",
+  "objection": "I don't want my child's data going to some AI company",
+  "habit": "your child shares one smartphone with you in the evenings"
+ },
+ {
+  "id": "P010",
+  "name": "Madhavi",
+  "age": 32,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 998000,
+  "behaviour": "Price-careful",
+  "behaviour_how": "Counts every recurring expense, especially with more than one child in school.",
+  "objection": "AI can give wrong answers; who checks what my child is taught?",
+  "habit": "you check homework on the school WhatsApp group most nights"
+ },
+ {
+  "id": "P011",
+  "name": "Vijay",
+  "age": 43,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 379000,
+  "behaviour": "Price-careful",
+  "behaviour_how": "Counts every recurring expense, especially with more than one child in school.",
+  "objection": "More screen time is the last thing my child needs",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P012",
+  "name": "Naveen",
+  "age": 47,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 865000,
+  "behaviour": "Marks-focused",
+  "behaviour_how": "Judges everything by exam marks and rank; buys whatever the school or other parents say improves scores.",
+  "objection": "Will my child actually use it after the first week?",
+  "habit": "you attend every parent-teacher meeting"
+ },
+ {
+  "id": "P013",
+  "name": "Ramesh",
+  "age": 36,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 305000,
+  "behaviour": "Burned by an edtech app",
+  "behaviour_how": "Paid for a big-brand learning app before; the child stopped using it within weeks.",
+  "objection": "Free apps and YouTube already do this",
+  "habit": "you attend every parent-teacher meeting"
+ },
+ {
+  "id": "P014",
+  "name": "Nikhat",
+  "age": 35,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 403000,
+  "behaviour": "Follows the school",
+  "behaviour_how": "Pays for what the school recommends, rarely researches alternatives.",
+  "objection": "My child already has tuition; this is one more thing",
+  "habit": "your child shares one smartphone with you in the evenings"
+ },
+ {
+  "id": "P015",
+  "name": "Ravi",
+  "age": 44,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 1436000,
+  "behaviour": "Marks-focused",
+  "behaviour_how": "Judges everything by exam marks and rank; buys whatever the school or other parents say improves scores.",
+  "objection": "Will it match my child's syllabus and exams?",
+  "habit": "your child goes to tuition three evenings a week"
+ },
+ {
+  "id": "P016",
+  "name": "Srinivas",
+  "age": 32,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 1209000,
+  "behaviour": "Marks-focused",
+  "behaviour_how": "Judges everything by exam marks and rank; buys whatever the school or other parents say improves scores.",
+  "objection": "My child already has tuition; this is one more thing",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P017",
+  "name": "Lakshmi",
+  "age": 44,
+  "segment": "Parent at a premium or international-curriculum school",
+  "income": 5107000,
+  "behaviour": "Tech-curious",
+  "behaviour_how": "Uses ChatGPT or YouTube to help the child already and likes trying new tools.",
+  "objection": "More screen time is the last thing my child needs",
+  "habit": "a relative's child is in the same school"
+ },
+ {
+  "id": "P018",
+  "name": "Sravani",
+  "age": 40,
+  "segment": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+  "income": 1845000,
+  "behaviour": "Tuition-first",
+  "behaviour_how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps.",
+  "objection": "The school should pay for this, not me",
+  "habit": "you check homework on the school WhatsApp group most nights"
+ },
+ {
+  "id": "P019",
+  "name": "Kiran",
+  "age": 44,
+  "segment": "Parent at a premium or international-curriculum school",
+  "income": 3528000,
+  "behaviour": "Tuition-first",
+  "behaviour_how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps.",
+  "objection": "More screen time is the last thing my child needs",
+  "habit": "you check homework on the school WhatsApp group most nights"
+ },
+ {
+  "id": "P020",
+  "name": "Anitha",
+  "age": 40,
+  "segment": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+  "income": 565000,
+  "behaviour": "Tuition-first",
+  "behaviour_how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps.",
+  "objection": "More screen time is the last thing my child needs",
+  "habit": "you work long hours and your parents help with the children"
+ }
+]

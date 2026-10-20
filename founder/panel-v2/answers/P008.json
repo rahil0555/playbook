@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "I'll let my son do it while the school makes it free homework, but I already pay his tuition teacher every month and she sits with him in person. I'm not paying extra for another app on top of that.",
+  "objection": "More screen time is the last thing my child needs, and I trust a real teacher who can see his face more than a screen that tells me he's 'behind'.",
+  "would_change_my_mind": "If the end-of-term re-test showed his gap topics clearly closed and his tuition teacher could also see the report and use it, so it replaces some tuition cost instead of adding to it.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 500
+}

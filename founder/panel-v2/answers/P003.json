@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "trust",
+  "reason": "If the class teacher is assigning it as homework and checking it in class, I will pay. ₹249 a month is less than one tuition class, and it follows the school's own chapters, so my child is not doing something separate from the exams.",
+  "objection": "Will the school really keep using it after the pilot, or will I be paying for an app the teacher has stopped checking? I also cannot sit with my child every evening, so I am not sure the 20 minutes will actually happen at my parents' house.",
+  "would_change_my_mind": "If the school stops assigning it or the teacher stops checking it in class, I would cancel.",
+  "price_too_cheap": 49,
+  "price_cheap": 199,
+  "price_expensive": 499,
+  "price_too_expensive": 899
+}

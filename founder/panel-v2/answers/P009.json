@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "I'll let my son do it while the school pilot is free, but I already pay his tuition sir every month and I trust him sitting with my child more than an app. Paying ₹299 extra on top of tuition for something on my phone in the evening is not going to happen.",
+  "objection": "I still don't fully trust where my child's data goes. A 'promise' on paper from an AI company is easy to sign, and my phone is shared, so who else sees what is on it.",
+  "would_change_my_mind": "If the end-of-term re-test clearly shows his weak chapters improved and the tuition sir himself says it helps, I might pay so I can cut down tuition hours.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 349
+}
