@@ -19,7 +19,7 @@ Every input in `founder/numbers.json`, and whether it's founder-confirmed, from 
 | --- | --- | --- |
 | Payment gateway | 2% + 18% GST = 2.36% (₹7.06 on ₹299). UPI may also carry 2% at Razorpay; a 0% intro offer may apply for the first 90 days. | [Razorpay pricing explained](https://razorpay.com/blog/razorpay-payment-gateway-pricing-explained/) |
 | Supabase Pro | 25 USD/month (≈ ₹2,200), plus usage overages | [Supabase pricing guide](https://makerkit.dev/blog/md/saas/supabase-pricing) (third party; confirm on supabase.com/pricing) |
-| Vercel Pro | 20 USD per seat per month (≈ ₹1,760), 1 seat assumed | [Third-party tracker](https://toolradar.com/tools/openai-api/pricing); confirm on vercel.com/pricing |
+| Vercel Pro | 20 USD per seat per month (≈ ₹1,760), 1 seat assumed | Third-party price tracker (unlinked); confirm on https://vercel.com/pricing |
 | OpenAI gpt-4.1-mini | 0.40 USD per 1M input tokens, 1.60 USD per 1M output tokens | [Aggregator](https://pricepertoken.com/pricing-page/model/openai-gpt-4.1-mini); confirm on openai.com/api/pricing |
 | OpenAI gpt-4o-mini-tts | 0.60 USD per 1M text input tokens, 12 USD per 1M audio output tokens | [Aggregator](https://www.llmreference.com/model/gpt-4o-mini-tts/openai-api); confirm on OpenAI's page |
 
