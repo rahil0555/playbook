@@ -21,6 +21,7 @@ import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel'
 import type { Scheduled } from '../../../services/audioService';
 import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
+import { VoicePractice } from '../../../components/VoicePractice';
 import { StorybookCutscene } from './StorybookCutscene';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
 
@@ -447,6 +448,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
               <LikeButton kind="word" id={word.id} label={word.text} className="shrink-0 self-end sm:mb-1" />
             ) : null}
           </div>
+          {/* after the word is finished the child can say it too; "Next word" above is always there, so skipping costs nothing */}
+          {complete ? <VoicePractice expected={[word.text]} prompt="Say the word for the picture" /> : null}
         </div>
       </div>
     </div>
