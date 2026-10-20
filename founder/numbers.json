@@ -1,0 +1,30 @@
+{
+  "business": "Edurance",
+  "unit": "paid student-month",
+  "price": 299,
+  "variable": [
+    {"label": "School revenue share (30% of ₹299, founder-confirmed)", "cost": 89.70},
+    {"label": "Payment gateway (Razorpay standard 2% + 18% GST = 2.36%)", "cost": 7.06},
+    {"label": "AI explanations, OpenAI gpt-4.1-mini (ESTIMATE, see cfo-sources.md)", "cost": 22.00},
+    {"label": "Text-to-speech narration after caching (ESTIMATE)", "cost": 20.00},
+    {"label": "Supabase/Vercel usage beyond plan per student (ESTIMATE)", "cost": 3.00}
+  ],
+  "fixed_monthly": [
+    {"label": "Founder pay (4 founders, unpaid by founder decision)", "cost": 0},
+    {"label": "Supabase Pro (25 USD at an ESTIMATED ₹88 per USD)", "cost": 2200},
+    {"label": "Vercel Pro, 1 seat (20 USD, ESTIMATE)", "cost": 1760},
+    {"label": "Domain, email, misc. software (ESTIMATE)", "cost": 1000},
+    {"label": "Travel to schools across 4 zones (ESTIMATE)", "cost": 8000},
+    {"label": "Printed gap reports and pilot materials (ESTIMATE)", "cost": 2000},
+    {"label": "Phone and data (ESTIMATE)", "cost": 1000}
+  ],
+  "startup": [
+    {"label": "Child-data / DPDP legal review and consent forms (ESTIMATE)", "cost": 25000},
+    {"label": "Free pilot AI+TTS cost: 3 schools x 120 students x 2 months x ₹42 (ESTIMATE)", "cost": 30240},
+    {"label": "Pilot launch materials, parent evenings, refreshments (ESTIMATE)", "cost": 15000},
+    {"label": "Contingency (ESTIMATE)", "cost": 15000}
+  ],
+  "days_per_month": 1,
+  "plan_per_day": 144,
+  "ramp_per_day": [0, 0, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144]
+}
