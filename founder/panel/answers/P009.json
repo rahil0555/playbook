@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I already pay the tuition sir every month and I trust him more than any app. I don't want my child's test results and data sitting with some AI company, and on top of that the boy can only use my phone in the evening.",
+  "objection": "Who is this company and what are they doing with my child's data? The school is piloting it, but nobody has told me where the information goes or who sees it.",
+  "would_change_my_mind": "If the school itself told me in writing that the data stays with the school and is not sold or used by the company, and the class teacher showed me his marks actually went up during the pilot.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 349
+}

@@ -1,0 +1,128 @@
+{
+ "n": 20,
+ "seed": 149644,
+ "customer": {
+  "business": "Edurance (AI-powered adaptive learning for school students, introduced through the child's school)",
+  "target": "Parents in Hyderabad and Secunderabad whose child (Class 4 to 10) attends a private school that is piloting Edurance",
+  "where": "Hyderabad and Secunderabad, Telangana, India",
+  "age": [
+   30,
+   50
+  ],
+  "currency": "₹",
+  "segments": [
+   {
+    "name": "Parent at a budget private school (fees roughly ₹25k-60k a year)",
+    "share": 0.4,
+    "income": [
+     300000,
+     800000
+    ]
+   },
+   {
+    "name": "Parent at a mid-fee private school (fees roughly ₹60k-1.5L a year)",
+    "share": 0.4,
+    "income": [
+     800000,
+     2000000
+    ]
+   },
+   {
+    "name": "Parent at a premium or international-curriculum school",
+    "share": 0.2,
+    "income": [
+     2000000,
+     6000000
+    ]
+   }
+  ],
+  "behaviours": [
+   {
+    "name": "Tuition-first",
+    "share": 0.22,
+    "how": "Already pays a local tuition teacher or coaching centre and trusts in-person help more than apps."
+   },
+   {
+    "name": "Marks-focused",
+    "share": 0.18,
+    "how": "Judges everything by exam marks and rank; buys whatever the school or other parents say improves scores."
+   },
+   {
+    "name": "Follows the school",
+    "share": 0.15,
+    "how": "Pays for what the school recommends, rarely researches alternatives."
+   },
+   {
+    "name": "Screen-time worrier",
+    "share": 0.12,
+    "how": "Limits the child's phone and tablet use and is wary of anything that adds more."
+   },
+   {
+    "name": "Burned by an edtech app",
+    "share": 0.12,
+    "how": "Paid for a big-brand learning app before; the child stopped using it within weeks."
+   },
+   {
+    "name": "Price-careful",
+    "share": 0.11,
+    "how": "Counts every recurring expense, especially with more than one child in school."
+   },
+   {
+    "name": "Tech-curious",
+    "share": 0.1,
+    "how": "Uses ChatGPT or YouTube to help the child already and likes trying new tools."
+   }
+  ],
+  "objections": [
+   "My child already has tuition; this is one more thing",
+   "Will my child actually use it after the first week?",
+   "AI can give wrong answers; who checks what my child is taught?",
+   "More screen time is the last thing my child needs",
+   "Free apps and YouTube already do this",
+   "The school should pay for this, not me",
+   "I don't want my child's data going to some AI company",
+   "Will it match my child's syllabus and exams?"
+  ],
+  "habits": [
+   "your child shares one smartphone with you in the evenings",
+   "you check homework on the school WhatsApp group most nights",
+   "your child goes to tuition three evenings a week",
+   "you attend every parent-teacher meeting",
+   "you work long hours and your parents help with the children",
+   "a relative's child is in the same school"
+  ],
+  "names": [
+   "Lakshmi",
+   "Srinivas",
+   "Ayesha",
+   "Ravi",
+   "Padma",
+   "Mohammed",
+   "Swathi",
+   "Venkat",
+   "Farah",
+   "Kiran",
+   "Anitha",
+   "Naveen",
+   "Sravani",
+   "Imran",
+   "Deepa",
+   "Rajesh",
+   "Kavitha",
+   "Suresh",
+   "Sana",
+   "Prasad",
+   "Madhavi",
+   "Arjun",
+   "Shabana",
+   "Harish",
+   "Divya",
+   "Ramesh",
+   "Nikhat",
+   "Vijay",
+   "Sunitha",
+   "Abdul"
+  ]
+ },
+ "pitch": "Your child's school is piloting Edurance, an AI learning app, for your child's class this term.\nIn week 1 your child took a short diagnostic test in class. You have received a free report showing which topics they have mastered and which they are behind on.\nEdurance gives your child a personal learning path for those gaps, explanations they can read or listen to, and practice that adjusts to their level. It works in a web browser on a phone, tablet or computer. You see progress each week in a parent view.\nTo continue after the free pilot: ₹299 per month, paid by you to Edurance. Cancel any time."
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "need",
+  "reason": "I already work hard to keep my son off the phone, and this asks me to pay ₹299 a month to put him back on it. The free report is useful and I will take it to the PTM, but I would rather the teacher work on those gaps in class.",
+  "objection": "Will this actually follow his school syllabus and exam pattern, or is it generic practice? And it is more screen time, which I am trying to cut down.",
+  "would_change_my_mind": "If his class teacher told me at the PTM that the app follows exactly what they teach and that his test scores went up during the pilot, with a fixed daily time limit I can set myself.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 500
+}

@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "habit",
+  "reason": "If the school is running it in my child's class and the report already shows where she is behind, I'll just continue it. ₹299 a month is nothing next to the fees, and my relative's child is doing the same thing.",
+  "objection": "Will it actually match my child's syllabus and the school's exam pattern, or is it generic practice that doesn't follow what the teacher is covering?",
+  "would_change_my_mind": "If the school stopped recommending it after the pilot, or the teacher told me it doesn't follow their syllabus, I would cancel.",
+  "price_too_cheap": 99,
+  "price_cheap": 199,
+  "price_expensive": 999,
+  "price_too_expensive": 2000
+}

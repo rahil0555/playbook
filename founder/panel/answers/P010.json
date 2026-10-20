@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "The free report is useful and I'll let my child use the pilot, but I won't add ₹299 a month per child on top of school fees for an AI app when I don't know who checks what it teaches. I already sit with homework from the WhatsApp group every night.",
+  "objection": "AI can give wrong answers, and nobody has told me which teacher or school person checks the explanations my child reads. If it teaches something wrong, I won't know until the exam.",
+  "would_change_my_mind": "The school's own teachers vouching for it at the end of the pilot, with proof my child's weak topics actually improved, and a sibling price so two kids don't cost ₹600 a month.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 199,
+  "price_too_expensive": 349
+}

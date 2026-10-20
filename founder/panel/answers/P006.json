@@ -1,0 +1,13 @@
+{
+  "id": "P006",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "values",
+  "reason": "I already fight to keep my son off the phone and tablet, and this is one more app asking for screen time on top of school and tuition. The free report is useful, but I am not paying ₹299 a month to give him another reason to be on a device.",
+  "objection": "More screen time, and I have no proof yet that it follows his CBSE syllabus and exam pattern rather than generic practice. I am at work late and my parents can't supervise an app, so I can't tell if he is learning or just tapping.",
+  "would_change_my_mind": "If the school's own teachers assigned it as part of homework mapped chapter by chapter to his syllabus, with a fixed daily limit like 20 minutes, and the parent view showed his test marks actually improving after the pilot.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 499
+}

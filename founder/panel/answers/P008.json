@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "We already pay a tuition teacher who sits with my child and knows exactly where she struggles, and more screen time is the last thing she needs. I'll look at the free report and pass it to her tutor, but I won't pay another ₹299 a month for an app.",
+  "objection": "An app can't make my child actually sit and do the work the way a teacher in the room can, and it's just one more reason for her to be on the phone.",
+  "would_change_my_mind": "If the school's own teachers used it in class and the term-end report showed my child's weak topics clearly improved, enough that I could cut back on tuition.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 499
+}

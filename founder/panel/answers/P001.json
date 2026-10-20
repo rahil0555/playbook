@@ -1,0 +1,13 @@
+{
+  "id": "P001",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I'll look at the free report and let him finish the pilot, but I'm not paying an AI company every month for my son's test data. I paid for a big learning app before and he dropped it in three weeks, and I work late so nobody is going to sit with him to make sure he uses it.",
+  "objection": "Where does my child's data go, who sees it, and will they use it to sell me more things? Plus I've been burned before: these apps are exciting for two weeks and then nobody opens them.",
+  "would_change_my_mind": "If the school itself told me in writing that the data stays with the school and isn't sold or used for anything else, and his class teacher showed me his marks actually went up during the free pilot.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 249,
+  "price_too_expensive": 499
+}
