@@ -249,7 +249,7 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
           </Button>
         </form>
       ) : supported && state === 'idle' ? (
-        <button type="button" onClick={() => setTyping(true)} className="text-sm font-bold text-brand-700 underline">
+        <button type="button" onClick={() => setTyping(true)} className="min-h-[2.75rem] px-3 text-sm font-bold text-brand-700 underline">
           Type it instead
         </button>
       ) : null}
