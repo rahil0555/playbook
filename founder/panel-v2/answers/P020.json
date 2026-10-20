@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "I already pay the tuition teacher every month and I trust her to sit with my child in person. If the school makes him do it during the free pilot I will allow it, but I am not adding another monthly payment for more phone time on top of tuition.",
+  "objection": "More screen time is the last thing my child needs, and an app cannot sit next to him and make sure he actually understands, the way his tuition teacher does.",
+  "would_change_my_mind": "If the end-of-term re-test shows his gap topics really closed and the class teacher tells me it helped more than tuition did, so I could cut down tuition hours instead of paying for both.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 249,
+  "price_too_expensive": 399
+}

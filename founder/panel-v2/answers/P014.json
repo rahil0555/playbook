@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "habit",
+  "reason": "If the class teacher keeps giving it as homework and checking it in class, I will pay, because I don't want my child left behind the others. I would take the ₹249 monthly plan, not the term one, so I can stop if it doesn't help.",
+  "objection": "My child already goes to tuition and I pay for that, so this is one more monthly cost. And there is only one phone at home, which I need too in the evenings.",
+  "would_change_my_mind": "If the school says it is optional and the teacher stops checking it in class, I would cancel and rely on tuition.",
+  "price_too_cheap": 49,
+  "price_cheap": 149,
+  "price_expensive": 299,
+  "price_too_expensive": 500
+}

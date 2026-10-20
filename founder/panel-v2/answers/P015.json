@@ -1,0 +1,13 @@
+{
+  "id": "P015",
+  "buys": true,
+  "purchases_first_month": 1,
+  "reason_code": "need",
+  "reason": "The school itself is using it, it is mapped to our syllabus chapters and the teacher checks it in class, so it is not some random app. At ₹249 a month it is nothing next to what I pay for tuition, so I will lock in the pilot price before it ends.",
+  "objection": "Will the gap topics actually turn into higher marks in unit tests and finals, or just better scores on their own diagnostic? If his marks do not move I am not keeping it next year.",
+  "would_change_my_mind": "If the school stops assigning it as homework after the pilot, or the end-of-term re-test shows no improvement and his exam marks stay flat.",
+  "price_too_cheap": 49,
+  "price_cheap": 199,
+  "price_expensive": 599,
+  "price_too_expensive": 1200
+}

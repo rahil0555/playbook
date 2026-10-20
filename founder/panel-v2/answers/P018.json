@@ -1,0 +1,13 @@
+{
+  "id": "P018",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "values",
+  "reason": "We already pay the school fees and a tuition teacher. If the class teacher is assigning this as homework, it is part of school, so the school should pay for it, not me. I will let my child use it while it is free, but I will not pay ₹299 a month on top.",
+  "objection": "The school is asking me to pay for something the teacher assigns and checks in class. It feels like a fee hike by the back door, and my tuition teacher already covers the weak topics in person.",
+  "would_change_my_mind": "If the end-of-term re-test showed clear improvement that my tuition teacher had not managed, and the school folded the cost into the fees or I could drop some tuition hours because of it.",
+  "price_too_cheap": 49,
+  "price_cheap": 99,
+  "price_expensive": 249,
+  "price_too_expensive": 499
+}
