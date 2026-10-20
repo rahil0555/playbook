@@ -29,7 +29,7 @@
    - Break-even: 290 enrolled students, about 3 schools.
    - **Year 1: +₹3,03,480.** Cash needed: ₹1,17,160.
    - This is the strongest lever by far, *if* schools will pay. That's test E2 in `board.md`.
-2. **Price ₹349 instead of ₹299** (share scaled): contribution ₹191 (vs ₹157 before the guarantee reserve), break-even 84, year 1 −₹19,566. The re-test panel's median "getting expensive" rose to ₹399, so ₹349 is testable. Simulated answers aren't proof.
+2. **Price ₹349 instead of ₹299** (share scaled): contribution ₹182 (vs ₹148), break-even 88, year 1 −₹27,666. The re-test panel's median "getting expensive" rose to ₹399, so ₹349 is testable. Simulated answers aren't proof.
 3. **Cut AI cost per student.** Cache explanations by topic as well as audio, and use a smaller model for routine hints. Each ₹10 saved adds ₹10 to the contribution and lowers break-even by about 7 students.
 
 **The board's money conditions (`board.md` §5):**

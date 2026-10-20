@@ -19,13 +19,15 @@ Inputs: `founder/pricing-curve.md` (20 simulated parents), `founder/numbers.json
 
 | price/month | contribution per paid student | break-even (paid students/month) | margin at plan (144) | year 1 operating result |
 | ---: | ---: | ---: | ---: | ---: |
-| ₹199 | ₹89.6 (45%) | 178 | -11% | -₹1,10,880 |
-| ₹249 | ₹123.4 (50%) | 129 | 5% | -₹80,442 |
-| **₹299** | **₹157.2 (53%)** | **102** | **16%** | **-₹50,004** |
-| ₹349 | ₹191.1 (55%) | 84 | 23% | -₹19,566 |
-| ₹399 | ₹224.9 (56%) | 71 | 29% | +₹10,872 |
+| ₹199 | ₹80.6 (41%) | 198 | -15% | -₹1,18,980 |
+| ₹249 | ₹114.4 (46%) | 139 | 1% | -₹88,542 |
+| **₹299** | **₹148.2 (50%)** | **108** | **13%** | **-₹58,104** |
+| ₹349 | ₹182.1 (52%) | 88 | 20% | -₹27,666 |
+| ₹399 | ₹215.9 (54%) | 74 | 26% | +₹2,772 |
 
-Going below ₹299 to win budget parents almost doubles the break-even at ₹199. The panel also said price was the main reason for only 1 of the 14 parents who said no. Trust, tuition and screen time were the real blockers, and those are an offer problem (`founder/offer.md`), not a price problem. **So keep ₹299 and fix the offer, rather than cut the price.**
+(Includes the ₹9/month guarantee reserve from `offer.md`.)
+
+Going below ₹299 to win budget parents nearly doubles the break-even at ₹199. The panel also said price was the main reason for only 1 of the 14 parents who said no. Trust, tuition and screen time were the real blockers, and those are an offer problem (`founder/offer.md`), not a price problem. **So keep ₹299 and fix the offer, rather than cut the price.**
 
 **Against competitors** (public prices, not all official; check before quoting):
 - **Free substitutes:** Khan Academy, DIKSHA and YouTube. Two panel parents named "free apps and YouTube".
@@ -53,7 +55,7 @@ Parents at the **first three pilot schools** who subscribe before that school's 
 - The urgency is real: it's tied to a real pilot end date and a named group.
 - It doesn't train parents to wait for discounts, because the next school's parents never see it.
 - There is no "was ₹X" anchor. ₹299 is the price from the start.
-- At ₹249 the contribution is ₹123/month (see table). Cap it at the first three schools so it can't drag the margin.
+- At ₹249 the contribution is ₹114/month (see table). Cap it at the first three schools so it can't drag the margin.
 
 ## 4. What to test with real buyers
 
