@@ -27,7 +27,7 @@ export const VOICE_MESSAGES = {
   unsupported: "Voice answers aren't available in this browser. Type your answer instead.",
   lowConfidence: "I'm not sure I heard that correctly. Please say it again.",
   empty: "I couldn't hear an answer. Please try again.",
-  correct: 'Good answer! You said it right.',
+  correct: 'Good answer! That is the word.',
   close: 'Almost! Say it once more, slowly, one sound at a time.',
   wrong: 'That is not the word for this picture. Try again.',
 } as const;

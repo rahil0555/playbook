@@ -68,6 +68,14 @@ describe('listenOnce: one phrase, one outcome', () => {
     expect(cb.onError).not.toHaveBeenCalled();
   });
 
+  it('a confidence of exactly 0 is not a measurement: it is reported as unknown, not as "not confident"', () => {
+    const { made, factory, cb } = setup();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
+    made[0]!.heard('banana', 0);
+    made[0]!.end();
+    expect(cb.onResult).toHaveBeenCalledWith({ transcript: 'banana', confidence: undefined });
+  });
+
   it('an end with nothing heard is "no speech"', () => {
     const { made, factory, cb } = setup();
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);

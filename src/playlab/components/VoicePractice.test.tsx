@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { PlayLabContext, type PlayLabContextValue } from '../app/PlayLabContext';
 import { fakeRecognizers } from '../test/fakeRecognizer';
 import { VoicePractice } from './VoicePractice';
@@ -16,6 +16,17 @@ function renderWithProviders(ui: ReactElement) {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const mic = () => screen.getByRole('button', { name: 'Speak your answer' });
+
+/** The browser's microphone permission check, held open by the test until it answers (or never answers). */
+function controlPermission() {
+  let answer: (state: PermissionState) => void = () => undefined;
+  const query = () => new Promise<{ state: PermissionState }>((resolve) => (answer = (state) => resolve({ state })));
+  Object.defineProperty(navigator, 'permissions', { value: { query }, configurable: true });
+  return { answer: (state: PermissionState) => answer(state) };
+}
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'permissions');
+});
 
 /** Speaking, with the browser's recogniser replaced by a fake: the test decides what the browser hears, and when. */
 function renderVoice(expected = ['apple']) {
@@ -132,3 +143,66 @@ describe('VoicePractice: without speech recognition', () => {
     expect(await screen.findByText('Correct!')).toBeInTheDocument();
   });
 });
+
+describe('VoicePractice: the typed answer is always reachable, and nothing late overrides it', () => {
+  it('the typed answer is reachable while the browser is asking for the microphone', async () => {
+    controlPermission();
+    const { user } = renderVoice();
+    await user.click(mic());
+    expect(await screen.findByText(/Waiting for the microphone/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Type it instead' }));
+    await user.type(screen.getByLabelText('Type your answer'), 'apple');
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+    expect(await screen.findByText('Correct!')).toBeInTheDocument();
+  });
+
+  it('a typed answer given while permission is pending is final: the microphone never opens afterwards', async () => {
+    const perm = controlPermission();
+    const { user, fake } = renderVoice();
+    await user.click(mic());
+    await screen.findByText(/Waiting for the microphone/);
+    await user.click(screen.getByRole('button', { name: 'Type it instead' }));
+    await user.type(screen.getByLabelText('Type your answer'), 'apple');
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+    await screen.findByText('Correct!');
+    perm.answer('prompt'); // the browser answers late
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fake.made.length, 'only the availability check ever made a recogniser').toBe(1);
+    expect(screen.getByText('Correct!')).toBeInTheDocument();
+  });
+
+  it('the typed answer is reachable while listening, and a speech result that arrives after it is ignored', async () => {
+    const { user, fake } = renderVoice();
+    await listen(user, fake);
+    await user.click(screen.getByRole('button', { name: 'Type it instead' }));
+    await user.type(screen.getByLabelText('Type your answer'), 'apple');
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+    expect(await screen.findByText('Correct!')).toBeInTheDocument();
+    expect(fake.latest().aborted, 'the microphone is released when the typed answer is judged').toBe(true);
+    fake.latest().heard('banana');
+    fake.latest().end();
+    expect(screen.queryByText(/banana/)).toBeNull();
+    expect(screen.getByText('Correct!')).toBeInTheDocument();
+  });
+
+  it('a denied permission is explained, and no microphone opens', async () => {
+    const perm = controlPermission();
+    const { user, fake } = renderVoice();
+    await user.click(mic());
+    perm.answer('denied');
+    expect(await screen.findByText(/Microphone access is blocked/)).toBeInTheDocument();
+    expect(fake.made.length).toBe(1);
+  });
+
+  it('leaving the question while permission is pending means the microphone never opens', async () => {
+    const perm = controlPermission();
+    const { user, fake, unmount } = renderVoice();
+    await user.click(mic());
+    await screen.findByText(/Waiting for the microphone/);
+    unmount();
+    perm.answer('granted');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fake.made.length).toBe(1);
+  });
+});
+

@@ -80,4 +80,46 @@ test.describe('Magic Letters: say the word after spelling it', () => {
     await page.getByRole('button', { name: 'Check' }).click();
     await expect(page.getByText('Correct!')).toBeVisible();
   });
+
+  test('skipping the speaking step does not block the next word', async ({ page }) => {
+    await scriptSpeech(page);
+    await page.goto('/#/word-builder');
+    const word = await solveWord(page);
+    await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+    const next = await solveWord(page);
+    expect(next.id).not.toBe(word.id);
+    await expect(page.getByText('Correct!')).toHaveCount(0);
+  });
+
+  test('after speaking, Next word starts the next word with a clean speaking area', async ({ page }) => {
+    await scriptSpeech(page);
+    await page.goto('/#/word-builder');
+    const word = await solveWord(page);
+    await page.evaluate((text) => ((window as unknown as { __speechScript: { transcript: string } }).__speechScript.transcript = text), word.text);
+    await page.getByRole('button', { name: 'Speak your answer' }).click();
+    await expect(page.getByText('Correct!')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+    const next = await solveWord(page);
+    expect(next.id).not.toBe(word.id);
+    await expect(page.getByText(/^You said:/)).toHaveCount(0);
+    await expect(page.getByText('Correct!')).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'Tap the microphone and say the answer.' })).toBeVisible();
+  });
+
+  test('nothing heard asks to try again, and trying again works without a page refresh', async ({ page }) => {
+    await scriptSpeech(page);
+    await page.goto('/#/word-builder');
+    const word = await solveWord(page);
+    await page.evaluate(() => ((window as unknown as { __speechScript: { error: string | null } }).__speechScript.error = 'no-speech'));
+    await page.getByRole('button', { name: 'Speak your answer' }).click();
+    await expect(page.getByText("I couldn't hear you. Please try again.")).toBeVisible({ timeout: 5000 });
+    await page.evaluate((text) => {
+      const script = (window as unknown as { __speechScript: { error: string | null; transcript: string } }).__speechScript;
+      script.error = null;
+      script.transcript = text;
+    }, word.text);
+    await page.getByRole('button', { name: 'Speak your answer' }).click();
+    await expect(page.getByText('Correct!')).toBeVisible({ timeout: 5000 });
+  });
 });
+

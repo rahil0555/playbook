@@ -67,17 +67,28 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
   const listening = useRef<Listening | null>(null);
   const ticker = useRef<ReturnType<typeof setInterval>>();
   const mounted = useRef(true);
+  /** counts the attempts: a callback from an older attempt (a late result, a late permission answer) does nothing */
+  const attempt = useRef(0);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      attempt.current += 1;
       listening.current?.cancel();
       clearInterval(ticker.current);
     };
   }, []);
 
   const stopTicker = () => clearInterval(ticker.current);
+
+  /** drops the attempt in progress, if any: the microphone is released and nothing it reports from now on is shown */
+  const dropAttempt = () => {
+    attempt.current += 1;
+    listening.current?.cancel();
+    listening.current = null;
+    stopTicker();
+  };
 
   /** speech failed: say why, and offer typing (the specification: the child can retry or type the answer instead) */
   const fail = (text: string) => {
@@ -90,6 +101,8 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
 
   /** one transcript (spoken or typed) judged against the expected answers */
   const judge = (heard: string, confidence: number | undefined, typedAnswer: boolean) => {
+    // the first answer is final: a typed answer releases the microphone, and no late speech can replace it
+    dropAttempt();
     setTranscript(heard);
     setTypedLast(typedAnswer);
     setState('processing');
@@ -110,24 +123,30 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
     setTranscript('');
     setTyping(false);
     setState('requesting_permission');
+    const id = ++attempt.current;
+    const current = () => id === attempt.current;
     if (await microphoneBlocked()) {
-      if (mounted.current) fail(VOICE_MESSAGES.permission);
+      if (current() && mounted.current) fail(VOICE_MESSAGES.permission);
       return;
     }
-    if (!mounted.current) return;
+    // the child may have typed an answer, retried or left while the browser was answering: then nothing opens
+    if (!current() || !mounted.current) return;
     listening.current = listenOnce(factory, { lang, timeoutMs: listenMs }, {
       onListening: () => {
+        if (!current()) return;
         setState('listening');
         setSeconds(0);
         stopTicker();
         ticker.current = setInterval(() => setSeconds((n) => n + 1), 1000);
       },
       onResult: (r) => {
+        if (!current()) return;
         stopTicker();
         listening.current = null;
         judge(r.transcript, r.confidence, false);
       },
       onError: (kind) => {
+        if (!current()) return;
         listening.current = null;
         fail(ERROR_TEXT[kind]);
       },
@@ -138,9 +157,7 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
 
   /** back to the start: nothing from the last attempt stays on screen */
   const again = () => {
-    listening.current?.cancel();
-    listening.current = null;
-    stopTicker();
+    dropAttempt();
     setMessage(supported ? null : VOICE_MESSAGES.unsupported);
     setEvaluation(null);
     setTranscript('');
@@ -248,7 +265,7 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
             Check
           </Button>
         </form>
-      ) : supported && state === 'idle' ? (
+      ) : supported && (state === 'idle' || state === 'requesting_permission' || state === 'listening') ? (
         <button type="button" onClick={() => setTyping(true)} className="min-h-[2.75rem] px-3 text-sm font-bold text-brand-700 underline">
           Type it instead
         </button>

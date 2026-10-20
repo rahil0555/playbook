@@ -89,6 +89,14 @@ export function voiceErrorKind(error: string): VoiceErrorKind {
   }
 }
 
+/**
+ * A confidence of exactly 0 is treated as "not provided". The specification does not make 0 a measurement, and a browser
+ * that cannot score a result may report it; penalising a child for that would be wrong. (Not verified on real devices.)
+ */
+export function usableConfidence(value: number | undefined): number | undefined {
+  return typeof value === 'number' && value > 0 ? value : undefined;
+}
+
 /** Listens for one phrase. Calls exactly one of onResult or onError, once. */
 export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: ListenCallbacks): Listening {
   const rec = create();
@@ -116,7 +124,7 @@ export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: L
   rec.onresult = (event) => {
     const last = event.results[event.results.length - 1];
     const best = last?.[0];
-    if (last?.isFinal && best) heard = { transcript: best.transcript, confidence: best.confidence };
+    if (last?.isFinal && best) heard = { transcript: best.transcript, confidence: usableConfidence(best.confidence) };
   };
   rec.onerror = (event) => finish(() => cb.onError(voiceErrorKind(event.error)));
   rec.onend = () => finish(() => (heard && heard.transcript.trim() ? cb.onResult(heard) : cb.onError('no-speech')));
