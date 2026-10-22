@@ -15,6 +15,7 @@ const screens: Record<PlayLabView, React.LazyExoticComponent<React.ComponentType
   'word-builder': lazy(() => import('../features/word-builder/WordBuilderActivity')),
   sentences: lazy(() => import('../features/sentence-builder/SentenceBuilderActivity')),
   matching: lazy(() => import('../features/matching/MatchingActivity')),
+  story: lazy(() => import('../features/story/StoryActivity')),
 };
 
 export function LoadingScreen() {

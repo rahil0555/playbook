@@ -23,8 +23,9 @@ describe('Alphabet playground', () => {
       return s as NonNullable<ReturnType<typeof adapter.load>>;
     });
     expect((saved as { exploredLetters: string[] }).exploredLetters).toHaveLength(26);
-    // Letter Explorer badge toast appears
-    expect(await screen.findByText('Letter Explorer')).toBeInTheDocument();
+    // Letter Explorer badge toast appears. In jsdom it reaches the page about 2.8 s after the last letter is saved (measured
+    // 2.75-2.84 s over three runs), so the wait is longer than the default 1 s. The toast stays up for 5 s, so it is still found.
+    expect(await screen.findByText('Letter Explorer', {}, { timeout: 8000 })).toBeInTheDocument();
   }, 40_000);
 
   it('plays a tone and the letter name on tap, and never needs audio to animate or select', async () => {

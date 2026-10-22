@@ -22,6 +22,8 @@ interface LooseLetterProps {
   disabled: boolean;
   /** increments each time this tile should wobble (a miss) */
   wobbleKey: number;
+  /** the story screen: the letter itself, in its colour, instead of the letter monster */
+  glyph?: boolean;
   onTap: (tileId: string) => void;
   /** slot under the letter while dragging (null = none) */
   onHover: (slot: number | null) => void;
@@ -51,7 +53,7 @@ function nearestSlot(el: HTMLElement | null): number | null {
  * its motion, and screams; let it go and it snaps back. A miss makes it wobble. Drag it onto a spot, or tap it to pick it
  * up (then tap a spot). The drag target is the outer button; the reactions run on inner spans so they never fight the drag.
  */
-export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop, onHoldStart, onHoldEnd }: LooseLetterProps) {
+export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, glyph = false, onTap, onHover, onDrop, onHoldStart, onHoldEnd }: LooseLetterProps) {
   const { reducedMotion } = usePlayLab();
   const { sfx } = useSpeech();
   const squish = useAnimationControls();
@@ -189,7 +191,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         feelTap();
         onTap(tile.id);
       }}
-      className="pl-draggable relative z-10 grid h-[4.4rem] w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem]"
+      className="pl-draggable relative z-10 grid aspect-square w-full max-w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:max-w-none"
     >
       {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
       {/* selected / hinted ring (a separate layer, so the monster keeps its shadow) */}
@@ -216,16 +218,22 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
       <motion.span animate={squish} aria-hidden="true" className="block h-full w-full">
         <motion.span animate={wobble} className="block h-full w-full">
           <motion.span style={{ rotate: tilt, scaleX: stretchX, scaleY: stretchY }} className="block h-full w-full">
-            <LetterMonster
-              letter={tile.value}
-              color={color}
-              mood={mood}
-              lookX={lookX}
-              lookY={lookY}
-              bounce={!reducedMotion && !selected && !held}
-              phase={index * 0.23}
-              blinkDelay={(index * 1.3) % 4}
-            />
+            {glyph ? (
+              <span data-letter-glyph style={{ color }} className={`grid h-full w-full place-items-center font-display text-[4.2rem] font-black leading-none drop-shadow-[0_3px_0_#ffffff] ${reducedMotion || selected || held ? '' : 'pl-float'}`}>
+                {tile.value}
+              </span>
+            ) : (
+              <LetterMonster
+                letter={tile.value}
+                color={color}
+                mood={mood}
+                lookX={lookX}
+                lookY={lookY}
+                bounce={!reducedMotion && !selected && !held}
+                phase={index * 0.23}
+                blinkDelay={(index * 1.3) % 4}
+              />
+            )}
           </motion.span>
         </motion.span>
       </motion.span>

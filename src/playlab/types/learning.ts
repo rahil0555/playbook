@@ -12,7 +12,7 @@ export type DifficultyLevel = 'starter' | 'explorer' | 'adventurer';
 export type ActivityId = 'alphabet' | 'phonics' | 'word-builder' | 'sentences' | 'matching';
 
 /** Screens PlayLab can show. */
-export type PlayLabView = 'home' | 'progress' | ActivityId;
+export type PlayLabView = 'home' | 'progress' | 'story' | ActivityId;
 
 export type AccentName = 'brand' | 'coral' | 'sun' | 'sky' | 'plum';
 
@@ -108,6 +108,16 @@ export interface ContentPack {
   letters: LetterEntry[];
   words: WordEntry[];
   sentences: SentenceEntry[];
+  /** the read-along story: one sentence, and the words the child builds from it. Packs without one hide the story screen. */
+  story?: StoryScene;
+}
+
+/** A sentence the child reads along with: each target word is spelled in sentence order. */
+export interface StoryScene {
+  id: string;
+  sentence: string;
+  /** lowercase, in the order they appear in the sentence */
+  targets: readonly string[];
 }
 
 export interface ActivityDefinition {

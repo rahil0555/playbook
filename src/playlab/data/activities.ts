@@ -51,7 +51,7 @@ export const ACTIVITIES: ActivityDefinition[] = [
 export const ACTIVITY_IDS: ActivityId[] = ACTIVITIES.map((a) => a.id);
 
 /** Every screen PlayLab can show; handy for validating a route param in the host app. */
-export const PLAYLAB_VIEWS: readonly PlayLabView[] = ['home', 'progress', ...ACTIVITY_IDS];
+export const PLAYLAB_VIEWS: readonly PlayLabView[] = ['home', 'progress', 'story', ...ACTIVITY_IDS];
 
 export const isPlayLabView = (value: unknown): value is PlayLabView => typeof value === 'string' && (PLAYLAB_VIEWS as readonly string[]).includes(value);
 

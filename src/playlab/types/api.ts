@@ -1,6 +1,5 @@
 import type {
   ActivityCompletion,
-  ActivityId,
   AnswerResult,
   DifficultyLevel,
   LanguageCode,
@@ -27,7 +26,7 @@ export interface PlayLabLearner {
 
 export interface PlayLabProps {
   /** Screen to open first. Default 'home'. */
-  initialActivity?: ActivityId | 'home' | 'progress';
+  initialActivity?: PlayLabView;
   /**
    * Controlled navigation (optional). Pass `view` together with `onViewChange`
    * if the host wants to mirror the current screen in its own URL.

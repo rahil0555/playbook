@@ -28,6 +28,7 @@ export function MagicWordBuilder() {
         activityId="word-builder"
         title="Magic Letters"
         instruction="Drag each letter onto its glowing outline to spell the word. You can also tap a letter, then tap a spot."
+        compact
       >
         {!round.summary ? <ProgressIndicator done={round.solvedCount} total={round.total} currentIndex={round.index} accent="brand" noun="Word" /> : null}
       </ActivityHeader>

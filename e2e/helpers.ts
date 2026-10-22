@@ -56,6 +56,62 @@ export async function installFakeSpeech(page: Page) {
 
 export const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
 
+/**
+ * Replace the browser's speech recogniser with a scripted one. The test decides what the browser "hears" (`transcript`), how it
+ * fails (`error`), and whether it is there at all (`supported`); `hold` keeps a session listening until the child stops it.
+ * `starts` counts the sessions the app opened. This is a mock: it proves the app's handling, not the microphone.
+ */
+export async function installScriptedSpeech(page: Page, options: { supported?: boolean } = {}) {
+  await page.addInitScript((supported: boolean) => {
+    const script = { transcript: '', error: null as string | null, hold: false, starts: 0 };
+    (window as unknown as { __speech: typeof script }).__speech = script;
+    class ScriptedRecognizer {
+      lang = '';
+      continuous = false;
+      interimResults = false;
+      maxAlternatives = 1;
+      onstart: (() => void) | null = null;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: { error: string }) => void) | null = null;
+      onend: (() => void) | null = null;
+      aborted = false;
+      start() {
+        script.starts += 1;
+        setTimeout(() => {
+          if (this.aborted) return;
+          this.onstart?.();
+          if (!script.hold) setTimeout(() => this.finish(), 300);
+        }, 30);
+      }
+      finish() {
+        if (this.aborted) return;
+        if (script.error) this.onerror?.({ error: script.error });
+        else if (script.transcript) this.onresult?.({ results: [{ isFinal: true, length: 1, 0: { transcript: script.transcript, confidence: 0.9 } }] });
+        this.onend?.();
+      }
+      stop() {
+        this.finish();
+      }
+      abort() {
+        this.aborted = true;
+      }
+    }
+    const w = window as unknown as { SpeechRecognition: unknown; webkitSpeechRecognition: unknown };
+    // Chromium has its own webkit-prefixed recogniser: "no speech recognition" has to clear both names
+    if (supported) w.SpeechRecognition = ScriptedRecognizer;
+    else {
+      w.SpeechRecognition = undefined;
+      w.webkitSpeechRecognition = undefined;
+    }
+  }, options.supported ?? true);
+}
+
+/** Sets what the scripted recogniser hears next, and how it behaves. */
+export const setHearing = (page: Page, script: { transcript?: string; error?: string | null; hold?: boolean }) =>
+  page.evaluate((s) => Object.assign((window as unknown as { __speech: object }).__speech, s), script);
+
+export const speechStarts = (page: Page) => page.evaluate(() => (window as unknown as { __speech: { starts: number } }).__speech.starts);
+
 export async function nextOrFinish(page: Page) {
   await page.getByRole('button', { name: /^(Next word|Next sentence|Next|Finish)$/ }).click();
 }

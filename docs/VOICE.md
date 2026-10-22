@@ -11,7 +11,56 @@ improvement or Try again. Typing is always there as a fallback. The current feat
 | Speech listener | `src/playlab/services/speechInput/recognizer.ts` | Wraps the browser's speech recognition (`SpeechRecognition`, or Safari's `webkitSpeechRecognition`). One phrase, one outcome. Stops itself after 8 seconds. Maps the browser's error names to ours. No Play Lab imports. |
 | Answer checker | `src/playlab/services/speechInput/evaluate.ts` | Judges spoken and typed answers with the same rules (below). |
 | Voice component | `src/playlab/components/VoicePractice.tsx` | Microphone button, listening state with a timer and Stop, transcript ("You said: …"), result, retry, and the typed fallback. Knows the question only through `expected` and `prompt`. |
-| Magic Letters | `src/playlab/features/word-builder/magic/MagicQuestion.tsx` | After a word is spelled, "Say the word for the picture" appears under the "Next word" row. |
+| Speak answer | `src/playlab/components/VoiceAnswer.tsx`, `src/playlab/hooks/useSpeechRecognition.ts` | The microphone control in Magic Letters that answers the question. Listens through the speech listener above and hands the transcript to Magic Letters. |
+| Magic Letters | `src/playlab/features/word-builder/magic/MagicQuestion.tsx` | Judges a spoken answer with the rules above and records it through the round. After a word is spelled, "Say the word for the picture" (practice only, never recorded) appears under the "Next word" row. |
+
+### Speaking the answer in Magic Letters
+
+The child can say the word instead of dragging or tapping letters. The control is labelled **Speak answer** and sits below the
+feedback message. It sits there, not above the letters, so the letters and the feedback keep their places (the Magic Letters
+layout checks depend on that). It follows the Play Lab V2 specification's states:
+
+* **Idle:** Speak answer. **Listening:** a listening indicator and a Stop button. **Processing** is momentary. **Done** replaces
+  the control once the word is spelled. **Error** says why (no speech, a refused microphone, a network problem, or no
+  speech recognition in this browser) and offers Speak answer again. An unsupported browser sees one sentence and keeps the
+  letters.
+* **Stop** ends listening at once and judges nothing, so a half-heard answer is never submitted.
+* **Judging:** the transcript is judged by `evaluateVoiceAnswer`, the same rules as the practice prompt. A correct word is
+  correct. A near miss and a different word are both wrong, and each gets its retry text. A transcript the browser is unsure
+  about (confidence below 0.3 and not the word) asks the child to say it again and uses no attempt.
+* **Recording:** a correct word goes through the round's `submit` with the normalised transcript as its response. The
+  letters then fly in one after another through the same judgement as a tap or a drag, so the completion is the existing one.
+  A wrong word goes through `submit` as an incorrect answer, which is one attempt, and the retry feedback follows. Stars,
+  progress, hints, `onAnswerSubmit` and `onActivityComplete` all come from the existing round.
+* **Failures:** no speech, a refused microphone, a network error and a browser that cannot listen are never counted as wrong
+  and never use an attempt. The letters always work.
+
+**Privacy-relevant change.** A judged spoken answer now goes through the round's `submit`. Its normalised transcript becomes the
+`response` of an `AnswerResult`, which is passed to the host's `onAnswerSubmit` and to the host's optional `track` hook (see
+"Privacy" below). The built-in progress store keeps only counters from it (questions answered, correct answers, first-try
+correct, stars). It does not keep the transcript. A spoken answer that was not judged (no speech, unsure, stopped, or an error)
+is not recorded at all.
+
+**Where the specification was adapted** (each is a choice that can be reversed):
+
+* **File location.** The browser recogniser, its error mapping and the answer checker already exist in
+  `services/speechInput/` from earlier voice work. The specification's `lib/speech/*` files would duplicate them, so they are
+  not created. Only `hooks/useSpeechRecognition.ts` and `components/VoiceAnswer.tsx` are new.
+* **Component props.** `VoiceAnswer` takes `solved` and `onTranscript`, not `expected` and `onError`. The Magic Letters caller
+  judges the transcript, and the component shows its own recognition errors.
+* **Language.** English is listened for as `en-IN`, as the specification says. The earlier practice prompt still uses `en-US`.
+* **Normalisation.** The existing `normalizeAnswer` is used, not a new function. It also removes accents and turns other
+  symbols into spaces. For the word list, which is all lower-case a to z, the result is the same as the specification's
+  `[.,!?;:]` rule.
+* **Stop.** The specification says a manual stop must not submit an incomplete answer, so Stop judges nothing. A child who
+  wants a word heard must tap Speak answer again.
+
+**Open decision.** Magic Letters now shows two microphone controls: Speak answer, which counts, and the practice prompt
+"Say the word for the picture" after a word is finished, which does not. The practice prompt was left as it was. It can be
+removed if the team wants one microphone.
+
+**Not in this change.** The specification's server speech-to-text phase, the host app's feature flag, and sentence, phonics
+and matching activities are not implemented.
 
 ### States (as the specification names them)
 
@@ -46,7 +95,19 @@ A failure in any state goes to `error`, which offers the microphone again and th
 * **No audio recording or upload.** The specification's MediaRecorder path is not used. The browser produces the
   transcript directly. The specification allows this ("audio/blob OR browser transcript").
 * **No rubric or AI evaluation** for open-ended answers. Only deterministic matching of short answers exists.
-* **Only Magic Letters uses it.** The component is reusable; other questions would pass their own `expected` and `prompt`.
+* **Only the word builder uses it.** Magic Letters and the read-along story screen (see below) use the same voice control. The component is reusable; other questions would pass their own `expected` and `prompt`.
+
+### The read-along story screen
+
+The story screen (Home → "Spell the story") builds the sentence from the reference reel, "Rod and Cone are two monsters in one!",
+one target word at a time: "are", then "two", then "one". Each word uses the Magic Letters engine: drag, tap, hints, retries,
+and Speak answer. The sentence is read aloud when the child arrives, and tapping any word in it speaks that word through the
+browser's voice. Each finished word plays a short tennis reward. The reward shows a racket and a ball, as in the reference.
+
+What is taken from the reference: the sentence and its three target words, the lavender screen, the blue, orange and green
+colours, and the plain coloured letters with a gentle drift. The reference's child, its footage and its exact voice are not
+reproduced, and the voice is the browser's own. The words were read from the on-screen text only: the reel's audio could not be
+transcribed here, so the spoken narration in the reel is unverified.
 
 ## Browser and provider limitations
 
@@ -72,10 +133,21 @@ What the **application code** does, verified by reading the code and by the chec
 
 * It does not capture, record, upload or store audio itself. The browser's recogniser is the only thing that receives the
   microphone.
-* It does not write the transcript to storage (no `localStorage`, `sessionStorage` or progress record). The transcript is
-  held in the component's state, and it is cleared on retry or when the question goes away.
+* The transcript is held in the component's state. It is cleared on retry, when the child moves to another word (the question
+  is remounted per word), and when the question goes away.
+* A judged spoken answer becomes an `AnswerResult` whose `response` is the normalised transcript. That object goes to the
+  host's `onAnswerSubmit`, and to the host's `track(event)` hook if the host supplies one. The `track` hook receives the raw
+  event, so a host that forwards it to analytics would forward the transcript too. Play Lab cannot see what a host does
+  with either hook.
+* The built-in progress store (`localStorage` by default) saves only counters: questions answered, correct answers,
+  first-try correct, stars, badges and recent completions. It does not save the transcript or any answer text, and the
+  built-in adapter does not implement `track`. Typed letters reach the same hooks, so this is not new for the host, but the
+  host now also receives spoken words there.
+* Play Lab adds no student identifier or name. The learner `id` is host-supplied and only namespaces saved progress; the
+  display name is not stored.
+* The practice prompt's transcripts are never submitted or stored.
 * It does not log transcripts or speech. The voice code contains no `console` calls.
-* It does not write voice results into progress: the voice code never calls the round's submit.
+* The practice prompt never calls the round's submit. Speak answer calls it only for a judged answer.
 * The app makes no network calls of its own in `src/playlab` (no `fetch`, no XHR). There are no API keys, tokens or
   environment variables in frontend code.
 
@@ -90,7 +162,24 @@ What the **browser** does, which the app cannot control:
 
 ## Automated tests
 
-Run on commit `16d38f3` (the audit commit). Commands are the ones in `package.json`.
+### This change (voice answers in Magic Letters, not committed)
+
+Run on the working tree above `ac96d37`, with the uncommitted changes in place. Commands are the ones in `package.json`.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Type-check | `npm run typecheck` | Passed |
+| Unit and component tests | `npm test` | 322 passed, 0 failed (36 files). 23 of these are new voice tests. |
+| Production build | `npm run build` | Passed |
+| Library build | `npm run build:lib` | Passed |
+| Full Chromium Playwright suite | `npx playwright test` | 193 passed, 0 failed, 0 skipped. 12 of these are new voice tests. |
+
+The Playwright run used a build of the final source. No source or test file changed after that build. Only Chromium was run.
+The voice tests use a scripted recogniser, so they test the app's handling and not a real microphone.
+
+### Earlier audit (commit `16d38f3`, before the Magic Letters voice answer)
+
+Commands are the ones in `package.json`.
 
 | Check | Command | Result |
 | --- | --- | --- |
@@ -107,10 +196,10 @@ recogniser, so they test the app's behaviour, not a real microphone or a real pr
 
 ### Known failure that predates voice input
 
-`src/playlab/features/alphabet/alphabet.test.tsx` ("selects each of the 26 letters") exceeds the 5-second test timeout.
-It fails at about 5.1 to 6 seconds on every run in isolation, and it also fails on commit `3814380`, which is before any
-voice code. It is not caused by voice input. It has not been fixed here, because that would mean changing unrelated
-Alphabet timing.
+`src/playlab/features/alphabet/alphabet.test.tsx` ("selects each of the 26 letters") exceeded the 5-second test timeout in
+the audit above, and it failed on commit `3814380`, which is before any voice code. It is not caused by voice input. It has
+not been fixed, because that would mean changing unrelated Alphabet timing. It passed in the final run for this change, so
+its timing is still unexplained.
 
 `src/playlab/features/matching/matching.test.tsx` ("Word completion") takes about 1.4 seconds alone but close to 5 seconds
 under the full parallel run. It has passed on most full runs and failed on some. It is timing-sensitive under load. It is

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { Button } from '../../../components/Button';
 import { CelebrationEffect, useBurst } from '../../../components/CelebrationEffect';
@@ -21,15 +21,26 @@ import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel'
 import type { Scheduled } from '../../../services/audioService';
 import type { Pose } from '../../../moments/flightPath';
 import { OutlineSlot } from './OutlineSlot';
+import { VoiceAnswer } from '../../../components/VoiceAnswer';
 import { VoicePractice } from '../../../components/VoicePractice';
+import { StorySentence, type StoryStage } from '../../story/StorySentence';
+import { TennisScene } from '../../story/TennisScene';
+import { storyLetterColor } from '../../story/storyRounds';
+import { evaluateVoiceAnswer, normalizeAnswer } from '../../../services/speechInput/evaluate';
+import type { RecognizedResult } from '../../../services/speechInput/recognizer';
 import { StorybookCutscene } from './StorybookCutscene';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
 
-const colorOf = (letter: string) => letterColor(letter.charCodeAt(0));
+const letterHue = (letter: string) => letterColor(letter.charCodeAt(0));
+
+/** the gap between the letters of a word spelled by voice: each one flies in on its own */
+const VOICE_LETTER_GAP_MS = 380;
 
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
-export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: WordEntry }) {
-  const { level, reducedMotion } = usePlayLab();
+/** `storyStage` is set on the read-along story: the sentence replaces the picture, and the letters take the reference's colours. */
+export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEntry>; word: WordEntry; storyStage?: StoryStage }) {
+  const colorOf = (letter: string) => (storyStage ? storyLetterColor(letter) : letterHue(letter));
+  const { content, level, reducedMotion } = usePlayLab();
   const { speak, sfx, stop, loopPhonic } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
@@ -49,6 +60,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const [fresh, setFresh] = useState<number | null>(null);
   const [wobble, setWobble] = useState<Record<string, number>>({});
   const [missed, setMissed] = useState(false);
+  /** feedback for a spoken answer: `counted` when it was judged (a wrong word is an attempt); otherwise the child is asked to say it again */
+  const [voiceNote, setVoiceNote] = useState<{ text: string; counted: boolean } | null>(null);
   const [announce, setAnnounce] = useState('');
   // Logic is judged the instant a letter is dropped; the visuals follow: a copy of the bubble flies to the
   // slot, and the slot only shows its own letter once that flight has landed.
@@ -59,6 +72,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const generation = useRef(0);
   const scene = useRef<HTMLDivElement>(null);
   const freshTimer = useRef<ReturnType<typeof setTimeout>>();
+  const voiceTimer = useRef<ReturnType<typeof setTimeout>>();
   const [phonicsGate] = useState(() => createRepeatGate(PHONICS_GAP_MS));
   /** tiles whose sound was already said when they were picked up: placing them does not say it again */
   const soundedTiles = useRef(new Set<string>());
@@ -81,6 +95,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   useEffect(
     () => () => {
       clearTimeout(freshTimer.current);
+      clearTimeout(voiceTimer.current);
       generation.current += 1; // a cheer still waiting for its letter sound does not play after the question is gone
     },
     [],
@@ -101,6 +116,12 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   /** every letter is in place AND has finished landing: now the word is "complete" */
   const complete = done && landed.size === target.length;
   const hint = !done && round.attempts >= 2 ? nextHint(target, slots, tiles) : null;
+  /** a finished story word plays the tennis reward once: the counter moves when the word becomes complete, not on every render */
+  const storyActive = storyStage !== undefined;
+  const [tennisRun, setTennisRun] = useState(0);
+  useEffect(() => {
+    if (storyActive && complete) setTennisRun((n) => n + 1);
+  }, [complete, storyActive]);
 
   const miss = useCallback(
     (tile: MagicTile, slotIndex: number | null) => {
@@ -108,6 +129,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
       round.submit(`${tile.value}${slotIndex === null ? '' : `@${slotIndex + 1}`}`, word.text, false);
       setWobble((w) => ({ ...w, [tile.id]: (w[tile.id] ?? 0) + 1 }));
       setMissed(true);
+      setVoiceNote(null);
       setSelected(null);
       setAnnounce(`${tile.value.toUpperCase()} doesn’t go there. Try another spot.`);
     },
@@ -211,6 +233,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
         commitSlots(result.slots);
         setSelected(null);
         setMissed(false);
+        setVoiceNote(null);
         if (isMagicDone(result.slots)) round.submit(word.text, word.text, true);
         // the success message is itself a live region, so the status line never repeats "You spelled…"
         setAnnounce(`${tile.value.toUpperCase()} placed in slot ${slotIndex + 1}.`);
@@ -233,6 +256,7 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     const t = tiles.find((x) => x.id === tileId);
     const picking = selected !== tileId;
     setSelected((s) => (s === tileId ? null : tileId));
+    setVoiceNote(null);
     setPicks((n) => n + 1);
     if (picking && t) {
       // the sound this letter makes in THIS word: the spot it is heading for is the first empty one with that letter.
@@ -276,6 +300,53 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   /** Let go: the repeating sound stops at once. A drop then says the letter's sound once, from the landing. */
   const releaseTile = () => stop();
 
+  /** the latest drop judgement, for the letters a spoken answer places one after another (a timer must not see an old one) */
+  const attemptRef = useRef(attempt);
+  attemptRef.current = attempt;
+
+  /**
+   * A correct spoken word is spelled the way a child would spell it: one letter after another, each through the same judgement
+   * as a tap or a drag. The completion that follows is the one drops already use, so there is a single completion path.
+   */
+  const spellByVoice = () => {
+    const step = () => {
+      const now = slotsRef.current;
+      const slot = now.findIndex((s) => s === null);
+      const tile = slot < 0 ? undefined : tiles.find((t) => !t.decoy && t.value === target[slot] && !isTilePlaced(now, t.id));
+      if (slot < 0 || !tile) return;
+      attemptRef.current(tile.id, slot);
+      voiceTimer.current = setTimeout(step, VOICE_LETTER_GAP_MS);
+    };
+    clearTimeout(voiceTimer.current);
+    step();
+  };
+
+  /**
+   * A spoken answer is judged by the rules for a typed letter: a correct word is spelled out, a wrong one is an attempt with the
+   * retry feedback. A transcript too unsure to judge uses no attempt: the child is asked to say it again.
+   */
+  const heardSpeech = (result: RecognizedResult) => {
+    if (done || round.solved) return;
+    const verdict = evaluateVoiceAnswer(result.transcript, [word.text], result.confidence);
+    if (verdict.result === 'retry') {
+      setVoiceNote({ text: verdict.feedback, counted: false });
+      return;
+    }
+    const response = normalizeAnswer(result.transcript);
+    setSelected(null);
+    setMissed(false);
+    if (verdict.result === 'correct') {
+      setVoiceNote(null);
+      round.submit(response, word.text, true);
+      setAnnounce('You said it. Spelling the word now.');
+      spellByVoice();
+      return;
+    }
+    sfx('oops');
+    round.submit(response, word.text, false);
+    setVoiceNote({ text: verdict.feedback, counted: true });
+  };
+
   // Typing a letter places it in the first matching empty slot (keyboard / screen-reader friendly).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -299,6 +370,8 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
     stop(); // and a line already being said (a cheer or a letter sound)
     soundedTiles.current.clear();
     lastSound.current = null;
+    clearTimeout(voiceTimer.current); // letters of a word spelled by voice that are still on their way
+    setVoiceNote(null);
     setCreature((c) => ({ n: 0, from: c.from })); // Pip goes back to the picture's side of the board
     setCelebrated(false);
     setStory(false);
@@ -321,14 +394,15 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
   const mood = complete ? 'cheer' : missed ? 'oops' : selected ? 'think' : 'happy';
 
   return (
-    <div ref={scene} className="pl-story-board relative overflow-clip rounded-[2.6rem] p-3 sm:p-6">
+    <div ref={scene} className={`${storyStage ? 'pl-story-stage' : 'pl-story-board'} relative overflow-clip rounded-[2.6rem] p-2 sm:p-6`}>
       <CelebrationEffect burst={burst} onDone={clear} />
       {flights.map((f) => (
         <FlyingTile key={`${f.generation}-${f.id}`} flight={f} onLand={onFlightLand} onDone={onFlightDone} />
       ))}
-      <StorybookCutscene word={word} open={story} />
+      {storyStage ? null : <StorybookCutscene word={word} open={story} />}
 
-      <div className="relative grid items-center gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8">
+      <div className={storyStage ? 'relative grid items-center gap-2 sm:gap-4' : 'relative grid items-center gap-2 sm:gap-4 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-8'}>
+        {storyStage ? null : (
         <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
           <motion.span
             ref={pictureRef}
@@ -349,12 +423,15 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             <PronunciationControl label="Hear the clue" accent="brand" onPlay={() => speak(word.clue)} />
           </div>
         </div>
+        )}
 
-        <div className="flex min-w-0 flex-col items-center gap-4">
-          {/* the target word: glowing outlines on a parchment strip */}
-          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className="pl-story-strip pl-slot-row relative w-full rounded-[2rem] px-3 pb-4 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]" style={{ '--n': target.length } as CSSProperties}>
+        <div className="flex min-w-0 flex-col items-center gap-2 sm:gap-4">
+          {storyStage ? <StorySentence sentence={storyStage.sentence} targets={storyStage.targets} spelled={storyStage.spelled} target={word.text} complete={complete} /> : null}
+          {/* the target word: glowing outlines on a parchment strip (on the story screen, a plain outline on the lavender screen) */}
+          <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className={`pl-story-strip pl-slot-row relative w-full rounded-[2rem] px-3 pb-3 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]${storyStage ? ' pl-story-strip--stage' : ''}`} style={{ '--n': target.length } as CSSProperties}>
             {/* Pip's perch: a band above the letters that is always there, so nothing moves when the word is finished */}
             <CompletionCreature trigger={creature.n} from={creature.from} perchRef={perchRef} reducedMotion={reducedMotion} onLand={onCreatureLand} />
+            {storyStage && tennisRun > 0 ? <TennisScene key={`tennis-${tennisRun}`} reducedMotion={reducedMotion} /> : null}
             {splash > 0 && !reducedMotion ? <WordSplash key={splash} /> : null}
             <motion.span aria-hidden="true" initial={{ opacity: 0 }} animate={stripRing} className="pointer-events-none absolute inset-0 rounded-[2rem] border-4 border-brand-500" />
             {target.map((letter, i) => (
@@ -378,16 +455,18 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
             ))}
           </div>
 
+          {/* phones: four letters to a row (two rows hold the longest word's tiles), so the tray and the outlines fit on one screen */}
           {!complete ? (
-            <ul aria-label="Loose letters" className="pl-story-tray flex w-full flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
+            <ul aria-label="Loose letters" className="pl-story-tray flex w-full flex-wrap items-center justify-center gap-2 rounded-[1.9rem] px-3 py-2 sm:gap-4 sm:px-5 sm:py-4">
               {tiles.map((tile, i) => (
-                <li key={tile.id}>
+                <li key={tile.id} className="w-[calc((100%-1.5rem)/4)] max-w-[4.4rem] sm:w-auto sm:max-w-none">
                   {isTilePlaced(slots, tile.id) ? (
-                    <span aria-hidden="true" className="block h-[4.4rem] w-[4.4rem] rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.4rem] sm:w-[5.4rem]" />
+                    <span aria-hidden="true" className="block aspect-square w-full rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.4rem] sm:w-[5.4rem]" />
                   ) : (
                     <LooseLetter
                       tile={tile}
                       color={colorOf(tile.value)}
+                      glyph={storyActive}
                       index={i}
                       selected={selected === tile.id}
                       hinted={hint?.tileId === tile.id}
@@ -411,34 +490,43 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
 
           <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-end lg:gap-3">
             <div className="min-h-[6rem] min-w-0 flex-1">
-              <AnimatePresence mode="wait">
-                {complete ? (
-                  <FeedbackMessage
-                    key="ok"
-                    tone="success"
-                    title={`${pickLine(PRAISE, round.index)} Hooray!`}
-                    action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-                  >
-                    You spelled <strong>{word.text}</strong>!
-                  </FeedbackMessage>
-                ) : missed ? (
-                  <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
-                    That letter goes in a different spot. Try another!
-                  </FeedbackMessage>
-                ) : hint ? (
-                  <FeedbackMessage key="hint" tone="hint" title="Need a hint?">
-                    Look for the glowing spot and the letter with a star.
-                  </FeedbackMessage>
-                ) : selected ? (
-                  <FeedbackMessage key="picked" tone="info" mood="think" nudge={picks} title="Nice pick!">
-                    Now tap its glowing spot, or drag it there.
+              {/* one message at a time: each is replaced at once (a new one never waits for the old one to leave) */}
+              {complete ? (
+                <FeedbackMessage
+                  key="ok"
+                  tone="success"
+                  title={`${pickLine(PRAISE, round.index)} Hooray!`}
+                  action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
+                >
+                  You spelled <strong>{word.text}</strong>!
+                </FeedbackMessage>
+              ) : missed ? (
+                <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
+                  That letter goes in a different spot. Try another!
+                </FeedbackMessage>
+              ) : voiceNote ? (
+                voiceNote.counted ? (
+                  <FeedbackMessage key="voice-retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
+                    {voiceNote.text}
                   </FeedbackMessage>
                 ) : (
-                  <FeedbackMessage key="idle" tone="info" mood={mood} nudge={landed.size} title="Spell the word!">
-                    Drag each letter onto its outline, or tap a letter and then tap a spot.
+                  <FeedbackMessage key="voice-again" tone="retry" nudge={round.attempts} title="Let’s hear it again">
+                    {voiceNote.text}
                   </FeedbackMessage>
-                )}
-              </AnimatePresence>
+                )
+              ) : hint ? (
+                <FeedbackMessage key="hint" tone="hint" title="Need a hint?">
+                  Look for the glowing spot and the letter with a star.
+                </FeedbackMessage>
+              ) : selected ? (
+                <FeedbackMessage key="picked" tone="info" mood="think" nudge={picks} title="Nice pick!">
+                  Now tap its glowing spot, or drag it there.
+                </FeedbackMessage>
+              ) : (
+                <FeedbackMessage key="idle" tone="info" mood={mood} nudge={landed.size} title="Spell the word!">
+                  Drag each letter onto its outline, or tap a letter and then tap a spot.
+                </FeedbackMessage>
+              )}
             </div>
             {!done ? (
               <Button variant="secondary" accent="brand" icon="refresh" onClick={startAgain} className="shrink-0 self-end sm:mb-1">
@@ -448,8 +536,11 @@ export function MagicQuestion({ round, word }: { round: Round<WordEntry>; word: 
               <LikeButton kind="word" id={word.id} label={word.text} className="shrink-0 self-end sm:mb-1" />
             ) : null}
           </div>
+          {/* the same answer, spoken: judged by heardSpeech with the rules for a typed letter. It sits below the feedback, so the
+              feedback keeps its place on a desktop; not offered once the word is spelled. */}
+          {!done ? <VoiceAnswer language={content.language} solved={round.solved} onTranscript={heardSpeech} /> : null}
           {/* after the word is finished the child can say it too; "Next word" above is always there, so skipping costs nothing */}
-          {complete ? <VoicePractice expected={[word.text]} prompt="Say the word for the picture" /> : null}
+          {complete && !storyStage ? <VoicePractice expected={[word.text]} prompt="Say the word for the picture" /> : null}
         </div>
       </div>
     </div>

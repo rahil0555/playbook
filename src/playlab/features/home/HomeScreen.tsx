@@ -183,6 +183,20 @@ export default function HomeScreen() {
           ))}
         </ul>
       </section>
+
+      {content.story ? (
+        <section aria-labelledby="pl-story-title" className="mt-10">
+          <h2 id="pl-story-title" className="pl-wood mb-4 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">
+            Read the story
+          </h2>
+          <div className="flex flex-col items-start gap-4 rounded-[2rem] bg-white/85 p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-display text-xl font-semibold text-ink">“{content.story.sentence}”</p>
+            <Button size="lg" variant="primary" accent="plum" iconRight="arrow-right" onClick={() => navigate('story')}>
+              Spell the story
+            </Button>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

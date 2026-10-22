@@ -421,10 +421,14 @@
     gap: 0.875rem;
   }
 }
-/* very narrow phones: five spots in a row would be under 44 px each, so they wrap into rows of three */
+/* very narrow phones (320 px): five spots still fit one row at about 46 px each, with a little less side room and gap, so the
+   outlines take a single line instead of two (the squares stay above 44 px) */
 @media (max-width: 359px) {
   .pl-root.pl-root .pl-slot-row {
-    grid-template-columns: repeat(3, minmax(0, 4.4rem));
+    grid-template-columns: repeat(var(--n, 4), minmax(0, 4.4rem));
+    gap: 0.25rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 }
 /* a letter held over (or close to) an empty spot: its dashed outline pulses so the child sees where it will go */
@@ -598,6 +602,19 @@
   background: linear-gradient(180deg, #f8fff9 0%, #e3f8ee 100%);
   border: 3px solid #ffffff;
   box-shadow: inset 0 0 0 2px #cdeedd, 0 8px 0 rgba(90, 170, 130, 0.18), 0 18px 26px -16px rgba(40, 110, 90, 0.35);
+}
+/* the read-along story: a lavender screen, as in the reference reel, with the word strip sitting straight on it */
+.pl-root.pl-root .pl-story-stage {
+  background:
+    radial-gradient(120% 80% at 20% 0%, rgba(255, 255, 255, 0.5), transparent 60%),
+    linear-gradient(180deg, #e9e0f3 0%, #d6c7de 55%, #c9b8da 100%);
+  border: 6px solid #f6f1fb;
+  box-shadow: 0 0 0 4px #b9a2d4, 0 12px 0 rgba(120, 90, 170, 0.22), 0 30px 50px -22px rgba(90, 70, 150, 0.45);
+}
+.pl-root.pl-root .pl-story-strip--stage {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 .pl-root.pl-root .pl-story-tray {
   background: linear-gradient(180deg, #f3ebff 0%, #ffe6f3 100%);

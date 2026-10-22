@@ -20,7 +20,7 @@ interface PronunciationControlProps {
 }
 
 const MESSAGES: Partial<Record<SpeakOutcome, string>> = {
-  muted: 'Sound is off. Turn it on with the speaker button at the top.',
+  muted: 'Sound is off. Turn it on at the top.',
   unsupported: 'Sound can’t play on this device right now. Look at the picture and the letters instead!',
   blocked: 'Tap the button again to allow sound.',
   error: 'The sound didn’t play. Please try again.',

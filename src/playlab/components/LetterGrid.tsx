@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
+import { usePlayLab } from '../app/PlayLabContext';
 import { letterColor } from '../lib/accents';
 import { useRipple } from '../hooks/useRipple';
 import { animationFor, letterAnimations, springs } from '../motion/variants';
@@ -11,10 +12,12 @@ interface LetterTileProps {
   index: number;
   selected: boolean;
   explored: boolean;
+  /** passed down rather than read per tile: 26 context subscriptions would re-render the whole grid on every change */
+  reducedMotion: boolean;
   onSelect: (letter: LetterEntry, index: number) => void;
 }
 
-const LetterTile = memo(function LetterTile({ letter, index, selected, explored, onSelect }: LetterTileProps) {
+const LetterTile = memo(function LetterTile({ letter, index, selected, explored, reducedMotion, onSelect }: LetterTileProps) {
   const controls = useAnimationControls();
   const color = letterColor(index);
   const { onRippleClick, rippleLayer } = useRipple(color);
@@ -26,8 +29,9 @@ const LetterTile = memo(function LetterTile({ letter, index, selected, explored,
       aria-pressed={selected}
       aria-label={`Letter ${letter.upper}, ${letter.lower}${explored ? ', already explored' : ''}`}
       animate={controls}
-      whileTap={{ scale: 0.88 }}
-      whileHover={{ scale: 1.06 }}
+      /* reduced motion: no press or hover movement; the selected ring and colour still show the choice */
+      whileTap={reducedMotion ? undefined : { scale: 0.88 }}
+      whileHover={reducedMotion ? undefined : { scale: 1.06 }}
       transition={springs.snappy}
       onClick={(e) => {
         onRippleClick(e);
@@ -73,6 +77,7 @@ export function LetterGrid({
   label = 'Alphabet',
 }: LetterGridProps) {
   const ref = useRef<HTMLUListElement>(null);
+  const { reducedMotion } = usePlayLab();
   const handleSelect = useCallback((l: LetterEntry, i: number) => onSelect(l, i), [onSelect]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
@@ -92,7 +97,7 @@ export function LetterGrid({
     <ul ref={ref} aria-label={label} onKeyDown={onKeyDown} className={`pl-paper grid gap-2.5 rounded-[2rem] p-3 sm:gap-3 sm:p-4 ${className}`}>
       {letters.map((l, i) => (
         <li key={l.id}>
-          <LetterTile letter={l} index={i} selected={selectedId === l.id} explored={exploredIds.has(l.id)} onSelect={handleSelect} />
+          <LetterTile letter={l} index={i} selected={selectedId === l.id} explored={exploredIds.has(l.id)} reducedMotion={reducedMotion} onSelect={handleSelect} />
         </li>
       ))}
     </ul>
