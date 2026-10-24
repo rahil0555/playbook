@@ -63,7 +63,7 @@ test.describe('Magic Letters: say the word after spelling it', () => {
     const word = await solveWord(page);
     await page.evaluate(() => ((window as unknown as { __speechScript: { error: string | null } }).__speechScript.error = 'not-allowed'));
     await page.getByRole('button', { name: 'Speak your answer' }).click();
-    await expect(page.getByText(/Microphone access is blocked/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/did not get to use the microphone/)).toBeVisible({ timeout: 5000 });
     await page.getByLabel('Type your answer').fill(word.text);
     await page.getByRole('button', { name: 'Check' }).click();
     await expect(page.getByText('Correct!')).toBeVisible();

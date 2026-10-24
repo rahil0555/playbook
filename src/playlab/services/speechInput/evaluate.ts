@@ -20,7 +20,15 @@ export const LOW_CONFIDENCE = 0.3;
 
 /** The messages the child sees for each way speech input can fail (the Play Lab voice specification's table). */
 export const VOICE_MESSAGES = {
-  permission: 'Microphone access is blocked. Allow microphone access or type your answer.',
+  /** the browser says the microphone is turned off for this site */
+  permission: 'Microphone access is blocked for this site. Allow it in the browser’s site settings, or type your answer.',
+  /** the browser refused the microphone, and the page's settings do not explain it */
+  refused: 'The browser did not get to use the microphone. Check the microphone privacy setting on this computer, or type your answer.',
+  insecure: 'Voice answers need a secure page (an https:// address). This page is not secure, so type your answer instead.',
+  embedded: 'This page is inside another page, which may not let the browser use the microphone. Type your answer instead.',
+  noMicrophone: 'The browser could not open a microphone. Check the sound settings, or type your answer.',
+  speechService: 'Speech recognition is switched off in this browser. Type your answer instead.',
+  notStarted: 'The browser did not start listening. If it asked to use the microphone, allow it, then tap the microphone again, or type your answer.',
   noSpeech: "I couldn't hear you. Please try again.",
   stt: "I couldn't understand the recording. Please try again.",
   network: 'Connection problem. Please check your internet and retry.',

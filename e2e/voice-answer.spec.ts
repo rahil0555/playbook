@@ -65,9 +65,43 @@ test.describe('Magic Letters: speaking the answer', () => {
     await openWordBuilder(page);
     await setHearing(page, { error: 'not-allowed' });
     await speakButton(page).click();
-    await expect(page.getByText(/The microphone is blocked/)).toBeVisible();
+    await expect(page.getByText(/The browser did not get to use the microphone/)).toBeVisible();
+    await expect(page.getByText(/blocked/)).toHaveCount(0);
     await expect(page.getByText('That is not the word for this picture')).toHaveCount(0);
     await solveWord(page);
+  });
+
+  test('a microphone the browser cannot open is named as that, not as a blocked microphone, and the letters still work', async ({ page }) => {
+    // the diagnostic line is a warning: it holds the browser's error name, and never what the child said
+    const logs: unknown[][] = [];
+    page.on('console', async (message) => {
+      if (message.type() === 'warning' && message.text().includes('[PlayLab voice]')) logs.push(await Promise.all(message.args().map((arg) => arg.jsonValue())));
+    });
+    await openWordBuilder(page);
+    await setHearing(page, { error: 'audio-capture' });
+    await speakButton(page).click();
+    await expect(page.getByText(/could not open a microphone/)).toBeVisible();
+    await expect(page.getByText(/blocked/)).toHaveCount(0);
+    await expect.poll(() => logs.length).toBe(1);
+    expect(JSON.stringify(logs)).toContain('audio-capture');
+    await solveWord(page);
+  });
+
+  test('a browser whose speech service is switched off says so, not that the microphone is blocked', async ({ page }) => {
+    await openWordBuilder(page);
+    await setHearing(page, { error: 'service-not-allowed' });
+    await speakButton(page).click();
+    await expect(page.getByText(/speech service is switched off/)).toBeVisible();
+    await expect(page.getByText(/blocked/)).toHaveCount(0);
+    await solveWord(page);
+  });
+
+  test('a browser that never starts listening is told so, and the child can try again', async ({ page }) => {
+    await openWordBuilder(page);
+    await setHearing(page, { noStart: true });
+    await speakButton(page).click();
+    await expect(page.getByText(/did not start listening/)).toBeVisible({ timeout: 20000 });
+    await expect(speakButton(page)).toBeVisible();
   });
 
   test('no speech is not an attempt: the child is asked to try again, and the next try can still be correct', async ({ page }) => {

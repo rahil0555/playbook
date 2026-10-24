@@ -174,15 +174,33 @@ test.describe('Magic Letters feel', () => {
   });
 });
 
-/** reload until the round is the word with this text, so a test can rely on its letters */
-async function openRoundWith(page: Page, word: string) {
-  const clueOf = englishWords.find((w) => w.text === word)!.clue;
-  for (let i = 0; i < 60; i++) {
-    await openMagic(page);
-    if ((await page.locator('[data-magic-clue]').innerText()) === clueOf) return;
-    await page.reload();
-  }
-  throw new Error(`no round with ${word}`);
+/**
+ * The page's random choices are seeded for this test only, so the first round is the same word on every load. Seed 5 gives APPLE
+ * first. It was found by trying seeds against the production build, and the same word came up on ten loads. If the app starts
+ * making its random choices differently, the check in openAppleRound fails with a message, and a new seed must be found.
+ */
+const APPLE_SEED = 5;
+
+/** Makes Math.random give the same sequence on every load of this page (a seeded generator). */
+async function seedRandom(page: Page, seed: number) {
+  await page.addInitScript((s: number) => {
+    let a = s >>> 0;
+    Math.random = () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }, seed);
+}
+
+/** Opens Magic Letters with APPLE as the first word of the round, so the test can rely on its letters. */
+async function openAppleRound(page: Page) {
+  await seedRandom(page, APPLE_SEED);
+  await openMagic(page);
+  const apple = englishWords.find((w) => w.text === 'apple')!;
+  expect(await page.locator('[data-magic-clue]').innerText(), `seed ${APPLE_SEED} no longer gives APPLE first: find a new seed`).toBe(apple.clue);
 }
 
 test.describe('dragging a five-letter word', () => {
@@ -193,7 +211,7 @@ test.describe('dragging a five-letter word', () => {
     test(`${name}: all five letters of APPLE sit on one row, glow before the drop, and each one lands on its spot`, async ({ page }) => {
       test.setTimeout(90_000);
       await page.setViewportSize(viewport);
-      await openRoundWith(page, 'apple');
+      await openAppleRound(page);
       await page.locator('[data-magic-slot="4"]').scrollIntoViewIfNeeded();
       const tops = await page.evaluate(() => [...document.querySelectorAll('[data-magic-slot]')].map((x) => Math.round(x.getBoundingClientRect().top)));
       expect(new Set(tops).size, 'the five spots are in one row').toBe(1);

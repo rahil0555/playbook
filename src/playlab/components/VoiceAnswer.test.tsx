@@ -1,11 +1,11 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayLabContext, type PlayLabContextValue } from '../app/PlayLabContext';
 import { recognitionLanguage, useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { VOICE_MESSAGES } from '../services/speechInput/evaluate';
-import type { RecognizedResult, RecognizerFactory } from '../services/speechInput/recognizer';
+import { START_WAIT_MS, type RecognizedResult, type RecognizerFactory } from '../services/speechInput/recognizer';
 import { fakeRecognizers } from '../test/fakeRecognizer';
 import { VoiceAnswer } from './VoiceAnswer';
 
@@ -85,7 +85,8 @@ describe('VoiceAnswer: a session', () => {
     const { user, onTranscript } = renderVoice(fake.factory);
     await user.click(mic());
     act(() => fake.latest().fail('not-allowed'));
-    expect(status()).toHaveTextContent('The microphone is blocked. You can still drag or tap the letters.');
+    await waitFor(() => expect(status()).toHaveTextContent('The browser did not get to use the microphone.'));
+    expect(status()).toHaveTextContent('You can still drag or tap the letters.');
     expect(onTranscript).not.toHaveBeenCalled();
     expect(mic()).toBeInTheDocument();
   });
@@ -140,6 +141,103 @@ describe('VoiceAnswer: a session', () => {
     renderVoice(fakeRecognizers().factory, { solved: true });
     expect(status()).toHaveTextContent('You said it! The word is spelled.');
     expect(screen.queryByRole('button', { name: 'Speak answer' })).toBeNull();
+  });
+});
+
+/** a page's own settings, set for one test and put back after it */
+function setPageSettings(settings: { secure?: boolean; permission?: PermissionState }) {
+  const restore: Array<() => void> = [];
+  if (settings.secure !== undefined) {
+    const before = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+    Object.defineProperty(window, 'isSecureContext', { value: settings.secure, configurable: true });
+    restore.push(() => (before ? Object.defineProperty(window, 'isSecureContext', before) : Reflect.deleteProperty(window, 'isSecureContext')));
+  }
+  if (settings.permission !== undefined) {
+    const state = settings.permission;
+    Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state }) }, configurable: true });
+    restore.push(() => Reflect.deleteProperty(navigator, 'permissions'));
+  }
+  return () => restore.forEach((undo) => undo());
+}
+
+describe('VoiceAnswer: each failure says what happened and what to check', () => {
+  let undo: () => void = () => undefined;
+  beforeEach(() => {
+    undo = setPageSettings({ secure: true, permission: 'prompt' });
+  });
+  afterEach(() => {
+    undo();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('a page that is not secure is told so, not told the microphone is blocked', async () => {
+    undo();
+    undo = setPageSettings({ secure: false, permission: 'prompt' });
+    const fake = fakeRecognizers();
+    const { user } = renderVoice(fake.factory);
+    await user.click(mic());
+    act(() => fake.latest().fail('not-allowed'));
+    await waitFor(() => expect(status()).toHaveTextContent('needs a secure page'));
+    expect(status()).not.toHaveTextContent('blocked');
+  });
+
+  it('a site whose microphone is turned off is told how to allow it', async () => {
+    undo();
+    undo = setPageSettings({ secure: true, permission: 'denied' });
+    const fake = fakeRecognizers();
+    const { user } = renderVoice(fake.factory);
+    await user.click(mic());
+    act(() => fake.latest().fail('not-allowed'));
+    await waitFor(() => expect(status()).toHaveTextContent('turned off for this site'));
+    expect(status()).toHaveTextContent('lock icon');
+  });
+
+  it('a missing or unusable microphone is not called a blocked microphone', async () => {
+    const fake = fakeRecognizers();
+    const { user } = renderVoice(fake.factory);
+    await user.click(mic());
+    act(() => fake.latest().fail('audio-capture'));
+    expect(status()).toHaveTextContent('could not open a microphone');
+    expect(status()).not.toHaveTextContent('blocked');
+  });
+
+  it('a switched-off speech service is named as that, not as a permission problem', async () => {
+    const fake = fakeRecognizers();
+    const { user } = renderVoice(fake.factory);
+    await user.click(mic());
+    act(() => fake.latest().fail('service-not-allowed'));
+    expect(status()).toHaveTextContent('speech service is switched off');
+    expect(status()).not.toHaveTextContent('blocked');
+  });
+
+  it('a browser that never starts is told so, and the child can try again', () => {
+    // plain clicks: user-event waits on real timers, which fake timers would stop
+    vi.useFakeTimers();
+    const fake = fakeRecognizers();
+    renderVoice(fake.factory);
+    act(() => mic().click());
+    act(() => {
+      vi.advanceTimersByTime(START_WAIT_MS + 1);
+    });
+    expect(status()).toHaveTextContent('did not start listening');
+    expect(mic()).toBeInTheDocument();
+  });
+
+  it('the diagnostic line holds the browser error name, and never what the child said', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fake = fakeRecognizers();
+    const { user } = renderVoice(fake.factory);
+    await user.click(mic());
+    act(() => {
+      fake.latest().heard('secretword');
+      fake.latest().fail('network');
+    });
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain('network');
+    expect(logged).toContain('environment');
+    expect(logged).not.toContain('secretword');
   });
 });
 

@@ -6,6 +6,17 @@ import { renderPlayLab } from '../../test/utils';
 
 type User = ReturnType<typeof renderPlayLab>['user'];
 
+// The words of the next Missing Letter round, in order, when a test needs to know them. Empty: the app chooses at random, as it does for a child.
+const fixedRound = vi.hoisted(() => ({ words: [] as string[] }));
+vi.mock('../../lib/random', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/random')>();
+  return {
+    ...actual,
+    pickFresh: <T extends { id: string }>(pool: readonly T[], count: number, seen: ReadonlySet<string>) =>
+      fixedRound.words.length ? fixedRound.words.map((id) => pool.find((p) => p.id === id)).filter((p): p is T => !!p) : actual.pickFresh(pool, count, seen),
+  };
+});
+
 const cards = (side: 'left' | 'right') => [...document.querySelectorAll<HTMLElement>(`[data-side="${side}"]`)];
 
 async function solvePairs(user: User) {
@@ -84,24 +95,33 @@ describe('Sound to letter', () => {
 
 describe('Word completion', () => {
   it('finishes a full round of missing-letter words', async () => {
-    const onActivityComplete = vi.fn();
-    const { user } = renderPlayLab({ initialActivity: 'matching', onActivityComplete });
-    await user.click(await screen.findByText('Missing Letter'));
-    for (let i = 0; i < 5; i++) {
-      const label = (await screen.findByLabelText(/Word with a missing letter/, {}, { timeout: 4000 })).getAttribute('aria-label')!;
-      const tokens = label.split(': ')[1]!.split(' ');
-      const pattern = new RegExp(`^${tokens.map((t) => (t === 'blank' ? '.' : t)).join('')}$`);
-      const word = englishWords.find((w) => pattern.test(w.text) && w.text.length === tokens.length)!;
-      const answer = word.text[tokens.indexOf('blank')]!;
-      if (i === 0) {
-        const wrong = [...document.querySelectorAll<HTMLElement>('[data-choice]')].find((el) => el.dataset.choice !== answer)!;
-        await user.click(wrong);
-        expect(await screen.findByText(/Say the word out loud/, {}, { timeout: 4000 })).toBeInTheDocument();
+    // The words are fixed so that each answer is the letter of the word really on screen. The picture does not name its word, and a
+    // dictionary lookup from the masked letters can pick another word ("_at" could be cat, bat or hat).
+    fixedRound.words = ['hat', 'pen', 'lion', 'cat', 'moon'];
+    try {
+      const onActivityComplete = vi.fn();
+      const { user } = renderPlayLab({ initialActivity: 'matching', onActivityComplete });
+      await user.click(await screen.findByText('Missing Letter'));
+      for (let i = 0; i < 5; i++) {
+        const label = (await screen.findByLabelText(/Word with a missing letter/, {}, { timeout: 4000 })).getAttribute('aria-label')!;
+        const tokens = label.split(': ')[1]!.split(' ');
+        const word = englishWords.find((w) => w.text === fixedRound.words[i])!;
+        const blank = tokens.indexOf('blank');
+        // the question on screen is this word with one letter hidden
+        expect(tokens).toEqual(word.text.split('').map((c, k) => (k === blank ? 'blank' : c)));
+        const answer = word.text[blank]!;
+        if (i === 0) {
+          const wrong = [...document.querySelectorAll<HTMLElement>('[data-choice]')].find((el) => el.dataset.choice !== answer)!;
+          await user.click(wrong);
+          expect(await screen.findByText(/Say the word out loud/, {}, { timeout: 4000 })).toBeInTheDocument();
+        }
+        await user.click(document.querySelector<HTMLElement>(`[data-choice="${answer}"]`)!);
+        await user.click(await screen.findByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }, { timeout: 4000 })); // appears after the idle bubble's short exit
       }
-      await user.click(document.querySelector<HTMLElement>(`[data-choice="${answer}"]`)!);
-      await user.click(await screen.findByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }, { timeout: 4000 })); // appears after the idle bubble's short exit
+      expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 4000 })).toBeInTheDocument();
+      expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ variant: 'word-completion', total: 5 }));
+    } finally {
+      fixedRound.words = [];
     }
-    expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 4000 })).toBeInTheDocument();
-    expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ variant: 'word-completion', total: 5 }));
   }, 20_000);
 });

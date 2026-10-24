@@ -5,7 +5,11 @@
  * instead. Nothing in this file knows about Play Lab, so other activities can use it too.
  */
 
-export type VoiceErrorKind = 'unsupported' | 'permission' | 'no-speech' | 'stt' | 'network';
+/**
+ * What went wrong, as the app tells it apart. Every browser error name maps to exactly one kind (see voiceErrorKind), and a
+ * kind is never shown as the cause of a different failure.
+ */
+export type VoiceErrorKind = 'unsupported' | 'permission' | 'no-microphone' | 'speech-service' | 'not-started' | 'no-speech' | 'stt' | 'network';
 
 export interface RecognizedResult {
   transcript: string;
@@ -62,8 +66,11 @@ export interface ListenCallbacks {
   onListening: () => void;
   /** the final transcript, once the browser has finished listening */
   onResult: (result: RecognizedResult) => void;
-  /** listening failed; `kind` says why, so the caller can say what to do */
-  onError: (kind: VoiceErrorKind) => void;
+  /**
+   * listening failed. `kind` says why, so the caller can say what to do. `error` is the browser's own error name (or a short
+   * note from this module): it is for the diagnostic log only, and never contains audio or what was said.
+   */
+  onError: (kind: VoiceErrorKind, error: string) => void;
 }
 
 export interface Listening {
@@ -73,13 +80,28 @@ export interface Listening {
   cancel(): void;
 }
 
-/** Maps the browser's error names to ours. Anything not listed is a speech-recognition failure. */
+/**
+ * How long the browser has to say it has started listening. A permission prompt can wait on the child, so this is generous; but a
+ * browser that never starts and never reports an error must not leave the child waiting on "listening" forever.
+ */
+export const START_WAIT_MS = 12000;
+
+/**
+ * Maps the browser's error names to ours. Each name has its own kind: a refused microphone, a microphone that cannot be opened
+ * and a speech service that is switched off are different problems with different fixes, so they are never merged. Anything not
+ * listed is a speech-recognition failure.
+ */
 export function voiceErrorKind(error: string): VoiceErrorKind {
   switch (error) {
+    // the browser refused the microphone. It also says this for an insecure page or a frame without the microphone permission.
     case 'not-allowed':
-    case 'service-not-allowed':
-    case 'audio-capture':
       return 'permission';
+    // no usable input device, or the browser could not open the one it chose
+    case 'audio-capture':
+      return 'no-microphone';
+    // the browser is not allowing speech recognition at all (its settings or policy)
+    case 'service-not-allowed':
+      return 'speech-service';
     case 'no-speech':
       return 'no-speech';
     case 'network':
@@ -97,20 +119,30 @@ export function usableConfidence(value: number | undefined): number | undefined 
   return typeof value === 'number' && value > 0 ? value : undefined;
 }
 
+/** The name of a thrown error, for the log. Never the message: a message can contain anything. */
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
+}
+
 /** Listens for one phrase. Calls exactly one of onResult or onError, once. */
 export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: ListenCallbacks): Listening {
   const rec = create();
   if (!rec) {
-    cb.onError('unsupported');
+    cb.onError('unsupported', 'no-api');
     return { stop() {}, cancel() {} };
   }
   let done = false;
   let heard: RecognizedResult | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let startTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearTimers = () => {
+    clearTimeout(timer);
+    clearTimeout(startTimer);
+  };
   const finish = (report: () => void) => {
     if (done) return;
     done = true;
-    clearTimeout(timer);
+    clearTimers();
     report();
   };
 
@@ -119,28 +151,44 @@ export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: L
   rec.interimResults = false;
   rec.maxAlternatives = 1;
   rec.onstart = () => {
-    if (!done) cb.onListening();
+    if (done) return;
+    clearTimeout(startTimer);
+    // the listening limit counts from when the browser has really started, not from the call (a session that never starts has none)
+    timer = setTimeout(stopNow, opts.timeoutMs);
+    cb.onListening();
   };
   rec.onresult = (event) => {
     const last = event.results[event.results.length - 1];
     const best = last?.[0];
     if (last?.isFinal && best) heard = { transcript: best.transcript, confidence: usableConfidence(best.confidence) };
   };
-  rec.onerror = (event) => finish(() => cb.onError(voiceErrorKind(event.error)));
-  rec.onend = () => finish(() => (heard && heard.transcript.trim() ? cb.onResult(heard) : cb.onError('no-speech')));
+  rec.onerror = (event) => finish(() => cb.onError(voiceErrorKind(event.error), event.error));
+  rec.onend = () => finish(() => (heard && heard.transcript.trim() ? cb.onResult(heard) : cb.onError('no-speech', 'no-speech-event')));
 
-  timer = setTimeout(() => {
+  const stopNow = () => {
     try {
       rec.stop();
     } catch {
       /* already stopped */
     }
-  }, opts.timeoutMs);
+  };
+
+  // no start and no error from the browser: say so, and stop waiting
+  startTimer = setTimeout(() => {
+    finish(() => {
+      try {
+        rec.abort();
+      } catch {
+        /* never started */
+      }
+      cb.onError('not-started', 'no-start-event');
+    });
+  }, START_WAIT_MS);
 
   try {
     rec.start();
-  } catch {
-    finish(() => cb.onError('stt'));
+  } catch (error) {
+    finish(() => cb.onError('not-started', `start-threw:${errorName(error)}`));
   }
 
   return {
@@ -155,7 +203,7 @@ export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: L
     cancel() {
       if (done) return;
       done = true;
-      clearTimeout(timer);
+      clearTimers();
       try {
         rec.abort();
       } catch {

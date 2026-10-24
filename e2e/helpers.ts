@@ -63,7 +63,7 @@ export const spoken = (page: Page) => page.evaluate(() => (window as unknown as 
  */
 export async function installScriptedSpeech(page: Page, options: { supported?: boolean } = {}) {
   await page.addInitScript((supported: boolean) => {
-    const script = { transcript: '', error: null as string | null, hold: false, starts: 0 };
+    const script = { transcript: '', error: null as string | null, hold: false, noStart: false, starts: 0 };
     (window as unknown as { __speech: typeof script }).__speech = script;
     class ScriptedRecognizer {
       lang = '';
@@ -77,6 +77,8 @@ export async function installScriptedSpeech(page: Page, options: { supported?: b
       aborted = false;
       start() {
         script.starts += 1;
+        // a browser that never starts: no start event, no error, no end
+        if (script.noStart) return;
         setTimeout(() => {
           if (this.aborted) return;
           this.onstart?.();
@@ -107,7 +109,7 @@ export async function installScriptedSpeech(page: Page, options: { supported?: b
 }
 
 /** Sets what the scripted recogniser hears next, and how it behaves. */
-export const setHearing = (page: Page, script: { transcript?: string; error?: string | null; hold?: boolean }) =>
+export const setHearing = (page: Page, script: { transcript?: string; error?: string | null; hold?: boolean; noStart?: boolean }) =>
   page.evaluate((s) => Object.assign((window as unknown as { __speech: object }).__speech, s), script);
 
 export const speechStarts = (page: Page) => page.evaluate(() => (window as unknown as { __speech: { starts: number } }).__speech.starts);

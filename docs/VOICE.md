@@ -8,7 +8,8 @@ improvement or Try again. Typing is always there as a fallback. The current feat
 
 | Piece | File | What it does |
 | --- | --- | --- |
-| Speech listener | `src/playlab/services/speechInput/recognizer.ts` | Wraps the browser's speech recognition (`SpeechRecognition`, or Safari's `webkitSpeechRecognition`). One phrase, one outcome. Stops itself after 8 seconds. Maps the browser's error names to ours. No Play Lab imports. |
+| Speech listener | `src/playlab/services/speechInput/recognizer.ts` | Wraps the browser's speech recognition (`SpeechRecognition`, or Safari's `webkitSpeechRecognition`). One phrase, one outcome. Stops itself 8 seconds after the browser starts listening, and gives up after 12 seconds if the browser never starts. Gives each browser error name its own failure kind. No Play Lab imports. |
+| Failure diagnosis | `src/playlab/services/speechInput/diagnosis.ts` | Reads the page's settings (secure page, frame, microphone policy, site permission) to say why a refusal happened, and writes one diagnostic console line. It asks for no permission and starts no recognition. |
 | Answer checker | `src/playlab/services/speechInput/evaluate.ts` | Judges spoken and typed answers with the same rules (below). |
 | Voice component | `src/playlab/components/VoicePractice.tsx` | Microphone button, listening state with a timer and Stop, transcript ("You said: …"), result, retry, and the typed fallback. Knows the question only through `expected` and `prompt`. |
 | Speak answer | `src/playlab/components/VoiceAnswer.tsx`, `src/playlab/hooks/useSpeechRecognition.ts` | The microphone control in Magic Letters that answers the question. Listens through the speech listener above and hands the transcript to Magic Letters. |
@@ -21,9 +22,8 @@ feedback message. It sits there, not above the letters, so the letters and the f
 layout checks depend on that). It follows the Play Lab V2 specification's states:
 
 * **Idle:** Speak answer. **Listening:** a listening indicator and a Stop button. **Processing** is momentary. **Done** replaces
-  the control once the word is spelled. **Error** says why (no speech, a refused microphone, a network problem, or no
-  speech recognition in this browser) and offers Speak answer again. An unsupported browser sees one sentence and keeps the
-  letters.
+  the control once the word is spelled. **Error** says which cause applies (see "Error messages" below) and offers Speak
+  answer again. An unsupported browser sees one sentence and keeps the letters.
 * **Stop** ends listening at once and judges nothing, so a half-heard answer is never submitted.
 * **Judging:** the transcript is judged by `evaluateVoiceAnswer`, the same rules as the practice prompt. A correct word is
   correct. A near miss and a different word are both wrong, and each gets its retry text. A transcript the browser is unsure
@@ -33,7 +33,8 @@ layout checks depend on that). It follows the Play Lab V2 specification's states
   A wrong word goes through `submit` as an incorrect answer, which is one attempt, and the retry feedback follows. Stars,
   progress, hints, `onAnswerSubmit` and `onActivityComplete` all come from the existing round.
 * **Failures:** no speech, a refused microphone, a network error and a browser that cannot listen are never counted as wrong
-  and never use an attempt. The letters always work.
+  and never use an attempt. The letters always work. Each cause has its own message, so a missing microphone is never
+  reported as a blocked one.
 
 **Privacy-relevant change.** A judged spoken answer now goes through the round's `submit`. Its normalised transcript becomes the
 `response` of an `AnswerResult`, which is passed to the host's `onAnswerSubmit` and to the host's optional `track` hook (see
@@ -88,6 +89,47 @@ A failure in any state goes to `error`, which offers the microphone again and th
 * Typing is reachable in `idle`, `requesting_permission`, `listening` and `error`. During `processing`/`evaluating` (a moment) and
   after a spoken success it is not shown; after a success, "Say it again" brings it back.
 
+### Error messages and what to check
+
+When listening fails, the app names the cause. The browser's error name and the page's settings decide it. Each cause has
+its own message, and none is reported as "blocked" unless the browser says the site's microphone is denied. The messages
+below are the Speak answer ones; the practice prompt shows the same causes in its own words.
+
+| Browser error or app signal | Cause shown (`kind` / `reason` in the log) | What the child sees | What a grown-up checks |
+| --- | --- | --- | --- |
+| `not-allowed` or no start, on a page that is not secure | `insecure` | "Speaking needs a secure page (an https:// address)…" | Open PlayLab over https, or on localhost on the same computer. |
+| `not-allowed`, the page is in a frame whose permission policy blocks the microphone | `embedded` | "This page is inside another page, which may not let the browser use the microphone…" | Open PlayLab in its own browser tab. |
+| `not-allowed`, and the browser reports the site's microphone as denied | `site-blocked` | "The browser has the microphone turned off for this site…" | The lock icon in the address bar, then Site settings, Microphone: Allow. Reload. |
+| `not-allowed`, none of the above | `refused` | "The browser did not get to use the microphone…" | On Windows: Settings, Privacy & security, Microphone, and "Let desktop apps access your microphone" on. Then the browser's own site settings. |
+| `audio-capture` | `no-microphone` | "The browser could not open a microphone…" | The sound settings name a microphone as the input. No other app (a video call, for example) is using it. |
+| `service-not-allowed` | `speech-service` | "This browser's speech service is switched off…" | The browser's settings or a managed (school) policy may block its speech service. **Not verified.** |
+| `network` | `network` | "Connection problem…" | The internet connection. The browser sends speech to its vendor's service. |
+| `no-speech` | `no-speech` | "I couldn't hear you…" | Speaking closer and clearly. It uses no attempt. |
+| No start event after 12 seconds, or the start call threw | `not-started` | "The browser did not start listening…" | Whether the browser asked for the microphone (allow it), then the checks above. |
+| Any other browser error | `unclear` | "I couldn't understand the recording…" | The console line, which names the error. |
+| No speech recognition in the browser | `unsupported` | "Speaking answers is not available in this browser…" | Use Chrome or Edge. Typing and dragging still work. |
+
+### Windows: how to tell the cause apart (not verified on Windows)
+
+The reported symptom was: Windows shows the microphone meter moving, but the app says the microphone is blocked. A moving
+meter shows that the device works. It does not show that the browser may use it. The browser needs three things: the Windows
+privacy switch for desktop apps, the site's microphone permission, and a secure page. The app's messages above follow those
+three.
+
+To see the actual cause, open the browser's developer console (F12, then Console) on the PlayLab page, try Speak answer, and
+read the line `[PlayLab voice] speech recognition gave no answer`:
+
+* `error: "not-allowed"` with `reason: "site-blocked"`: the site's microphone is turned off in the browser. Change it in site
+  settings.
+* `error: "not-allowed"` with `reason: "refused"` and `environment.permission: "prompt"`: the browser refused without
+  asking. Check the Windows microphone privacy switches above, and the browser's microphone setting.
+* `error: "audio-capture"`: the browser could not open the device the sound settings chose.
+* `environment.secureContext: false`: the page is not secure, whatever the error.
+* `error: "no-start-event"`: the browser never started. Allow the microphone if it asks, then try again.
+
+These steps follow from the app's messages and the browser's permission settings. They were **not checked on a Windows
+computer** with Edge or Chrome, and the real error for the reported machine is **not known** from this audit.
+
 ## What is not implemented (future work)
 
 * **No server routes.** The specification's `POST /api/speech-to-text` and `POST /api/evaluate-voice-answer` do not
@@ -117,14 +159,17 @@ transcribed here, so the spoken narration in the reel is unverified.
 * **Provider:** the browser sends the speech to its own recognition service. Chrome and Edge use the browser vendor's
   services (Google, Microsoft); Safari on iOS uses Apple's. Whether a given browser recognises on the device or on the
   vendor's servers depends on the browser, OS and language pack, and was **not verified**.
-* **Permission:** the browser asks for the microphone when listening starts. The app first checks
-  `navigator.permissions` where the browser supports it, so a refusal already made is explained before listening.
-  Where that query is not supported (it may be Safari), the check is skipped and the browser's own prompt is used.
+* **Permission:** the browser asks for the microphone when listening starts. The practice prompt checks
+  `navigator.permissions` first, and says the microphone is blocked for this site only when the browser reports that
+  permission as denied. Speak answer does not check first. When the browser refuses, the app reads the page's settings to
+  decide the cause (see "Error messages"). Where the permissions query is not supported (it may be Safari), the check is
+  skipped.
 * **Quality:** recognition quality for children's voices, accents, background noise and single words was not measured.
   A correct word can be misheard. The app then asks the child to say it again or to type it. It does not mark them wrong
   for a near miss.
-* **Timing:** listening stops after 8 seconds, on Stop, or when the browser ends it. If a browser never sends its end
-  event, the child can still type the answer; the microphone is released when the typed answer is judged.
+* **Timing:** listening stops 8 seconds after the browser starts, on Stop, or when the browser ends it. If the browser has not
+  started listening after 12 seconds, the app stops waiting and says so. If a browser never sends its end event, the child
+  can still type the answer; the microphone is released when the typed answer is judged.
 * **Confidence:** see the evaluation rules. Not verified on devices.
 
 ## Privacy: what happens to a child's speech
@@ -146,7 +191,12 @@ What the **application code** does, verified by reading the code and by the chec
 * Play Lab adds no student identifier or name. The learner `id` is host-supplied and only namespaces saved progress; the
   display name is not stored.
 * The practice prompt's transcripts are never submitted or stored.
-* It does not log transcripts or speech. The voice code contains no `console` calls.
+* It does not log transcripts or speech. When a recognition attempt gives no answer, the code writes one `console.warn`
+  line, `[PlayLab voice] speech recognition gave no answer`. Its data holds the browser's error name (for example
+  `not-allowed` or `audio-capture`), the failure the app took it to mean, and the page's settings: whether the page is
+  secure, whether it is in a frame, the microphone permission the browser reports, whether the browser has a speech API,
+  and the browser's user-agent string. It holds no audio, no transcript and no word the child said. The line is visible
+  only in the browser's developer console.
 * The practice prompt never calls the round's submit. Speak answer calls it only for a judged answer.
 * The app makes no network calls of its own in `src/playlab` (no `fetch`, no XHR). There are no API keys, tokens or
   environment variables in frontend code.
@@ -162,17 +212,18 @@ What the **browser** does, which the app cannot control:
 
 ## Automated tests
 
-### This change (voice answers in Magic Letters, not committed)
+### This change (voice failure messages, not committed)
 
-Run on the working tree above `ac96d37`, with the uncommitted changes in place. Commands are the ones in `package.json`.
+Run on the working tree above `d2bd741`, with the uncommitted changes in place. Commands are the ones in `package.json`.
+The unit suite was run four times on the final code, and the Playwright suite once.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Type-check | `npm run typecheck` | Passed |
-| Unit and component tests | `npm test` | 322 passed, 0 failed (36 files). 23 of these are new voice tests. |
+| Unit and component tests | `npm test` | 354 tests in 38 files. Five full runs, then a final run after the last test change: all 354 passed in every run. |
 | Production build | `npm run build` | Passed |
 | Library build | `npm run build:lib` | Passed |
-| Full Chromium Playwright suite | `npx playwright test` | 193 passed, 0 failed, 0 skipped. 12 of these are new voice tests. |
+| Full Chromium Playwright suite | `npx playwright test` | Final run after the last test change: 205 passed, 0 failed, 0 skipped (6.0 minutes). The 33 voice tests are included. |
 
 The Playwright run used a build of the final source. No source or test file changed after that build. Only Chromium was run.
 The voice tests use a scripted recogniser, so they test the app's handling and not a real microphone.
@@ -201,9 +252,20 @@ the audit above, and it failed on commit `3814380`, which is before any voice co
 not been fixed, because that would mean changing unrelated Alphabet timing. It passed in the final run for this change, so
 its timing is still unexplained.
 
-`src/playlab/features/matching/matching.test.tsx` ("Word completion") takes about 1.4 seconds alone but close to 5 seconds
-under the full parallel run. It has passed on most full runs and failed on some. It is timing-sensitive under load. It is
-not voice-related.
+`src/playlab/features/matching/matching.test.tsx` ("Word completion > finishes a full round of missing-letter words") was
+intermittent. The cause was in the test, not the app. The test found the expected letter by taking the first dictionary word
+that matched the masked letters. Some pictures match a different word: "_at" matches cat, bat and hat, so a picture of "hat"
+was tested as "cat". The correct letter was then never clicked. The test now fixes the round's words and checks that the
+question on screen is that word with one letter hidden. The app is unchanged. Five full unit runs on the final code all passed.
+
+`src/playlab/features/word-builder/magic/magicVoice.test.tsx` read the "Speak answer" button straight after the slots
+appeared. That button is shown only after the browser's support check, which can finish a moment later. The helper now waits
+for the button. This is a test-only change.
+
+`e2e/magic-feel.spec.ts` ("dragging a five-letter word") used to reload the page until the first round was APPLE, one of 18
+words, so a rare run could miss it. It failed once in a full run. The test now seeds the page's random choices for those two
+tests, so the first round is APPLE on every load (seed 5, found against the production build and checked on ten loads). The
+test asserts the APPLE round before it starts, so a change in the app's random choices fails with a clear message.
 
 ## Manual checks still required (not performed)
 
@@ -211,6 +273,7 @@ No physical device or real browser microphone was used for this audit. Every ite
 
 - [ ] **Desktop Chrome:** tap the microphone, allow the prompt, say "apple" on the Magic Letters word, see "You said: apple" and Correct. Deny the microphone and see the blocked message and the typed answer work. Stay silent and see "I couldn't hear you". Say a wrong word and see Needs improvement. Stop while listening. Tap "Say it again". Finish the word, press "Next word", and check the speaking area is clean on the next word. Close the tab while listening and reopen; check the microphone indicator in the browser goes off.
 - [ ] **Microsoft Edge (desktop):** the same steps as desktop Chrome.
+- [ ] **Windows 10 or 11 with Edge and Chrome (the reported case):** follow "Windows: how to tell the cause apart", and record the `error`, `reason` and `environment` values that the console shows for each browser. Then check whether Speak answer hears a word once the Windows and site settings are right.
 - [ ] **Chrome on Android:** the same steps on a phone at 390 px width. Check the speaking area does not cover the letters or "Next word", and that the typed answer keyboard does not hide the Check button.
 - [ ] **Safari on iOS:** the same steps. Firefox on desktop: the microphone button should be absent and the typed answer should work.
 - [ ] **Children's speech:** a few children of the target age say each word; record how often a correct word is misheard.

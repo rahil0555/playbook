@@ -73,7 +73,7 @@ describe('VoicePractice: speaking an answer', () => {
     const { user, fake } = renderVoice();
     await listen(user, fake);
     fake.latest().fail('not-allowed');
-    expect(await screen.findByText(/Microphone access is blocked/)).toBeInTheDocument();
+    expect(await screen.findByText(/did not get to use the microphone/)).toBeInTheDocument();
     expect(screen.getByLabelText('Type your answer')).toBeInTheDocument();
   });
 

@@ -7,6 +7,7 @@ import {
   type RecognizerFactory,
   type VoiceErrorKind,
 } from '../services/speechInput/recognizer';
+import { describeVoiceEnvironment, failureFor, logVoiceFailure, type VoiceFailure } from '../services/speechInput/diagnosis';
 
 /** Where a voice answer is. `checking_support` lasts only until the browser has been asked; `error` also covers "unsupported". */
 export type SpeechRecognitionState = 'checking_support' | 'idle' | 'requesting_permission' | 'listening' | 'processing' | 'error';
@@ -46,6 +47,9 @@ function hasRecognizer(factory: RecognizerFactory): boolean {
  * One speaking session at a time: start, stop without judging, and a clean release on unmount. The transcript is handed to
  * `onResult` only once the browser has finished hearing; judging it is the caller's job. Failures move the state to
  * `error` with a reason, and the next start clears it, so the state can never stay on listening or processing.
+ *
+ * A failure is first shown as its most likely reason, then refined once the page's own settings have been read (insecure page,
+ * frame, site setting). Each failure is logged once, with the browser's error name and those settings, never audio or speech.
  */
 export function useSpeechRecognition({ language, onResult, createRecognizer, timeoutMs = DEFAULT_TIMEOUT_MS }: SpeechRecognitionOptions) {
   const factory = useMemo(() => createRecognizer ?? browserRecognizer(), [createRecognizer]);
@@ -55,6 +59,7 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
 
   const [state, setState] = useState<SpeechRecognitionState>('checking_support');
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
+  const [failure, setFailure] = useState<VoiceFailure | null>(null);
   const [heard, setHeard] = useState<string | null>(null);
   const session = useRef<Listening | null>(null);
   /** counts the sessions: anything a finished or stopped session reports after that does nothing */
@@ -66,6 +71,7 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
       setState('idle');
     } else {
       setErrorKind('unsupported');
+      setFailure('unsupported');
       setState('error');
     }
     return () => {
@@ -89,6 +95,7 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
     };
     clearTimeout(heardTimer.current);
     setErrorKind(null);
+    setFailure(null);
     setHeard(null);
     setState('requesting_permission');
 
@@ -109,11 +116,19 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
           setState('idle');
         }
       },
-      onError: (kind) => {
+      onError: (kind, raw) => {
         if (!current()) return;
         end();
         setErrorKind(kind);
+        setFailure(failureFor(kind, null));
         setState('error');
+        // the page's own settings decide between "the page is not secure", "a frame may not use the microphone" and the rest
+        void describeVoiceEnvironment().then((env) => {
+          if (!current()) return;
+          const reason = failureFor(kind, env);
+          setFailure(reason);
+          logVoiceFailure(raw, kind, reason, env);
+        });
       },
     });
     if (!ended.value) session.current = handle;
@@ -126,8 +141,9 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
     session.current.cancel();
     session.current = null;
     setErrorKind(null);
+    setFailure(null);
     setState('idle');
   }, []);
 
-  return { state, errorKind, heard, start, stop };
+  return { state, errorKind, failure, heard, start, stop };
 }

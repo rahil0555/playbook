@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { listenOnce, voiceErrorKind, type RecognizerFactory, type SpeechRecognizerLike } from './recognizer';
+import { listenOnce, START_WAIT_MS, voiceErrorKind, type RecognizerFactory, type SpeechRecognizerLike } from './recognizer';
 
 /** A recogniser the test drives by hand: it records what it was asked to do and fires the events on demand. */
 class FakeRecognizer implements SpeechRecognizerLike {
@@ -80,7 +80,7 @@ describe('listenOnce: one phrase, one outcome', () => {
     const { made, factory, cb } = setup();
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
     made[0]!.end();
-    expect(cb.onError).toHaveBeenCalledWith('no-speech');
+    expect(cb.onError).toHaveBeenCalledWith('no-speech', 'no-speech-event');
     expect(cb.onResult).not.toHaveBeenCalled();
   });
 
@@ -89,7 +89,7 @@ describe('listenOnce: one phrase, one outcome', () => {
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
     made[0]!.heard('   ');
     made[0]!.end();
-    expect(cb.onError).toHaveBeenCalledWith('no-speech');
+    expect(cb.onError).toHaveBeenCalledWith('no-speech', 'no-speech-event');
   });
 
   it('an error is reported once, and the end that follows it does not report again', () => {
@@ -98,16 +98,26 @@ describe('listenOnce: one phrase, one outcome', () => {
     made[0]!.fail('network');
     made[0]!.end();
     expect(cb.onError).toHaveBeenCalledTimes(1);
-    expect(cb.onError).toHaveBeenCalledWith('network');
+    expect(cb.onError).toHaveBeenCalledWith('network', 'network');
   });
 
   it('listening ends by itself after the time limit, so a forgotten microphone never stays on', () => {
     const { made, factory, cb } = setup();
     listenOnce(factory, { lang: 'en-US', timeoutMs: 5000 }, cb);
+    made[0]!.begin();
     vi.advanceTimersByTime(4999);
     expect(made[0]!.stopped).toBe(false);
     vi.advanceTimersByTime(1);
     expect(made[0]!.stopped).toBe(true);
+  });
+
+  it('the time limit counts from the browser starting: a session that never starts is "not started", not "no speech"', () => {
+    const { made, factory, cb } = setup();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 5000 }, cb);
+    vi.advanceTimersByTime(START_WAIT_MS + 1);
+    expect(cb.onError).toHaveBeenCalledWith('not-started', 'no-start-event');
+    expect(cb.onError).not.toHaveBeenCalledWith('no-speech', expect.anything());
+    expect(made[0]!.stopped).toBe(false);
   });
 
   it('stop() finishes now and still delivers what was heard', () => {
@@ -134,7 +144,7 @@ describe('listenOnce: one phrase, one outcome', () => {
   it('with no recogniser in the browser it says so at once', () => {
     const { factory, cb } = setup(() => null);
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
-    expect(cb.onError).toHaveBeenCalledWith('unsupported');
+    expect(cb.onError).toHaveBeenCalledWith('unsupported', 'no-api');
   });
 
   it('if the browser refuses to start, that is a speech failure', () => {
@@ -146,18 +156,73 @@ describe('listenOnce: one phrase, one outcome', () => {
       return r;
     });
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
-    expect(cb.onError).toHaveBeenCalledWith('stt');
+    expect(cb.onError).toHaveBeenCalledWith('not-started', 'start-threw:Error');
   });
 });
 
 describe('voiceErrorKind: what the browser calls each failure', () => {
-  it('maps the browser names to ours', () => {
+  it('maps the browser names to ours, one kind each', () => {
     expect(voiceErrorKind('not-allowed')).toBe('permission');
-    expect(voiceErrorKind('service-not-allowed')).toBe('permission');
-    expect(voiceErrorKind('audio-capture')).toBe('permission');
+    expect(voiceErrorKind('audio-capture')).toBe('no-microphone');
+    expect(voiceErrorKind('service-not-allowed')).toBe('speech-service');
     expect(voiceErrorKind('no-speech')).toBe('no-speech');
     expect(voiceErrorKind('network')).toBe('network');
     expect(voiceErrorKind('aborted')).toBe('stt');
     expect(voiceErrorKind('language-not-supported')).toBe('stt');
+  });
+
+  it('a refused microphone is never reported as a missing device or a switched-off service', () => {
+    expect(voiceErrorKind('audio-capture')).not.toBe('permission');
+    expect(voiceErrorKind('service-not-allowed')).not.toBe('permission');
+  });
+});
+
+describe('listenOnce: the browser error name reaches the caller for the log', () => {
+  it('passes the browser error name with the kind', () => {
+    const { made, factory, cb } = setup();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
+    made[0]!.fail('not-allowed');
+    expect(cb.onError).toHaveBeenCalledWith('permission', 'not-allowed');
+  });
+
+  it('a missing device and a switched-off service are their own kinds', () => {
+    const device = setup();
+    listenOnce(device.factory, { lang: 'en-US', timeoutMs: 8000 }, device.cb);
+    device.made[0]!.fail('audio-capture');
+    expect(device.cb.onError).toHaveBeenCalledWith('no-microphone', 'audio-capture');
+
+    const service = setup();
+    listenOnce(service.factory, { lang: 'en-US', timeoutMs: 8000 }, service.cb);
+    service.made[0]!.fail('service-not-allowed');
+    expect(service.cb.onError).toHaveBeenCalledWith('speech-service', 'service-not-allowed');
+  });
+});
+
+describe('listenOnce: a browser that never starts does not leave the child waiting', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('after the start wait, it stops, says the browser did not start, and reports once', () => {
+    const { made, factory, cb } = setup();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);
+    vi.advanceTimersByTime(START_WAIT_MS + 1);
+    expect(made[0]!.aborted).toBe(true);
+    expect(cb.onError).toHaveBeenCalledTimes(1);
+    expect(cb.onError).toHaveBeenCalledWith('not-started', 'no-start-event');
+    made[0]!.end();
+    expect(cb.onError).toHaveBeenCalledTimes(1);
+  });
+
+  it('once the browser has started, the start wait does not fire', () => {
+    const { made, factory, cb } = setup();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 30000 }, cb);
+    made[0]!.begin();
+    vi.advanceTimersByTime(START_WAIT_MS + 1);
+    expect(cb.onError).not.toHaveBeenCalled();
+    expect(cb.onListening).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,18 +1,28 @@
 import { useSpeechRecognition, type SpeechRecognitionState } from '../hooks/useSpeechRecognition';
 import { VOICE_MESSAGES } from '../services/speechInput/evaluate';
-import type { RecognizedResult, RecognizerFactory, VoiceErrorKind } from '../services/speechInput/recognizer';
+import type { VoiceFailure } from '../services/speechInput/diagnosis';
+import type { RecognizedResult, RecognizerFactory } from '../services/speechInput/recognizer';
 import { Button } from './Button';
 
 /** What the child sees: the hook's states, plus `done` once the word has been spelled by voice. */
 export type VoiceAnswerView = SpeechRecognitionState | 'done';
 
-/** Word Builder has no typing box, so the fallback here is the tap and drag the child already has. */
-const MESSAGES: Record<VoiceErrorKind, string> = {
+/**
+ * Word Builder has no typing box, so the fallback here is the tap and drag the child already has. Each failure says what happened
+ * and what to check, and never blames the microphone for something else (a page that is not secure, a frame, a speech service).
+ */
+const MESSAGES: Record<VoiceFailure, string> = {
   unsupported: 'Speaking answers is not available in this browser. Drag or tap the letters instead.',
-  permission: 'The microphone is blocked. You can still drag or tap the letters.',
-  'no-speech': VOICE_MESSAGES.noSpeech,
-  stt: VOICE_MESSAGES.stt,
+  insecure: 'Speaking needs a secure page (an https:// address). This page is not secure, so the browser will not use the microphone. You can still drag or tap the letters.',
+  embedded: 'This page is inside another page, which may not let the browser use the microphone. Open PlayLab in its own browser tab to speak. You can still drag or tap the letters.',
+  'site-blocked': 'The browser has the microphone turned off for this site. A grown-up can allow it with the lock icon in the address bar. You can still drag or tap the letters.',
+  refused: 'The browser did not get to use the microphone. A grown-up can check the computer’s microphone privacy setting (on Windows: Settings, Privacy & security, Microphone, and turn on “Let desktop apps access your microphone”). You can still drag or tap the letters.',
+  'no-microphone': 'The browser could not open a microphone. In the computer’s sound settings, check that a microphone is the input device and that no other app is using it. You can still drag or tap the letters.',
+  'speech-service': 'This browser’s speech service is switched off, so speech cannot be understood here. You can still drag or tap the letters.',
+  'not-started': 'The browser did not start listening. If it asked to use the microphone, allow it. If it never asked, a grown-up can check the microphone settings for this site and in the computer’s privacy settings. Then tap Speak answer again. You can still drag or tap the letters.',
   network: VOICE_MESSAGES.network,
+  'no-speech': VOICE_MESSAGES.noSpeech,
+  unclear: VOICE_MESSAGES.stt,
 };
 
 interface VoiceAnswerProps {
@@ -32,7 +42,7 @@ interface VoiceAnswerProps {
  * with the fallback the child already has, and never counts as an answer.
  */
 export function VoiceAnswer({ language, solved = false, onTranscript, createRecognizer }: VoiceAnswerProps) {
-  const { state, errorKind, heard, start, stop } = useSpeechRecognition({ language, onResult: onTranscript, createRecognizer });
+  const { state, failure, heard, start, stop } = useSpeechRecognition({ language, onResult: onTranscript, createRecognizer });
 
   if (state === 'checking_support') return null;
 
@@ -41,7 +51,7 @@ export function VoiceAnswer({ language, solved = false, onTranscript, createReco
 
   const status = (() => {
     if (solved) return 'You said it! The word is spelled.';
-    if (state === 'error' && errorKind) return MESSAGES[errorKind];
+    if (state === 'error' && failure) return MESSAGES[failure];
     if (state === 'requesting_permission') return 'Waiting for the microphone. Allow it if your browser asks.';
     if (state === 'listening') return 'Listening… say the word.';
     if (state === 'processing') return 'Checking what you said…';
@@ -50,7 +60,7 @@ export function VoiceAnswer({ language, solved = false, onTranscript, createReco
   })();
 
   // no microphone at all: explain once, and leave the letters to the child
-  const offerMicrophone = !solved && !(state === 'error' && errorKind === 'unsupported');
+  const offerMicrophone = !solved && failure !== 'unsupported';
 
   return (
     <section aria-label="Voice answer" data-voice-state={view} className="flex w-full flex-col items-center gap-2 text-center">

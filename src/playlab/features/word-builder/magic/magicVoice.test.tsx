@@ -36,6 +36,8 @@ async function openRound() {
   const utils = renderPlayLab({ initialActivity: 'word-builder', onAnswerSubmit, onActivityComplete });
   await screen.findByRole('heading', { level: 1, name: 'Magic Letters' }, { timeout: 5000 });
   await screen.findAllByLabelText(/^Slot \d, empty/);
+  // the microphone appears only after the browser's support check has run, which can be a moment after the slots
+  await screen.findByRole('button', { name: 'Speak answer' }, { timeout: 5000 });
   return { ...utils, onAnswerSubmit, onActivityComplete };
 }
 
@@ -103,7 +105,7 @@ describe('Magic Letters: a spoken answer', () => {
     const { user, onAnswerSubmit } = await openRound();
     await user.click(speakButton());
     act(() => fake.latest().fail('not-allowed'));
-    expect(await screen.findByText(/The microphone is blocked/)).toBeInTheDocument();
+    expect(await screen.findByText(/The browser did not get to use the microphone/)).toBeInTheDocument();
     expect(onAnswerSubmit).not.toHaveBeenCalled();
     expect(realTile('c')).toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
-import { browserRecognizer, listenOnce, type Listening, type RecognizerFactory, type VoiceErrorKind } from '../services/speechInput/recognizer';
+import { browserRecognizer, listenOnce, type Listening, type RecognizerFactory } from '../services/speechInput/recognizer';
+import { describeVoiceEnvironment, failureFor, logVoiceFailure, type VoiceFailure } from '../services/speechInput/diagnosis';
 import { evaluateVoiceAnswer, VOICE_MESSAGES, type VoiceEvaluation } from '../services/speechInput/evaluate';
 import { Button } from './Button';
 import { FeedbackMessage } from './FeedbackMessage';
@@ -20,12 +21,19 @@ interface VoicePracticeProps {
   createRecognizer?: RecognizerFactory;
 }
 
-const ERROR_TEXT: Record<VoiceErrorKind, string> = {
-  permission: VOICE_MESSAGES.permission,
-  'no-speech': VOICE_MESSAGES.noSpeech,
-  stt: VOICE_MESSAGES.stt,
-  network: VOICE_MESSAGES.network,
+/** what the child is told for each failure (each one has its own fix, so none is shown for a different cause) */
+const FAILURE_TEXT: Record<VoiceFailure, string> = {
   unsupported: VOICE_MESSAGES.unsupported,
+  insecure: VOICE_MESSAGES.insecure,
+  embedded: VOICE_MESSAGES.embedded,
+  'site-blocked': VOICE_MESSAGES.permission,
+  refused: VOICE_MESSAGES.refused,
+  'no-microphone': VOICE_MESSAGES.noMicrophone,
+  'speech-service': VOICE_MESSAGES.speechService,
+  'not-started': VOICE_MESSAGES.notStarted,
+  network: VOICE_MESSAGES.network,
+  'no-speech': VOICE_MESSAGES.noSpeech,
+  unclear: VOICE_MESSAGES.stt,
 };
 
 /** True only when the browser has already refused the microphone. Browsers that cannot say (Safari) ask when listening starts. */
@@ -145,10 +153,17 @@ export function VoicePractice({ expected, prompt, lang = 'en-US', listenMs = 800
         listening.current = null;
         judge(r.transcript, r.confidence, false);
       },
-      onError: (kind) => {
+      onError: (kind, raw) => {
         if (!current()) return;
         listening.current = null;
-        fail(ERROR_TEXT[kind]);
+        fail(FAILURE_TEXT[failureFor(kind, null)]);
+        // the page's own settings refine the message (insecure page, frame, site setting) and the failure is logged once
+        void describeVoiceEnvironment().then((env) => {
+          if (!current() || !mounted.current) return;
+          const reason = failureFor(kind, env);
+          logVoiceFailure(raw, kind, reason, env);
+          fail(FAILURE_TEXT[reason]);
+        });
       },
     });
   };
