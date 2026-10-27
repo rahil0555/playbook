@@ -1,7 +1,7 @@
 import type { ContentPack } from '../../types/learning';
 import { englishLetters } from './alphabet';
 import { englishSentences } from './sentences';
-import { englishStory } from './story';
+import { englishStories } from './story';
 import { englishWords } from './words';
 
 export const englishPack: ContentPack = {
@@ -11,5 +11,5 @@ export const englishPack: ContentPack = {
   letters: englishLetters,
   words: englishWords,
   sentences: englishSentences,
-  story: englishStory,
+  stories: englishStories,
 };

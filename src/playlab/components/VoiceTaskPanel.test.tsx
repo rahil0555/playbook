@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayLabContext, type PlayLabContextValue } from '../app/PlayLabContext';
 import { letterNameTask } from '../services/speechInput/tasks';
 import { createFakeAudio } from '../test/fakeAudio';
@@ -52,6 +52,19 @@ function hear(fake: ReturnType<typeof fakeRecognizers>, transcript: string) {
     fake.latest().end();
   });
 }
+
+describe('VoiceTaskPanel: on a page that is not secure, the words say why, and there is no button that cannot work', () => {
+  const secureBefore = window.isSecureContext;
+  afterEach(() => Object.defineProperty(window, 'isSecureContext', { value: secureBefore, configurable: true }));
+
+  it('shows no Speak now button, names the address to use, and still offers the letters', () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    setup();
+    expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
+    expect(status()).toHaveTextContent("Speaking can't work on this address");
+    expect(status()).toHaveTextContent('http://localhost:5173');
+  });
+});
 
 describe('VoiceTaskPanel: focus stays where the child can use it', () => {
   it('after Speak now, focus is on Stop, the same button, while the microphone starts and listens', async () => {

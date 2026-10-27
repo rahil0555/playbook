@@ -8,7 +8,6 @@ import { PronunciationControl } from '../../../components/PronunciationControl';
 import { useSpeech } from '../../../hooks/useAudio';
 import type { Round } from '../../../hooks/useRound';
 import { Illustration } from '../../../illustrations/Illustration';
-import { letterColor } from '../../../lib/accents';
 import { PRAISE, pickLine, TRY_AGAIN } from '../../../lib/messages';
 import { springs } from '../../../motion/variants';
 import type { WordEntry } from '../../../types/learning';
@@ -16,7 +15,7 @@ import { FlyingTile, type Flight } from '../../../moments/FlyingTile';
 import { CompletionCreature, WordSplash } from './CompletionCreature';
 import { useMoments } from '../../../moments/useMoments';
 import { LikeButton } from '../../../components/LikeButton';
-import { measureTile, LooseLetter } from './LooseLetter';
+import { measureTile, LooseLetter, TILE_BOX, tilesPerRow } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
 import type { Scheduled } from '../../../services/audioService';
 import type { Pose } from '../../../moments/flightPath';
@@ -25,21 +24,20 @@ import { VoiceAnswer } from '../../../components/VoiceAnswer';
 import { VoicePractice } from '../../../components/VoicePractice';
 import { StorySentence, type StoryStage } from '../../story/StorySentence';
 import { TennisScene } from '../../story/TennisScene';
-import { storyLetterColor } from '../../story/storyRounds';
+import { LETTER_TILE_COLOR } from '../../story/storyRounds';
 import { evaluateVoiceAnswer, normalizeAnswer } from '../../../services/speechInput/evaluate';
 import type { RecognizedResult } from '../../../services/speechInput/recognizer';
 import { StorybookCutscene } from './StorybookCutscene';
 import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
 
-const letterHue = (letter: string) => letterColor(letter.charCodeAt(0));
-
 /** the gap between the letters of a word spelled by voice: each one flies in on its own */
 const VOICE_LETTER_GAP_MS = 380;
 
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
-/** `storyStage` is set on the read-along story: the sentence replaces the picture, and the letters take the reference's colours. */
+/** `storyStage` is set on the read-along story: the sentence replaces the picture, and it carries the word's hint. */
 export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEntry>; word: WordEntry; storyStage?: StoryStage }) {
-  const colorOf = (letter: string) => (storyStage ? storyLetterColor(letter) : letterHue(letter));
+  // every letter tile has the same colour, in Magic Letters and in the story alike (see LETTER_TILE_COLOR)
+  const colorOf = (_letter: string) => LETTER_TILE_COLOR;
   const { content, level, reducedMotion, audio } = usePlayLab();
   const { speak, sfx, stop, loopPhonic } = useSpeech();
   const moments = useMoments();
@@ -426,7 +424,16 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
         )}
 
         <div className="flex min-w-0 flex-col items-center gap-2 sm:gap-4">
-          {storyStage ? <StorySentence sentence={storyStage.sentence} targets={storyStage.targets} spelled={storyStage.spelled} target={word.text} complete={complete} /> : null}
+          {storyStage ? (
+            <StorySentence
+              sentence={storyStage.sentence}
+              targets={storyStage.targets}
+              spelled={storyStage.spelled}
+              hint={storyStage.hint}
+              target={word.text}
+              complete={complete}
+            />
+          ) : null}
           {/* the target word: glowing outlines on a parchment strip (on the story screen, a plain outline on the lavender screen) */}
           <div ref={stripRef} role="group" aria-label="Word slots. Drop each letter on its outline" className={`pl-story-strip pl-slot-row relative w-full rounded-[2rem] px-3 pb-3 pt-[4.25rem] sm:px-5 sm:pb-5 sm:pt-[5rem]${storyStage ? ' pl-story-strip--stage' : ''}`} style={{ '--n': target.length } as CSSProperties}>
             {/* Pip's perch: a band above the letters that is always there, so nothing moves when the word is finished */}
@@ -455,13 +462,13 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
             ))}
           </div>
 
-          {/* phones: four letters to a row (two rows hold the longest word's tiles), so the tray and the outlines fit on one screen */}
+          {/* phones: the tiles in even rows of at most four (the tray's padding holds each row to its width), so the tray and the outlines fit on one screen */}
           {!complete ? (
-            <ul aria-label="Loose letters" className="pl-story-tray flex w-full flex-wrap items-center justify-center gap-2 rounded-[1.9rem] px-3 py-2 sm:gap-4 sm:px-5 sm:py-4">
+            <ul aria-label="Loose letters" className="pl-story-tray flex w-full flex-wrap items-center justify-center gap-2 rounded-[1.9rem] py-2 sm:gap-4 sm:py-4" style={{ '--per-row': tilesPerRow(tiles.length) } as CSSProperties}>
               {tiles.map((tile, i) => (
-                <li key={tile.id} className="w-[calc((100%-1.5rem)/4)] max-w-[4.4rem] sm:w-auto sm:max-w-none">
+                <li key={tile.id}>
                   {isTilePlaced(slots, tile.id) ? (
-                    <span aria-hidden="true" className="block aspect-square w-full rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] sm:h-[5.4rem] sm:w-[5.4rem]" />
+                    <span aria-hidden="true" className={`block rounded-[1.8rem] bg-white/70 shadow-[inset_0_4px_8px_rgba(120,90,160,0.28)] ${TILE_BOX}`} />
                   ) : (
                     <LooseLetter
                       tile={tile}

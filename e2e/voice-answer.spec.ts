@@ -56,7 +56,7 @@ test.describe('Magic Letters: speaking the answer', () => {
 
   test('a browser with no speech recognition says so, and the letters still work', async ({ page }) => {
     await openWordBuilder(page, { supported: false });
-    await expect(page.getByText('Speaking answers is not available in this browser.')).toBeVisible();
+    await expect(page.getByText("This browser can't listen for speech.")).toBeVisible();
     await expect(speakButton(page)).toHaveCount(0);
     await solveWord(page);
   });

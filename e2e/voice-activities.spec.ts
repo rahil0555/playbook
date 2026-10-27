@@ -36,7 +36,7 @@ test.describe('Letter Playground: say the letter name', () => {
     await installScriptedSpeech(page, { supported: false });
     await page.goto('/#/alphabet');
     await tile(page, 'c').click();
-    await expect(turnStatus(page)).toContainText("Speaking isn't available in this browser");
+    await expect(turnStatus(page)).toContainText("This browser can't listen for speech");
     await expect(yourTurn(page).getByRole('button', { name: 'Speak now' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Selected letter' })).toContainText('C is for cat');
   });

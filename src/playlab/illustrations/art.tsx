@@ -397,13 +397,15 @@ export const ART: Record<IllustrationId, Art> = {
     </>
   ),
   mango: () => (
-    <>
-      <path d="M30 24Q60 8 78 36Q94 62 66 84Q36 98 22 66Q14 42 30 24Z" fill={C.yellow} />
-      <path d="M30 24Q48 14 62 22Q44 40 40 70Q26 52 30 24Z" fill="#f0763a" opacity=".85" />
-      <path d="M66 84Q94 62 78 36 82 60 56 76Z" fill={C.orange} opacity=".5" />
-      <path d="M30 24Q26 8 44 8Q46 22 30 24Z" fill={C.green} />
-      <ellipse cx="56" cy="40" rx="4" ry="9" fill="#fff" opacity=".4" transform="rotate(30 56 40)" />
-    </>
+    <g transform="rotate(-22 50 55)">
+      <path d="M50 16C64 16 72 36 72 56C72 78 64 94 48 94C32 94 26 80 26 60C26 36 36 16 50 16Z" fill={C.yellow} />
+      <path d="M50 16C64 16 72 36 72 56C72 78 64 94 48 94C56 84 60 72 60 56C60 36 56 24 50 16Z" fill={C.orange} opacity=".55" />
+      <path d="M50 16C36 16 26 36 26 60C26 74 30 86 36 92C30 80 36 58 40 40C42 28 46 20 50 16Z" fill={C.red} opacity=".38" />
+      <ellipse cx="38" cy="52" rx="3.2" ry="10" fill="#fff" opacity=".45" transform="rotate(10 38 52)" />
+      <path d="M50 16Q50 9 54 4" stroke={C.brown} strokeWidth="3.4" strokeLinecap="round" fill="none" />
+      <path d="M52 11Q66 0 84 6Q72 20 52 11Z" fill={C.green} />
+      <path d="M53 11Q67 8 78 6" stroke={C.greenL} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+    </g>
   ),
   bird: () => (
     <>

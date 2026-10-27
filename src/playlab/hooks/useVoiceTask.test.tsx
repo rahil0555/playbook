@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayLabContext, type PlayLabContextValue } from '../app/PlayLabContext';
@@ -94,6 +94,38 @@ describe("useVoiceTask: the app's own voice is never heard as the answer", () =>
       listening.end();
     });
     expect(onVerdict).not.toHaveBeenCalled();
+  });
+});
+
+describe('useVoiceTask: a page that is not secure, or a site that refuses the microphone, is said so before any tap', () => {
+  const secureBefore = window.isSecureContext;
+  const setSecure = (secure: boolean) => Object.defineProperty(window, 'isSecureContext', { value: secure, configurable: true });
+  afterEach(() => {
+    setSecure(secureBefore);
+    Reflect.deleteProperty(navigator, 'permissions');
+  });
+
+  it('on a page that is not secure, the page says so at once, and the microphone is never asked for', () => {
+    setSecure(false);
+    const { result } = render();
+    expect(result.current.phase).toBe('page-blocked');
+    expect(result.current.failure).toBe('insecure');
+    act(() => result.current.start());
+    expect(fake.made.some((recogniser) => recogniser.started), 'no recogniser was started').toBe(false);
+    expect(result.current.phase).toBe('page-blocked');
+  });
+
+  it('a microphone the browser already refuses for this site is said so before the child taps, and nothing is started', async () => {
+    Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state: 'denied' }) }, configurable: true });
+    const { result } = render();
+    await waitFor(() => expect(result.current.phase).toBe('denied'));
+    expect(fake.made.some((recogniser) => recogniser.started)).toBe(false);
+  });
+
+  it('a page that is secure and has no refused microphone starts in the ready state', () => {
+    setSecure(true);
+    const { result } = render();
+    expect(result.current.phase).toBe('ready');
   });
 });
 

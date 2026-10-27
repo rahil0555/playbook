@@ -243,7 +243,7 @@ export const eduranceProgressAdapter = (studentId: string): ProgressAdapter => (
 });
 ```
 
-Alternatively keep the default adapter and only forward `onAnswerSubmit` / `onActivityComplete` to your API. The star rules are: +1 star per question right on the first try, +1–3 stars when a round ends (always at least 1). Badges are awarded by the same reducer (`services/progressService.ts`).
+Alternatively keep the default adapter and only forward `onAnswerSubmit` / `onActivityComplete` to your API. The star rules are: a question on its own earns no star. A round earns 1–3 stars when it ends, by its score (at least 80% right is 3 stars, at least 50% is 2, otherwise 1), so each success is rewarded once. Badges are awarded by the same reducer (`services/progressService.ts`).
 
 Store only non-sensitive data. PlayLab itself stores no names, emails or identifiers other than the opaque `learner.id` used in the storage key.
 

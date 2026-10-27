@@ -41,6 +41,21 @@ async function openLetter(letter: string, user: ReturnType<typeof renderPlayLab>
   return screen.findByRole('region', { name: 'Your turn' });
 }
 
+describe('Letter Playground: on a page that is not secure, the letters still work and the page says why', () => {
+  const secureBefore = window.isSecureContext;
+  afterEach(() => Object.defineProperty(window, 'isSecureContext', { value: secureBefore, configurable: true }));
+
+  it('offers no Speak now button, explains the address, and tapping a letter still shows it', async () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
+    await openLetter('b', user);
+    expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
+    expect(status()).toHaveTextContent("Speaking can't work on this address");
+    await user.click(await tile('c'));
+    expect(stage()).toHaveTextContent('C is for cat');
+  });
+});
+
 describe('Letter Playground: say the letter name', () => {
   it('a correct spoken name is praised, and progress does not change (the letter was already found by tapping it)', async () => {
     const { user } = renderPlayLab({ initialActivity: 'alphabet' });
@@ -159,7 +174,7 @@ describe('Letter Playground: say the letter name', () => {
     Reflect.deleteProperty(window, 'SpeechRecognition');
     const { user } = renderPlayLab({ initialActivity: 'alphabet' });
     await openLetter('b', user);
-    expect(status()).toHaveTextContent("Speaking isn't available in this browser");
+    expect(status()).toHaveTextContent("This browser can't listen for speech");
     expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Hear the sound' })).toBeInTheDocument();
   });

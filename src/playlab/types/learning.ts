@@ -108,16 +108,18 @@ export interface ContentPack {
   letters: LetterEntry[];
   words: WordEntry[];
   sentences: SentenceEntry[];
-  /** the read-along story: one sentence, and the words the child builds from it. Packs without one hide the story screen. */
-  story?: StoryScene;
+  /** the read-along stories, played in order. Packs without any hide the story screen. */
+  stories?: readonly StoryScene[];
 }
 
 /** A sentence the child reads along with: each target word is spelled in sentence order. */
 export interface StoryScene {
   id: string;
   sentence: string;
-  /** lowercase, in the order they appear in the sentence */
+  /** lowercase, in the order they appear in the sentence; each appears once in the sentence */
   targets: readonly string[];
+  /** a gentle clue the child can ask for. It never spells the word out. */
+  hint: string;
 }
 
 export interface ActivityDefinition {

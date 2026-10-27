@@ -34,7 +34,7 @@ function HighlightedWord({ word, color }: { word: string; color: string }) {
 }
 
 export default function AlphabetActivity() {
-  const { content, recordStart, recordCompletion, exploreLetter, navigate } = usePlayLab();
+  const { content, store, recordStart, recordCompletion, exploreLetter, navigate } = usePlayLab();
   const { lifetime } = useProgressState();
   const { sayLetterName, sayLetterSound, sayWord, sfx } = useSpeech();
   const letters = content.letters;
@@ -43,6 +43,8 @@ export default function AlphabetActivity() {
   const [replays, setReplays] = useState(0);
   const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
   const [goalDone, setGoalDone] = useState(false);
+  // the goal's stars are awarded once per learner; a later visit that finds every letter again is celebrated without them
+  const [goalRewarded, setGoalRewarded] = useState(false);
   /** true while the child's microphone is on: the speech buttons are off then, so nothing is said over the child */
   const [listening, setListening] = useState(false);
   const { burst, fire, clear } = useBurst();
@@ -90,11 +92,14 @@ export default function AlphabetActivity() {
         if (next.size >= GOAL) {
           goalDoneRef.current = true;
           setGoalDone(true);
-          recordCompletion({ activityId: 'alphabet', score: GOAL, total: GOAL, stars: 3, durationMs: 0 });
+          // read from the store, not this render's copy, so a goal reached earlier in this visit is not rewarded twice either
+          const rewardedBefore = store.getState().lifetime.perActivity.alphabet.completed > 0;
+          setGoalRewarded(!rewardedBefore);
+          if (!rewardedBefore) recordCompletion({ activityId: 'alphabet', score: GOAL, total: GOAL, stars: 3, durationMs: 0 });
         }
       }
     },
-    [exploreLetter, fire, recordCompletion, sayLetterName, selectedId, sfx],
+    [exploreLetter, fire, recordCompletion, sayLetterName, selectedId, sfx, store],
   );
 
   // celebrate when the goal is reached (separate from the letter burst so it reads clearly)
@@ -222,7 +227,7 @@ export default function AlphabetActivity() {
           <AnimatePresence>
             {goalDone ? (
               <motion.div key="goal" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={springs.soft} className="overflow-hidden">
-                <FeedbackMessage tone="success" title={`${GOAL} letters found! 3 stars!`} action={{ label: 'Keep exploring', onClick: keepExploring, icon: 'sparkle' }}>
+                <FeedbackMessage tone="success" title={goalRewarded ? `${GOAL} letters found! 3 stars!` : `${GOAL} letters found again!`} action={{ label: 'Keep exploring', onClick: keepExploring, icon: 'sparkle' }}>
                   <Button variant="ghost" accent="coral" iconRight="arrow-right" onClick={() => navigate(next.id)} className="-ml-4">
                     Next: {next.title}
                   </Button>

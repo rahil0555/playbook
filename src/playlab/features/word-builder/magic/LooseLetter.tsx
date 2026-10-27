@@ -13,6 +13,22 @@ import type { MagicTile } from './magicBoard';
 /** kept under its old name for Magic Letters: where a tile is right now */
 export const measureTile = measurePose;
 
+/**
+ * Every letter tile is the same square: 56 px on the narrowest phones, 60 px from 360 px, and 86 px from the sm breakpoint, so four
+ * tiles and their gaps fit a row at each of those widths (the tray's padding in playlab.css uses the same sizes). The letter inside
+ * is sized to the square, so no letter pushes its tile taller.
+ */
+export const TILE_BOX = 'h-14 w-14 min-[360px]:h-[3.75rem] min-[360px]:w-[3.75rem] sm:h-[5.4rem] sm:w-[5.4rem]';
+
+/**
+ * How many tiles go in each row on a phone: as few rows as possible, at most four to a row, and the rows as even as they can be
+ * (five tiles are three and two, not four and one). The tray's padding uses this to hold each row to that width.
+ */
+export function tilesPerRow(count: number, maxPerRow = 4): number {
+  const rows = Math.max(1, Math.ceil(count / maxPerRow));
+  return Math.max(1, Math.ceil(count / rows));
+}
+
 interface LooseLetterProps {
   tile: MagicTile;
   color: string;
@@ -191,7 +207,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         feelTap();
         onTap(tile.id);
       }}
-      className="pl-draggable relative z-10 grid aspect-square w-full max-w-[4.4rem] cursor-grab place-items-center active:cursor-grabbing sm:h-[5.4rem] sm:w-[5.4rem] sm:max-w-none"
+      className={`pl-draggable relative z-10 grid cursor-grab place-items-center active:cursor-grabbing ${TILE_BOX}`}
     >
       {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
       {/* selected / hinted ring (a separate layer, so the monster keeps its shadow) */}
@@ -219,7 +235,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         <motion.span animate={wobble} className="block h-full w-full">
           <motion.span style={{ rotate: tilt, scaleX: stretchX, scaleY: stretchY }} className="block h-full w-full">
             {glyph ? (
-              <span data-letter-glyph style={{ color }} className={`grid h-full w-full place-items-center font-display text-[4.2rem] font-black leading-none drop-shadow-[0_3px_0_#ffffff] ${reducedMotion || selected || held ? '' : 'pl-float'}`}>
+              <span data-letter-glyph style={{ color }} className={`grid h-full w-full place-items-center font-display text-[2.8rem] font-black leading-none drop-shadow-[0_3px_0_#ffffff] min-[360px]:text-[3rem] sm:text-[4.2rem] ${reducedMotion || selected || held ? '' : 'pl-float'}`}>
                 {tile.value}
               </span>
             ) : (

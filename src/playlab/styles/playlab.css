@@ -411,6 +411,7 @@
 .pl-root.pl-root .pl-slot-row {
   display: grid;
   justify-items: center;
+  justify-content: center;
   align-items: center;
   grid-template-columns: repeat(var(--n, 4), minmax(0, 4.4rem));
   gap: 0.625rem;
@@ -620,6 +621,20 @@
   background: linear-gradient(180deg, #f3ebff 0%, #ffe6f3 100%);
   border: 3px solid #ffffff;
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.9), inset 0 -6px 0 rgba(160, 110, 200, 0.14), 0 8px 0 rgba(160, 110, 200, 0.2), 0 18px 26px -16px rgba(90, 60, 150, 0.35);
+  /* the padding holds each row to --per-row tiles (see tilesPerRow), so the rows come out even; the 3px border is taken off the
+     padding. From 640 px every tile shares one row, so the padding goes back to a plain gap from the edge. */
+  --tile: 3.5rem;
+  padding-inline: max(0.75rem, calc(50% - (var(--per-row, 4) * var(--tile) + (var(--per-row, 4) - 1) * 0.5rem) / 2 - 3px));
+}
+@media (min-width: 360px) {
+  .pl-root.pl-root .pl-story-tray {
+    --tile: 3.75rem;
+  }
+}
+@media (min-width: 640px) {
+  .pl-root.pl-root .pl-story-tray {
+    padding-inline: 1.25rem;
+  }
 }
 
 /* the storybook page that opens over the finished word */

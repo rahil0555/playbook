@@ -151,11 +151,10 @@ export function reduceProgress(
         lifetime.correctAnswers += 1;
         session.correctAnswers += 1;
       }
+      // a single answer earns no star: stars come from finished rounds only (activity_completed), so one success is rewarded once
       if (firstTry) {
         lifetime.firstTryCorrect += 1;
         session.firstTryCorrect += 1;
-        lifetime.stars += 1;
-        session.stars += 1;
       }
       // A wrong or retried answer simply restarts the streak; it is never shown as a loss.
       session.streak = firstTry ? session.streak + 1 : 0;

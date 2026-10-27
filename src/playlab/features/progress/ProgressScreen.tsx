@@ -10,7 +10,7 @@ import { STICKERS, STICKER_SLOTS, stickerSummary } from '../../data/stickers';
 import { StickerArt } from '../../components/StickerArt';
 import { useLikes } from '../../hooks/useLikes';
 
-function Tile({ label, value, hint }: { label: string; value: number; hint?: string }) {
+function Tile({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <div className="pl-paper rounded-[1.8rem] p-4">
       <p className="font-display text-3xl font-bold leading-none text-ink">{value}</p>
@@ -38,6 +38,8 @@ export default function ProgressScreen() {
   const { likes, toggle } = useLikes();
   const { unlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
   const [confirming, setConfirming] = useState(false);
+  // until the saved progress has loaded, the all-time numbers show a placeholder rather than zeros
+  const shown = (value: number) => (hydrated ? value : '…');
 
   return (
     <div className="space-y-8">
@@ -80,7 +82,9 @@ export default function ProgressScreen() {
             ))}
           </ul>
           <p className="mt-4 text-center font-display text-lg font-semibold" data-testid="sticker-count">
-            {unlocked} of {STICKER_SLOTS} stickers{extra > 0 ? `, and ${extra} extra` : ''}. Finish a round to earn the next one!
+            {hydrated
+              ? `${unlocked} of ${STICKER_SLOTS} stickers${extra > 0 ? `, and ${extra} extra` : ''}. Finish a round to earn the next one!`
+              : 'Loading your stickers…'}
           </p>
         </div>
       </section>
@@ -88,11 +92,11 @@ export default function ProgressScreen() {
       <section aria-labelledby="pl-p-total">
         <h2 id="pl-p-total" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">All time</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5" data-hydrated={hydrated}>
-          <Tile label="Stars" value={lifetime.stars} />
-          <Tile label="Activities started" value={lifetime.activitiesStarted} />
-          <Tile label="Answers tried" value={lifetime.questionsAnswered} />
-          <Tile label="Correct answers" value={lifetime.correctAnswers} hint={`${lifetime.firstTryCorrect} on the first try`} />
-          <Tile label="Rounds finished" value={lifetime.activitiesCompleted} />
+          <Tile label="Stars" value={shown(lifetime.stars)} />
+          <Tile label="Activities started" value={shown(lifetime.activitiesStarted)} />
+          <Tile label="Answers tried" value={shown(lifetime.questionsAnswered)} />
+          <Tile label="Correct answers" value={shown(lifetime.correctAnswers)} hint={hydrated ? `${lifetime.firstTryCorrect} on the first try` : undefined} />
+          <Tile label="Rounds finished" value={shown(lifetime.activitiesCompleted)} />
         </div>
       </section>
 

@@ -186,8 +186,9 @@ export function evaluateVoiceTask(task: VoiceTask, transcript: string, confidenc
 
 /** What the child is told when listening fails for a reason other than the answer. Each cause has its own text and its own fix. */
 export const FAILURE_COPY: Record<VoiceFailure, string> = {
-  unsupported: "Speaking isn't available in this browser. You can still tap the letters.",
-  insecure: 'Speaking needs a secure page (an https:// address). You can still tap the letters.',
+  unsupported: "This browser can't listen for speech. Chrome or Edge can. You can still tap the letters.",
+  insecure:
+    "Speaking can't work on this address. Browsers allow speech only on a secure page: open PlayLab at http://localhost:5173 on the computer that runs it, or at its https:// address. You can still tap the letters.",
   embedded: 'This page is inside another page, which may not let the browser use the microphone. Open PlayLab in its own tab to speak.',
   'site-blocked': 'The microphone is turned off for this site. A grown-up can allow it with the lock icon in the address bar, then try again.',
   refused: "The browser did not get to use the microphone. A grown-up can check the computer's microphone privacy setting, then try again.",

@@ -13,8 +13,9 @@ export type VoiceAnswerView = SpeechRecognitionState | 'done';
  * and what to check, and never blames the microphone for something else (a page that is not secure, a frame, a speech service).
  */
 const MESSAGES: Record<VoiceFailure, string> = {
-  unsupported: 'Speaking answers is not available in this browser. Drag or tap the letters instead.',
-  insecure: 'Speaking needs a secure page (an https:// address). This page is not secure, so the browser will not use the microphone. You can still drag or tap the letters.',
+  unsupported: "This browser can't listen for speech. Chrome or Edge can. You can still drag or tap the letters.",
+  insecure:
+    "Speaking can't work on this address. Browsers allow speech only on a secure page: open PlayLab at http://localhost:5173 on the computer that runs it, or at its https:// address. You can still drag or tap the letters.",
   embedded: 'This page is inside another page, which may not let the browser use the microphone. Open PlayLab in its own browser tab to speak. You can still drag or tap the letters.',
   'site-blocked': 'The browser has the microphone turned off for this site. A grown-up can allow it with the lock icon in the address bar. You can still drag or tap the letters.',
   refused: 'The browser did not get to use the microphone. A grown-up can check the computer’s microphone privacy setting (on Windows: Settings, Privacy & security, Microphone, and turn on “Let desktop apps access your microphone”). You can still drag or tap the letters.',
@@ -69,7 +70,8 @@ export function VoiceAnswer({ language, solved = false, onTranscript, createReco
   })();
 
   // no microphone at all: explain once, and leave the letters to the child
-  const offerMicrophone = !solved && failure !== 'unsupported';
+  const pageBlocked = failure === 'insecure' || failure === 'embedded';
+  const offerMicrophone = !solved && failure !== 'unsupported' && !pageBlocked;
 
   return (
     <section aria-label="Voice answer" data-voice-state={view} className="flex w-full flex-col items-center gap-2 text-center">

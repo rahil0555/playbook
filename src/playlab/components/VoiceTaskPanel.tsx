@@ -57,8 +57,9 @@ export function VoiceTaskPanel({ task, prompt, playModel, createRecognizer, onLi
   const primary = useRef<HTMLButtonElement>(null);
   const status = useRef<HTMLParagraphElement>(null);
   const speaking = phase === 'starting' || phase === 'listening';
-  // the main button is shown in every phase except a correct answer (nothing more to say) and an unsupported browser (no speaking)
-  const showPrimary = phase !== 'unsupported' && phase !== 'correct';
+  // the main button is shown in every phase except a correct answer (nothing more to say), an unsupported browser and a page that is
+  // not secure or is framed (a tap cannot change either of those, so the button would only fail again)
+  const showPrimary = phase !== 'unsupported' && phase !== 'page-blocked' && phase !== 'correct';
 
   const listen = () => {
     // the model is stopped first, so the speaker's own voice is not heard by the microphone

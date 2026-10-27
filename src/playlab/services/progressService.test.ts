@@ -38,7 +38,7 @@ describe('reduceProgress', () => {
     expect(lifetime.questionsAnswered).toBe(3);
     expect(lifetime.correctAnswers).toBe(2);
     expect(lifetime.firstTryCorrect).toBe(1);
-    expect(lifetime.stars).toBe(1); // one star per first-try correct answer
+    expect(lifetime.stars).toBe(0); // a single answer earns no star; stars come from finished rounds
     expect(lifetime.perActivity.phonics).toMatchObject({ started: 1, answered: 3, correct: 2, firstTryCorrect: 1 });
     expect(session.questionsAnswered).toBe(3);
   });
@@ -135,7 +135,8 @@ describe('ProgressStore', () => {
     store.record(answer());
     expect(listener).toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
-    expect(store.getState().lifetime.stars).toBe(4);
+    expect(store.getState().lifetime.stars).toBe(3); // a single answer adds no star; the round's stars come when it is finished
+    expect(store.getState().lifetime.questionsAnswered).toBe(1);
   });
 
   it('queues events that arrive before an async adapter has loaded, then replays them', async () => {
@@ -146,7 +147,7 @@ describe('ProgressStore', () => {
     expect(store.getState().hydrated).toBe(false);
     resolve({ ...createEmptySnapshot(), stars: 10 });
     await vi.waitFor(() => expect(store.getState().hydrated).toBe(true));
-    expect(store.getState().lifetime.stars).toBe(11);
+    expect(store.getState().lifetime.stars).toBe(10);
     expect(store.getState().lifetime.questionsAnswered).toBe(1);
   });
 

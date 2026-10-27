@@ -25,7 +25,7 @@ export function ProgressIndicator({ done, total, currentIndex, accent = 'brand',
   const a = ACCENTS[accent];
   const shown = currentIndex !== undefined ? Math.min(currentIndex + 1, total) : Math.min(done, total);
   return (
-    <div className="inline-flex items-center gap-3 rounded-full bg-white/90 py-1.5 pl-3 pr-4 shadow-soft">
+    <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-[1.6rem] bg-white/90 px-3 py-1.5 text-center shadow-soft sm:rounded-full sm:pr-4">
       <div
         role="progressbar"
         aria-label={`${noun} progress`}
@@ -33,19 +33,19 @@ export function ProgressIndicator({ done, total, currentIndex, accent = 'brand',
         aria-valuemax={total}
         aria-valuenow={done}
         aria-valuetext={`${done} of ${total} finished`}
-        className="flex items-center"
+        className="flex max-w-full flex-wrap items-center justify-center"
       >
         {Array.from({ length: total }, (_, i) => {
           const finished = i < done;
           const current = i === currentIndex && !finished;
           return (
             <Fragment key={i}>
-              {i > 0 ? <span aria-hidden="true" className={`mx-0.5 h-1 w-2.5 rounded-full sm:w-3.5 ${i <= done ? 'bg-sun-300' : 'bg-black/10'}`} /> : null}
+              {i > 0 ? <span aria-hidden="true" className={`mx-0.5 h-1 w-2 rounded-full sm:w-3.5 ${i <= done ? 'bg-sun-300' : 'bg-black/10'}`} /> : null}
               <motion.span
                 data-state={finished ? 'done' : current ? 'current' : 'todo'}
                 animate={finished ? { scale: [1, 1.5, 1], rotate: [0, 20, 0] } : { scale: 1 }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
-                className={`relative grid h-7 w-7 place-items-center rounded-full border-2 sm:h-8 sm:w-8 ${
+                className={`relative grid h-6 w-6 place-items-center rounded-full border-2 sm:h-8 sm:w-8 ${
                   finished ? 'border-sun-700/30 bg-sun-300 text-sun-700' : current ? `bg-white ${a.border} ring-[3px] ${a.ring} ${current ? 'pl-glow-pulse' : ''}` : 'border-black/15 bg-black/[0.04]'
                 }`}
               >

@@ -36,7 +36,7 @@ describe('VoiceAnswer: browser support', () => {
 
   it('explains, and offers no microphone, when the browser has no speech recognition', () => {
     renderVoice(() => null);
-    expect(status()).toHaveTextContent('Speaking answers is not available in this browser. Drag or tap the letters instead.');
+    expect(status()).toHaveTextContent("This browser can't listen for speech. Chrome or Edge can. You can still drag or tap the letters.");
     expect(screen.queryByRole('button', { name: 'Speak answer' })).toBeNull();
   });
 });
@@ -171,14 +171,14 @@ describe('VoiceAnswer: each failure says what happened and what to check', () =>
     vi.useRealTimers();
   });
 
-  it('a page that is not secure is told so, not told the microphone is blocked', async () => {
+  it('a page that is not secure is told so at once, with no microphone button, and not told the microphone is blocked', async () => {
     undo();
     undo = setPageSettings({ secure: false, permission: 'prompt' });
     const fake = fakeRecognizers();
-    const { user } = renderVoice(fake.factory);
-    await user.click(mic());
-    act(() => fake.latest().fail('not-allowed'));
-    await waitFor(() => expect(status()).toHaveTextContent('needs a secure page'));
+    renderVoice(fake.factory);
+    await waitFor(() => expect(status()).toHaveTextContent("Speaking can't work on this address"));
+    expect(screen.queryByRole('button', { name: 'Speak answer' })).toBeNull();
+    expect(fake.made.some((recogniser) => recogniser.started), 'the microphone is never asked for').toBe(false);
     expect(status()).not.toHaveTextContent('blocked');
   });
 
@@ -245,12 +245,28 @@ describe('useSpeechRecognition', () => {
   it('a second start while a session runs opens no second session', () => {
     const fake = fakeRecognizers();
     const { result } = renderHook(() => useSpeechRecognition({ language: 'en', onResult: () => undefined, createRecognizer: fake.factory }));
-    // the first recogniser made is the support check; the rest are sessions
     act(() => {
       result.current.start();
       result.current.start();
     });
-    expect(fake.made.length - 1).toBe(1);
+    // the support checks are made and dropped without starting; only a session is started
+    expect(fake.made.filter((r) => r.started)).toHaveLength(1);
+  });
+
+  it('on a page that is not secure, the very first render already says why, before any effect has run', () => {
+    const secure = window.isSecureContext;
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    try {
+      let first: { state: string; failure: string | null } | undefined;
+      renderHook(() => {
+        const r = useSpeechRecognition({ language: 'en', onResult: () => undefined, createRecognizer: fakeRecognizers().factory });
+        first ??= { state: r.state, failure: r.failure };
+        return r;
+      });
+      expect(first).toEqual({ state: 'error', failure: 'insecure' });
+    } finally {
+      Object.defineProperty(window, 'isSecureContext', { value: secure, configurable: true });
+    }
   });
 
   it('reports an unsupported browser as an error, without starting anything', () => {

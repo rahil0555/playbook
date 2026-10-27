@@ -45,6 +45,10 @@ if (typeof window.PointerEvent === 'undefined') {
   (window as unknown as { PointerEvent: unknown }).PointerEvent = PointerEventPolyfill;
 }
 
+// jsdom reports the test page as not secure, and PlayLab (correctly) does not listen on a page that is not secure. The tests of a
+// secure page therefore see it as secure; a test of an insecure page sets window.isSecureContext to false itself and restores it.
+Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+
 // jsdom logs "not implemented" for these; PlayLab only calls them best-effort.
 window.scrollTo = (() => undefined) as typeof window.scrollTo;
 Element.prototype.scrollIntoView = (() => undefined) as typeof Element.prototype.scrollIntoView;

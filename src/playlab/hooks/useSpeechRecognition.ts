@@ -8,7 +8,7 @@ import {
   type VoiceErrorKind,
 } from '../services/speechInput/recognizer';
 import type { AudioService } from '../services/audioService';
-import { describeVoiceEnvironment, failureFor, logVoiceFailure, type VoiceFailure } from '../services/speechInput/diagnosis';
+import { describeVoiceEnvironment, failureFor, logVoiceFailure, refusalFor, type VoiceFailure } from '../services/speechInput/diagnosis';
 
 /** Where a voice answer is. `checking_support` lasts only until the browser has been asked; `error` also covers "unsupported". */
 export type SpeechRecognitionState = 'checking_support' | 'idle' | 'requesting_permission' | 'listening' | 'processing' | 'error';
@@ -52,6 +52,16 @@ function hasRecognizer(factory: RecognizerFactory): boolean {
 }
 
 /**
+ * What the page already knows before anything is tried: no speech recogniser at all, or a page the browser will not listen on.
+ * The first frame shows this, so such a page never says "getting the microphone ready" before it says why it cannot listen.
+ */
+function knownVoiceState(factory: RecognizerFactory): { state: SpeechRecognitionState; errorKind: VoiceErrorKind | null; failure: VoiceFailure | null } {
+  if (!hasRecognizer(factory)) return { state: 'error', errorKind: 'unsupported', failure: 'unsupported' };
+  if (!window.isSecureContext) return { state: 'error', errorKind: null, failure: 'insecure' };
+  return { state: 'checking_support', errorKind: null, failure: null };
+}
+
+/**
  * One speaking session at a time: start, stop without judging, and a clean release on unmount. The transcript is handed to
  * `onResult` only once the browser has finished hearing; judging it is the caller's job. Failures move the state to
  * `error` with a reason, and the next start clears it, so the state can never stay on listening or processing.
@@ -65,9 +75,10 @@ export function useSpeechRecognition({ language, onResult, onInterim, audio, cre
   const latest = useRef({ language, onResult, onInterim, audio });
   latest.current = { language, onResult, onInterim, audio };
 
-  const [state, setState] = useState<SpeechRecognitionState>('checking_support');
-  const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
-  const [failure, setFailure] = useState<VoiceFailure | null>(null);
+  const [known] = useState(() => knownVoiceState(factory));
+  const [state, setState] = useState<SpeechRecognitionState>(known.state);
+  const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(known.errorKind);
+  const [failure, setFailure] = useState<VoiceFailure | null>(known.failure);
   const [heard, setHeard] = useState<string | null>(null);
   const session = useRef<Listening | null>(null);
   /** counts the sessions: anything a finished or stopped session reports after that does nothing */
@@ -75,14 +86,26 @@ export function useSpeechRecognition({ language, onResult, onInterim, audio, cre
   const heardTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (hasRecognizer(factory)) {
-      setState('idle');
-    } else {
+    // checked before the child taps, and without opening the microphone: the browser will not listen on a page that is not secure,
+    // so saying so now is kinder than letting a tap fail, and a site that already refuses the microphone is said so at once
+    let mounted = true;
+    if (!hasRecognizer(factory)) {
       setErrorKind('unsupported');
       setFailure('unsupported');
       setState('error');
+    } else if (!window.isSecureContext) {
+      setFailure('insecure');
+      setState('error');
+    } else {
+      setState('idle');
+      void describeVoiceEnvironment().then((env) => {
+        if (!mounted || session.current || env.secureContext === false || env.permission !== 'denied') return;
+        setFailure(refusalFor(env));
+        setState('error');
+      });
     }
     return () => {
+      mounted = false;
       sessionNo.current += 1;
       session.current?.cancel();
       session.current = null;
@@ -94,6 +117,13 @@ export function useSpeechRecognition({ language, onResult, onInterim, audio, cre
   const start = useCallback(() => {
     // a repeated tap while a session runs does not open a second one
     if (session.current) return;
+    if (!window.isSecureContext) {
+      // never ask the browser for the microphone on a page it will not trust
+      setErrorKind(null);
+      setFailure('insecure');
+      setState('error');
+      return;
+    }
     const id = ++sessionNo.current;
     const current = () => id === sessionNo.current;
     // interim results are asked for only by a caller that shows them; everyone else keeps the final answer only

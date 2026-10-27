@@ -14,6 +14,7 @@ import { useLikes } from '../../hooks/useLikes';
 import { letterColor } from '../../lib/accents';
 import { animationFor } from '../../motion/variants';
 import type { Like } from '../../services/likesService';
+import { visitLine } from './visitLine';
 
 const HERO_WORD = ['p', 'l', 'a', 'y'];
 const KIND_NAME = { letter: 'letter', word: 'word', sentence: 'sentence' } as const;
@@ -34,7 +35,7 @@ function Stat({ icon, value, label, color }: { icon: 'star' | 'check' | 'trophy'
 
 export default function HomeScreen() {
   const { navigate, learner, content } = usePlayLab();
-  const { lifetime, session } = useProgressState();
+  const { lifetime, session, hydrated } = useProgressState();
   const { sayLetterName, speak, sfx } = useSpeech();
   const { likes } = useLikes();
   const handles = useRef<Record<string, AnimatedLetterHandle | null>>({});
@@ -42,6 +43,8 @@ export default function HomeScreen() {
   const heroLetters = useMemo(() => HERO_WORD.map((id) => content.letters.find((l) => l.id === id)).filter((l) => !!l), [content]);
   const name = learner?.displayName?.trim();
   const { unlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
+  // until the saved progress has loaded, the stats show a placeholder rather than zeros that would change a moment later
+  const shown = (value: number | string) => (hydrated ? value : '…');
 
   /** Tap a loved thing to hear it again. Letters say their name, words and sentences are read aloud. */
   const hearLike = (like: Like) => {
@@ -116,15 +119,13 @@ export default function HomeScreen() {
           Your progress
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat icon="star" value={lifetime.stars} label="stars collected" color="#d9741c" />
-          <Stat icon="check" value={lifetime.activitiesCompleted} label="rounds finished" color="#16a286" />
-          <Stat icon="trophy" value={`${lifetime.badges.length} / ${BADGES.length}`} label="badges" color="#8a5cc7" />
-          <Stat icon="sparkle" value={`${unlocked} / ${STICKER_SLOTS}`} label="stickers" color="#2f8fd8" />
+          <Stat icon="star" value={shown(lifetime.stars)} label="stars collected" color="#d9741c" />
+          <Stat icon="check" value={shown(lifetime.activitiesCompleted)} label="rounds finished" color="#16a286" />
+          <Stat icon="trophy" value={shown(`${lifetime.badges.length} / ${BADGES.length}`)} label="badges" color="#8a5cc7" />
+          <Stat icon="sparkle" value={shown(`${unlocked} / ${STICKER_SLOTS}`)} label="stickers" color="#2f8fd8" />
         </div>
-        <p className="mt-3 inline-block rounded-full bg-white/85 px-4 py-1.5 text-ink shadow-soft">
-          {session.questionsAnswered > 0
-            ? `This visit: ${session.correctAnswers} correct answer${session.correctAnswers === 1 ? '' : 's'} out of ${session.questionsAnswered} tried. Keep going!`
-            : 'Nothing played yet this visit. Pick an activity to start!'}
+        <p className="mt-3 inline-block rounded-[1.4rem] bg-white/85 px-4 py-1.5 text-ink shadow-soft" data-testid="visit-line">
+          {visitLine(hydrated, session)}
         </p>
       </section>
 
@@ -184,13 +185,13 @@ export default function HomeScreen() {
         </ul>
       </section>
 
-      {content.story ? (
+      {content.stories && content.stories.length > 0 ? (
         <section aria-labelledby="pl-story-title" className="mt-10">
           <h2 id="pl-story-title" className="pl-wood mb-4 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">
             Read the story
           </h2>
           <div className="flex flex-col items-start gap-4 rounded-[2rem] bg-white/85 p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
-            <p className="font-display text-xl font-semibold text-ink">“{content.story.sentence}”</p>
+            <p className="font-display text-xl font-semibold text-ink">“{content.stories[0]?.sentence}”</p>
             <Button size="lg" variant="primary" accent="plum" iconRight="arrow-right" onClick={() => navigate('story')}>
               Spell the story
             </Button>

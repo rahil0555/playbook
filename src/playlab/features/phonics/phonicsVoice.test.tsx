@@ -33,6 +33,21 @@ function hear(transcript: string) {
   });
 }
 
+describe('Sound Discovery: on a page that is not secure, the letters still work and the page says why', () => {
+  const secureBefore = window.isSecureContext;
+  afterEach(() => Object.defineProperty(window, 'isSecureContext', { value: secureBefore, configurable: true }));
+
+  it('offers no Speak now button, explains the address, and tapping a letter still shows its sound question', async () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    const { user } = renderPlayLab({ initialActivity: 'phonics' });
+    await screen.findByRole('region', { name: 'Your turn' });
+    expect(within(panel()).queryByRole('button', { name: 'Speak now' })).toBeNull();
+    expect(within(panel()).getByRole('status')).toHaveTextContent("Speaking can't work on this address");
+    await user.click(await screen.findByRole('button', { name: /^Letter C,/ }));
+    expect(within(panel()).getByText(/sound of C/)).toBeInTheDocument();
+  });
+});
+
 describe('Sound Discovery: say a word that has the sound', () => {
   it('asks for a word with the sound, and accepts the example word', async () => {
     const { user } = renderPlayLab({ initialActivity: 'phonics' });
