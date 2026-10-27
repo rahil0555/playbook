@@ -128,13 +128,16 @@ test.describe('phonics', () => {
     await expect(page.getByText('/ă/').first()).toBeVisible();
     await page.getByRole('button', { name: 'Say the name' }).click();
     await page.getByRole('button', { name: 'Play the sound' }).click();
-    expect((await spoken(page)).slice(-2)).toEqual(['ay', 'aah']);
+    // the sound is heard inside its example word, after the lead-in: never as an invented respelling
+    await expect.poll(async () => (await spoken(page)).slice(-3)).toEqual(['ay', 'Listen for the sound in', 'apple']);
 
     await page.getByRole('tab', { name: 'Listen & choose' }).click();
     const map: Record<string, string[]> = { aah: ['a'], eh: ['e'] }; // helper for readability only
     void map;
     for (let q = 0; q < 5; q++) {
       await expect(page.getByText('Which letter makes this sound?')).toBeVisible();
+      // the sound is spoken as its example word, after the lead-in: wait for the word itself
+      await expect.poll(async () => (await spoken(page)).at(-1)).not.toBe('Listen for the sound in');
       const heard = (await spoken(page)).at(-1)!;
       const choices = await page.locator('[data-choice]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.choice as string));
       const { englishLetters } = await import('../src/playlab/data/en/alphabet');

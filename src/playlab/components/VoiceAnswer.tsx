@@ -1,4 +1,5 @@
 import { useSpeechRecognition, type SpeechRecognitionState } from '../hooks/useSpeechRecognition';
+import type { AudioService } from '../services/audioService';
 import { VOICE_MESSAGES } from '../services/speechInput/evaluate';
 import type { VoiceFailure } from '../services/speechInput/diagnosis';
 import type { RecognizedResult, RecognizerFactory } from '../services/speechInput/recognizer';
@@ -34,6 +35,8 @@ interface VoiceAnswerProps {
   onTranscript: (result: RecognizedResult) => void;
   /** tests pass a fake recogniser; the app uses the browser's own */
   createRecognizer?: RecognizerFactory;
+  /** the app's speech: its lines still waiting or playing stop when the child starts to answer, and listening stops before it speaks (see useSpeechRecognition) */
+  audio?: Pick<AudioService, 'onBeforePlay' | 'stop' | 'setListening'>;
 }
 
 /**
@@ -41,8 +44,14 @@ interface VoiceAnswerProps {
  * that always says what is happening. It judges nothing itself: the transcript goes to `onTranscript`. A failure is shown
  * with the fallback the child already has, and never counts as an answer.
  */
-export function VoiceAnswer({ language, solved = false, onTranscript, createRecognizer }: VoiceAnswerProps) {
-  const { state, failure, heard, start, stop } = useSpeechRecognition({ language, onResult: onTranscript, createRecognizer });
+export function VoiceAnswer({ language, solved = false, onTranscript, createRecognizer, audio }: VoiceAnswerProps) {
+  const { state, failure, heard, start, stop } = useSpeechRecognition({ language, onResult: onTranscript, createRecognizer, audio });
+
+  // the app's own speech is stopped first, so a line that was still waiting (or playing) cannot interrupt the child's answer
+  const listen = () => {
+    audio?.stop();
+    start();
+  };
 
   if (state === 'checking_support') return null;
 
@@ -75,7 +84,7 @@ export function VoiceAnswer({ language, solved = false, onTranscript, createReco
             <button
               type="button"
               aria-label="Speak answer"
-              onClick={start}
+              onClick={listen}
               className="inline-flex min-h-[3rem] items-center gap-2 rounded-full bg-brand-600 px-5 font-display text-lg font-bold text-white shadow-[0_5px_0_#0b6b57] transition active:translate-y-0.5"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

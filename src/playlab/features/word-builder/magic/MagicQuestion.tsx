@@ -40,7 +40,7 @@ const VOICE_LETTER_GAP_MS = 380;
 /** `storyStage` is set on the read-along story: the sentence replaces the picture, and the letters take the reference's colours. */
 export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEntry>; word: WordEntry; storyStage?: StoryStage }) {
   const colorOf = (letter: string) => (storyStage ? storyLetterColor(letter) : letterHue(letter));
-  const { content, level, reducedMotion } = usePlayLab();
+  const { content, level, reducedMotion, audio } = usePlayLab();
   const { speak, sfx, stop, loopPhonic } = useSpeech();
   const moments = useMoments();
   const { burst, fire, clear } = useBurst();
@@ -538,7 +538,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
           </div>
           {/* the same answer, spoken: judged by heardSpeech with the rules for a typed letter. It sits below the feedback, so the
               feedback keeps its place on a desktop; not offered once the word is spelled. */}
-          {!done ? <VoiceAnswer language={content.language} solved={round.solved} onTranscript={heardSpeech} /> : null}
+          {!done ? <VoiceAnswer language={content.language} solved={round.solved} onTranscript={heardSpeech} audio={audio} /> : null}
           {/* after the word is finished the child can say it too; "Next word" above is always there, so skipping costs nothing */}
           {complete && !storyStage ? <VoicePractice expected={[word.text]} prompt="Say the word for the picture" /> : null}
         </div>

@@ -134,6 +134,25 @@ describe('audioService', () => {
     await p2;
     expect(env.spoken.slice(3)).not.toContain('3');
   });
+
+  it('a pause before a line waits before it is said, and stop() during the pause drops that line', async () => {
+    const env = fakeSynth('speak');
+    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
+    const p = audio.playSequence([{ text: 'Listen for the sound in' }, { text: 'ball', pauseBeforeMs: 250 }]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(env.spoken).toEqual(['Listen for the sound in']);
+    await vi.advanceTimersByTimeAsync(400);
+    await p;
+    expect(env.spoken).toEqual(['Listen for the sound in', 'ball']);
+
+    const p2 = audio.playSequence([{ text: 'first' }, { text: 'second', pauseBeforeMs: 500 }]);
+    await vi.advanceTimersByTimeAsync(100);
+    audio.stop();
+    await vi.advanceTimersByTimeAsync(600);
+    await p2;
+    // 'first' had no pause, so it was said before the stop; the line that waited is never said
+    expect(env.spoken.slice(2)).toEqual(['first']);
+  });
 });
 
 /* ---------------------- voice selection (browser voices only) ---------------------- */
@@ -251,18 +270,75 @@ describe('audioService: voice selection', () => {
     expect(d.spoken.at(-1)?.voice?.name).toBe('Local US');
   });
 
-  it('uses the shared speech style by default, and a request can override rate (isolated sounds)', async () => {
+  it('uses the shared speech style by default, and a request can set its own rate', async () => {
     const d = voiceSynth(DEVICE);
     const audio = createAudioService(d.env);
     const a = audio.play({ text: 'cat' });
     await vi.advanceTimersByTimeAsync(10);
     await a;
     expect(d.spoken.at(-1)).toMatchObject({ rate: SPEECH_STYLE.rate, pitch: SPEECH_STYLE.pitch });
-    const b = audio.play({ text: 'buh', rate: SPEECH_STYLE.soundRate });
+    const b = audio.play({ text: 'hello', rate: 0.7 });
     await vi.advanceTimersByTimeAsync(10);
     await b;
-    expect(d.spoken.at(-1)).toMatchObject({ rate: SPEECH_STYLE.soundRate, pitch: SPEECH_STYLE.pitch });
-    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch, SPEECH_STYLE.soundRate]).toEqual([0.9, 1.05, 0.8]);
+    expect(d.spoken.at(-1)).toMatchObject({ rate: 0.7, pitch: SPEECH_STYLE.pitch });
+    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch]).toEqual([0.9, 1.05]);
+  });
+
+  it('tells listeners before a line starts, so the microphone can stop first', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    let spokenWhenTold = -1;
+    const off = audio.onBeforePlay(() => {
+      spokenWhenTold = d.spoken.length;
+    });
+    const p = audio.play({ text: 'bee' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+    expect(spokenWhenTold, 'the listener ran while nothing had been spoken yet').toBe(0);
+    expect(d.spoken.map((r) => r.text)).toEqual(['bee']);
+    off();
+  });
+
+  it('plays no sound effect while the microphone is listening (it could be picked up, and it distracts), and plays them again after', () => {
+    const tones: number[] = [];
+    class FakeAudioContext {
+      currentTime = 0;
+      state = 'running';
+      destination = {};
+      createOscillator() {
+        tones.push(tones.length);
+        return { type: 'sine', frequency: { value: 0 }, connect: () => ({ connect: () => undefined }), start: () => undefined, stop: () => undefined };
+      }
+      createGain() {
+        return { gain: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined }, connect: () => undefined };
+      }
+      resume() {
+        return Promise.resolve();
+      }
+    }
+    const audio = createAudioService({ synth: null, AudioContextCtor: FakeAudioContext as unknown as typeof AudioContext });
+    audio.setListening(true);
+    audio.sfx('pop');
+    expect(tones, 'no tone while listening').toEqual([]);
+    audio.setListening(false);
+    audio.sfx('pop');
+    expect(tones.length, 'the tone plays again once listening has stopped').toBeGreaterThan(0);
+  });
+
+  it('is not told when nothing is played (sound off), and a removed listener is not told', async () => {
+    const d = voiceSynth(DEVICE);
+    const audio = createAudioService(d.env);
+    let told = 0;
+    const off = audio.onBeforePlay(() => (told += 1));
+    audio.setMuted(true);
+    await audio.play({ text: 'bee' });
+    expect(told).toBe(0);
+    audio.setMuted(false);
+    off();
+    const p = audio.play({ text: 'bee' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+    expect(told).toBe(0);
   });
 
   it('mute still wins over a chosen voice', async () => {

@@ -4,21 +4,25 @@ import { AnimatedLetter } from '../../components/AnimatedLetter';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { LetterGrid } from '../../components/LetterGrid';
 import { PronunciationControl } from '../../components/PronunciationControl';
+import { VoiceTaskPanel } from '../../components/VoiceTaskPanel';
 import { Illustration } from '../../illustrations/Illustration';
 import { useSpeech } from '../../hooks/useAudio';
-import { SPEECH_STYLE } from '../../services/audioService';
 import { letterColor } from '../../lib/accents';
 import { animationFor } from '../../motion/variants';
+import { soundWordsFor } from '../../data/en/soundWords';
+import { phonicsSoundPrompt, phonicsSoundTask } from '../../services/speechInput/tasks';
 import type { LetterEntry } from '../../types/learning';
 
 /** Letter name vs letter sound, side by side, with an example word and replay controls. */
 export function LetterDiscovery() {
   const { content } = usePlayLab();
-  const { sayLetterName, sayLetterSound, sayWord, speakSequence, sfx } = useSpeech();
+  const { sayLetterName, sayLetterSound, sayLetterFully, sayWord, sfx } = useSpeech();
   const { burst, fire, clear } = useBurst();
   const letters = content.letters;
   const [selectedId, setSelectedId] = useState(letters[0]?.id ?? 'a');
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
+  /** true while the child's microphone is on: the speech buttons are off then, so nothing is said over the child */
+  const [listening, setListening] = useState(false);
   const index = Math.max(0, letters.findIndex((l) => l.id === selectedId));
   const letter = letters[index] as LetterEntry;
   const color = letterColor(index);
@@ -35,12 +39,8 @@ export function LetterDiscovery() {
     [fire, sayLetterName, sfx],
   );
 
-  const sayAll = () =>
-    speakSequence([
-      { text: letter.nameSpeech, src: letter.audio?.name },
-      { text: letter.sound.speech, src: letter.audio?.sound, rate: SPEECH_STYLE.soundRate },
-      { text: letter.word.text, src: letter.audio?.word },
-    ]);
+  /** the name, then the sound in its example word: "all three" */
+  const sayAll = () => sayLetterFully(letter);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
@@ -59,10 +59,11 @@ export function LetterDiscovery() {
               animation={animationFor(index)}
               label={`Letter ${letter.upper}. Tap to hear its name`}
               className="my-1 h-28 px-4 text-[5.2rem]"
+              disabled={listening}
               onTap={() => void sayLetterName(letter)}
             />
             <p className="font-display text-3xl font-bold">“{letter.name}”</p>
-            <PronunciationControl label="Say the name" accent="coral" onPlay={() => sayLetterName(letter)} className="mt-3" />
+            <PronunciationControl label="Say the name" accent="coral" disabled={listening} onPlay={() => sayLetterName(letter)} className="mt-3" />
           </article>
 
           <article className="flex flex-col items-center pl-paper rounded-[2rem] p-4 text-center">
@@ -71,7 +72,7 @@ export function LetterDiscovery() {
               {letter.sound.symbol}
             </p>
             <p className="min-h-[2.8rem] text-[0.98rem] leading-snug text-ink-soft">{letter.sound.tip}</p>
-            <PronunciationControl label="Play the sound" accent="sky" variant="primary" onPlay={() => sayLetterSound(letter)} className="mt-3" />
+            <PronunciationControl label="Play the sound" accent="sky" variant="primary" disabled={listening} onPlay={() => sayLetterSound(letter)} className="mt-3" />
           </article>
         </div>
 
@@ -87,10 +88,18 @@ export function LetterDiscovery() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <PronunciationControl label="Hear the word" accent="plum" onPlay={() => sayWord(letter.word.text, letter.audio?.word)} />
-            <PronunciationControl label="Hear all three" accent="brand" variant="primary" icon="play" onPlay={sayAll} />
+            <PronunciationControl label="Hear the word" accent="plum" disabled={listening} onPlay={() => sayWord(letter.word.text, letter.audio?.word)} />
+            <PronunciationControl label="Hear all three" accent="brand" variant="primary" icon="play" disabled={listening} onPlay={sayAll} />
           </div>
         </article>
+
+        {/* no model is played here: the question must not name a word the child is checked on (the teaching buttons above do) */}
+        <VoiceTaskPanel
+          key={letter.id}
+          task={phonicsSoundTask(letter, soundWordsFor(letter.id))}
+          prompt={phonicsSoundPrompt(letter.upper)}
+          onListeningChange={setListening}
+        />
       </section>
 
       <div className="lg:order-2">

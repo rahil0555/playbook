@@ -17,6 +17,8 @@ interface PronunciationControlProps {
   className?: string;
   /** On phones show only the icon (label stays available to screen readers) */
   collapse?: boolean;
+  /** Turned off (and not tappable) while something else is using the sound, e.g. the microphone is listening */
+  disabled?: boolean;
 }
 
 const MESSAGES: Partial<Record<SpeakOutcome, string>> = {
@@ -30,7 +32,7 @@ const MESSAGES: Partial<Record<SpeakOutcome, string>> = {
  * A "hear it again" button. Playing is fire-and-forget: the button never waits
  * on audio, so animations and taps stay instant; if audio fails it says so kindly.
  */
-export function PronunciationControl({ label, onPlay, accent = 'sky', variant = 'secondary', size = 'md', icon = 'speaker', className = '', collapse = false }: PronunciationControlProps) {
+export function PronunciationControl({ label, onPlay, accent = 'sky', variant = 'secondary', size = 'md', icon = 'speaker', className = '', collapse = false, disabled = false }: PronunciationControlProps) {
   const { soundEnabled } = usePlayLab();
   const { speaking } = useAudioStatus();
   const [note, setNote] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function PronunciationControl({ label, onPlay, accent = 'sky', variant = 
 
   return (
     <span className={`inline-flex flex-col items-start gap-1 ${className}`}>
-      <Button variant={variant} accent={accent} size={size} icon={soundEnabled ? icon : 'speaker-off'} onClick={handle} aria-label={label}>
+      <Button variant={variant} accent={accent} size={size} icon={soundEnabled ? icon : 'speaker-off'} onClick={handle} aria-label={label} disabled={disabled}>
         <span className={collapse ? 'sr-only sm:not-sr-only' : undefined}>{label}</span>
         {speaking ? (
           <span aria-hidden="true" className="ml-1 inline-flex h-4 items-end gap-0.5">

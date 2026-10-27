@@ -24,6 +24,8 @@ export async function installFakeSpeech(page: Page) {
   await page.addInitScript(() => {
     const spoken: string[] = [];
     (window as unknown as { __spoken: string[] }).__spoken = spoken;
+    // shared with installScriptedSpeech: what the microphone and the speech did, in order ("mic on", "mic off", "say:<text>")
+    const events = ((window as unknown as { __events?: string[] }).__events ??= []);
     class FakeUtterance {
       text: string;
       lang = '';
@@ -44,6 +46,7 @@ export async function installFakeSpeech(page: Page) {
       getVoices: () => [{ name: 'Fake Voice', lang: 'en-US', localService: true }],
       speak(u: FakeUtterance) {
         spoken.push(u.text);
+        events.push(`say:${u.text}`);
         setTimeout(() => {
           u.onstart?.();
           setTimeout(() => u.onend?.(), 20);
@@ -55,6 +58,8 @@ export async function installFakeSpeech(page: Page) {
 }
 
 export const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
+/** What the microphone and the speech did, in order (see installFakeSpeech and installScriptedSpeech). */
+export const events = (page: Page) => page.evaluate(() => (window as unknown as { __events: string[] }).__events);
 
 /**
  * Replace the browser's speech recogniser with a scripted one. The test decides what the browser "hears" (`transcript`), how it
@@ -65,6 +70,8 @@ export async function installScriptedSpeech(page: Page, options: { supported?: b
   await page.addInitScript((supported: boolean) => {
     const script = { transcript: '', error: null as string | null, hold: false, noStart: false, starts: 0 };
     (window as unknown as { __speech: typeof script }).__speech = script;
+    // shared with installFakeSpeech: the order of microphone and speech events
+    const events = ((window as unknown as { __events?: string[] }).__events ??= []);
     class ScriptedRecognizer {
       lang = '';
       continuous = false;
@@ -77,6 +84,7 @@ export async function installScriptedSpeech(page: Page, options: { supported?: b
       aborted = false;
       start() {
         script.starts += 1;
+        events.push('mic on');
         // a browser that never starts: no start event, no error, no end
         if (script.noStart) return;
         setTimeout(() => {
@@ -92,9 +100,11 @@ export async function installScriptedSpeech(page: Page, options: { supported?: b
         this.onend?.();
       }
       stop() {
+        events.push('mic off');
         this.finish();
       }
       abort() {
+        events.push('mic off');
         this.aborted = true;
       }
     }

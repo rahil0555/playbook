@@ -3,9 +3,10 @@ import { useSpeech } from '../hooks/useAudio';
 import { sfxDurationMs, type Scheduled } from '../services/audioService';
 import type { PhonemeId } from '../types/learning';
 import { createRepeatGate } from './gate';
+import { SPEECH_AFTER_SOUND_MS } from './timing';
 
-/** A spoken line starts this long after the pop or chime before it, so the two never overlap. */
-export const SPEECH_AFTER_SOUND_MS = 170;
+export { SPEECH_AFTER_SOUND_MS } from './timing';
+
 /** Silence between the end of a fanfare and the spoken line that follows it. */
 export const SPEECH_AFTER_FANFARE_GAP_MS = 120;
 /** A celebration's spoken line waits for the whole fanfare (its real length, not a guess) and a short gap. */

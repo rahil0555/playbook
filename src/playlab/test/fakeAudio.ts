@@ -1,5 +1,6 @@
 import type { AudioService, AudioSnapshot, PlayRequest, Scheduled, SpeakOutcome } from '../services/audioService';
 import { listEnglishVoices, type VoiceLike } from '../services/voiceCatalog';
+import { order } from './order';
 
 /** Every request that reached the (fake) audio service, in order. Clip-only requests are here too (see `clipOnly`). */
 export const audioLog: PlayRequest[] = [];
@@ -41,6 +42,11 @@ export function createFakeAudio(): AudioService {
   };
   /** lines and recordings waiting for their moment: each one is its cancel function */
   const waiting = new Set<() => void>();
+  /** listeners told before anything plays (see onBeforePlay), as in the real service */
+  const beforePlay = new Set<() => void>();
+  const announceBeforePlay = () => beforePlay.forEach((listener) => listener());
+  /** the microphone is listening: sound effects are off, as in the real service (see setListening) */
+  let listening = false;
 
   /** Plays one request the way the real service does: a recording (for `clipOnly`, never speech), or a spoken line. */
   const playNow = (req: PlayRequest): Promise<SpeakOutcome> => {
@@ -49,6 +55,7 @@ export function createFakeAudio(): AudioService {
     if (req.clipOnly) {
       note('clip', req.text);
       if (!req.src) return Promise.resolve('unsupported'); // no recording: nothing is said in its place
+      announceBeforePlay();
       return new Promise((resolve) => {
         // a looping recording has no end: it plays until it is cancelled (stopped, or let go)
         const t = req.loop
@@ -66,7 +73,9 @@ export function createFakeAudio(): AudioService {
         waiting.add(cancel);
       });
     }
+    announceBeforePlay();
     note('say', req.text);
+    order.push(`say:${req.text}`);
     return Promise.resolve('played');
   };
 
@@ -105,8 +114,18 @@ export function createFakeAudio(): AudioService {
       return Object.assign(cancel, { done });
     },
     sfx: (name) => {
+      if (listening) return;
       sfxLog.push(name);
       note('sfx', name);
+    },
+    setListening: (on) => {
+      listening = on;
+    },
+    onBeforePlay: (listener) => {
+      beforePlay.add(listener);
+      return () => {
+        beforePlay.delete(listener);
+      };
     },
     setMuted: (m) => set({ muted: m }),
     setVoice: (id) => {

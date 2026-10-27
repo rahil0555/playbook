@@ -71,6 +71,11 @@ export interface ListenCallbacks {
    * note from this module): it is for the diagnostic log only, and never contains audio or what was said.
    */
   onError: (kind: VoiceErrorKind, error: string) => void;
+  /**
+   * optional: what the browser thinks it hears so far. It may still change and is never judged; only the final transcript is.
+   * Asking for it turns on the browser's interim results, so leave it out where only the final answer matters.
+   */
+  onInterim?: (transcript: string) => void;
 }
 
 export interface Listening {
@@ -148,7 +153,7 @@ export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: L
 
   rec.lang = opts.lang;
   rec.continuous = false;
-  rec.interimResults = false;
+  rec.interimResults = Boolean(cb.onInterim);
   rec.maxAlternatives = 1;
   rec.onstart = () => {
     if (done) return;
@@ -158,9 +163,11 @@ export function listenOnce(create: RecognizerFactory, opts: ListenOptions, cb: L
     cb.onListening();
   };
   rec.onresult = (event) => {
+    if (done) return;
     const last = event.results[event.results.length - 1];
     const best = last?.[0];
     if (last?.isFinal && best) heard = { transcript: best.transcript, confidence: usableConfidence(best.confidence) };
+    else if (best?.transcript.trim()) cb.onInterim?.(best.transcript);
   };
   rec.onerror = (event) => finish(() => cb.onError(voiceErrorKind(event.error), event.error));
   rec.onend = () => finish(() => (heard && heard.transcript.trim() ? cb.onResult(heard) : cb.onError('no-speech', 'no-speech-event')));

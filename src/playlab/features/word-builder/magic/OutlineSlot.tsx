@@ -51,6 +51,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
       type="button"
       data-magic-slot={index}
       data-state={filled ? 'filled' : over ? 'over' : hinted ? 'hint' : 'empty'}
+      data-landed={landed ? 'true' : 'false'}
       aria-label={label}
       aria-disabled={filled}
       onClick={() => !filled && onActivate(index)}

@@ -7,6 +7,7 @@ import {
   type RecognizerFactory,
   type VoiceErrorKind,
 } from '../services/speechInput/recognizer';
+import type { AudioService } from '../services/audioService';
 import { describeVoiceEnvironment, failureFor, logVoiceFailure, type VoiceFailure } from '../services/speechInput/diagnosis';
 
 /** Where a voice answer is. `checking_support` lasts only until the browser has been asked; `error` also covers "unsupported". */
@@ -21,6 +22,13 @@ export interface SpeechRecognitionOptions {
   createRecognizer?: RecognizerFactory;
   /** after this long, listening ends by itself */
   timeoutMs?: number;
+  /** what the browser hears so far, while the child is still speaking. Shown only; the final answer is what is judged. */
+  onInterim?: (transcript: string) => void;
+  /**
+   * the app's speech. Before the app speaks, listening stops and judges nothing, so the app's own voice is never heard as the
+   * child's answer. Leave it out where the app does not speak during listening.
+   */
+  audio?: Pick<AudioService, 'onBeforePlay' | 'stop' | 'setListening'>;
 }
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -51,11 +59,11 @@ function hasRecognizer(factory: RecognizerFactory): boolean {
  * A failure is first shown as its most likely reason, then refined once the page's own settings have been read (insecure page,
  * frame, site setting). Each failure is logged once, with the browser's error name and those settings, never audio or speech.
  */
-export function useSpeechRecognition({ language, onResult, createRecognizer, timeoutMs = DEFAULT_TIMEOUT_MS }: SpeechRecognitionOptions) {
+export function useSpeechRecognition({ language, onResult, onInterim, audio, createRecognizer, timeoutMs = DEFAULT_TIMEOUT_MS }: SpeechRecognitionOptions) {
   const factory = useMemo(() => createRecognizer ?? browserRecognizer(), [createRecognizer]);
   // the latest callbacks: a session started earlier still reports to the question that is on screen now
-  const latest = useRef({ language, onResult });
-  latest.current = { language, onResult };
+  const latest = useRef({ language, onResult, onInterim, audio });
+  latest.current = { language, onResult, onInterim, audio };
 
   const [state, setState] = useState<SpeechRecognitionState>('checking_support');
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
@@ -79,6 +87,7 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
       session.current?.cancel();
       session.current = null;
       clearTimeout(heardTimer.current);
+      latest.current.audio?.setListening(false);
     };
   }, [factory]);
 
@@ -87,22 +96,33 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
     if (session.current) return;
     const id = ++sessionNo.current;
     const current = () => id === sessionNo.current;
+    // interim results are asked for only by a caller that shows them; everyone else keeps the final answer only
+    const wantsInterim = latest.current.onInterim !== undefined;
     // set when the session ends at once (for example, the recogniser refuses to start): then there is no session to keep
     const ended = { value: false };
     const end = () => {
       ended.value = true;
       session.current = null;
+      // the verdict's own sound (if any) is played after this, so it is not lost to the listening rule
+      latest.current.audio?.setListening(false);
     };
     clearTimeout(heardTimer.current);
     setErrorKind(null);
     setFailure(null);
     setHeard(null);
     setState('requesting_permission');
+    // sound effects are off from now until this session ends, so none can be picked up by the microphone (see setListening)
+    latest.current.audio?.setListening(true);
 
     const handle = listenOnce(factory, { lang: recognitionLanguage(latest.current.language), timeoutMs }, {
       onListening: () => {
         if (current()) setState('listening');
       },
+      onInterim: wantsInterim
+        ? (text) => {
+            if (current()) latest.current.onInterim?.(text);
+          }
+        : undefined,
       onResult: (result) => {
         if (!current()) return;
         end();
@@ -140,10 +160,14 @@ export function useSpeechRecognition({ language, onResult, createRecognizer, tim
     sessionNo.current += 1;
     session.current.cancel();
     session.current = null;
+    latest.current.audio?.setListening(false);
     setErrorKind(null);
     setFailure(null);
     setState('idle');
   }, []);
+
+  // before the app speaks, listening stops first (cancel, so nothing it heard is judged), and the app's own voice is never heard
+  useEffect(() => audio?.onBeforePlay(stop), [audio, stop]);
 
   return { state, errorKind, failure, heard, start, stop };
 }

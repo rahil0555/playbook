@@ -4,7 +4,8 @@
  *  - Voice: PlayLab ships NO recorded voice files. By default it asks the
  *    browser's built-in speech synthesis (Web Speech API) to say things, so
  *    pronunciation depends on the browser, the operating system and the
- *    installed voices. Isolated phonemes ("buh") are only approximated.
+ *    installed voices. Browser speech cannot say a sound on its own (such as
+ *    "b"), so the app never asks it to: a sound is heard inside an example word.
  *    If a clip URL is supplied (`src`), that file is played instead and speech
  *    is only the fallback.
  *  - Sound effects: tiny tones synthesized with the Web Audio API (no files).
@@ -17,13 +18,10 @@ import { listEnglishVoices, resolveVoice, type VoiceOption } from './voiceCatalo
 /**
  * Speech style, in ONE place for easy tuning. Browser voices differ a lot, so keep these conservative:
  * a little slower than normal for young listeners, with only a slight lift in pitch.
- * Isolated phonics sounds are slower still so each sound stays clean.
  */
 export const SPEECH_STYLE = {
   rate: 0.9,
   pitch: 1.05,
-  /** isolated letter sounds ("buh", "sss") */
-  soundRate: 0.8,
 } as const;
 
 /**
@@ -54,6 +52,8 @@ export interface PlayRequest {
   loop?: boolean;
   rate?: number;
   pitch?: number;
+  /** in a sequence only: a short breath before this line, between an instruction and the example word */
+  pauseBeforeMs?: number;
   /**
    * Use this English voice id for this request only (used by the Settings preview, so previewing never saves).
    * `undefined` = the saved preference; `null` = automatic.
@@ -86,6 +86,17 @@ export interface AudioService {
    */
   later(request: PlayRequest, delayMs: number): Scheduled;
   sfx(name: SfxName): void;
+  /**
+   * Called just before the app starts to play a line or a recording, so a listener can stop first. The microphone uses this:
+   * it stops before the app speaks, so the app's own voice is never heard as the child's answer. Returns a function that
+   * removes the listener.
+   */
+  onBeforePlay(listener: () => void): () => void;
+  /**
+   * Turns sound effects off while the child's microphone is listening. A tone played then can be picked up by the microphone,
+   * and it distracts the child from answering. Spoken lines are already stopped before they play (see onBeforePlay).
+   */
+  setListening(listening: boolean): void;
   setMuted(muted: boolean): void;
   /** Choose the voice for future speech (null = automatic). Unknown/stale ids fall back to automatic. */
   setVoice(voiceId: string | null): void;
@@ -167,6 +178,19 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
    * the end, when the only reference to an utterance is garbage-collected mid-sentence.
    */
   const inFlight = new Set<SpeechSynthesisUtterance>();
+  /** told just before a line or a recording starts (see onBeforePlay) */
+  const beforePlay = new Set<() => void>();
+  /** the microphone is listening: sound effects are off then (see setListening) */
+  let listening = false;
+  const announceBeforePlay = () => {
+    [...beforePlay].forEach((listener) => {
+      try {
+        listener();
+      } catch {
+        /* a listener must never stop a line from playing */
+      }
+    });
+  };
 
   const set = (patch: Partial<AudioSnapshot>) => {
     const next = { ...snapshot, ...patch };
@@ -345,9 +369,11 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       if (req.clipOnly) {
         // a recording only: with no recording there is nothing to play, and nothing is spoken instead
         if (!req.src) return 'unsupported';
+        announceBeforePlay();
         cancelSpeech();
         return (await playClip(req.src, req.loop)) ? 'played' : 'error';
       }
+      announceBeforePlay();
       if (req.src && (await playClip(req.src))) return 'played';
       // speech never starts on top of a recording that is still playing; with none playing, a line is spoken at once
       if (endClip) await clipIdle;
@@ -398,6 +424,10 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       let last: SpeakOutcome = 'played';
       for (const req of requests) {
         if (mine !== token) break;
+        if (req.pauseBeforeMs) {
+          await new Promise<void>((resolve) => setTimeout(resolve, req.pauseBeforeMs));
+          if (mine !== token) break;
+        }
         last = await play(req);
         if (last !== 'played') break;
       }
@@ -424,7 +454,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       return Object.assign(cancel, { done });
     },
     sfx(name) {
-      if (snapshot.muted) return;
+      if (snapshot.muted || listening) return;
       try {
         const c = getCtx();
         if (!c) return;
@@ -446,6 +476,15 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       } catch {
         /* sound effects are optional */
       }
+    },
+    onBeforePlay(listener) {
+      beforePlay.add(listener);
+      return () => {
+        beforePlay.delete(listener);
+      };
+    },
+    setListening(on) {
+      listening = on;
     },
     setMuted(muted) {
       if (muted) stop();

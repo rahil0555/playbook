@@ -11,11 +11,13 @@ import { LikeButton } from '../../components/LikeButton';
 import { ProgressIndicator } from '../../components/ProgressIndicator';
 import { PronunciationControl } from '../../components/PronunciationControl';
 import { Companion } from '../../components/Companion';
+import { VoiceTaskPanel } from '../../components/VoiceTaskPanel';
 import { getActivity, nextActivityId } from '../../data/activities';
 import { useSpeech } from '../../hooks/useAudio';
 import { Illustration } from '../../illustrations/Illustration';
 import { letterColor } from '../../lib/accents';
 import { animationFor, springs } from '../../motion/variants';
+import { letterNameTask } from '../../services/speechInput/tasks';
 import type { LetterEntry } from '../../types/learning';
 
 /** Letters to discover per round before a star is awarded. */
@@ -34,13 +36,15 @@ function HighlightedWord({ word, color }: { word: string; color: string }) {
 export default function AlphabetActivity() {
   const { content, recordStart, recordCompletion, exploreLetter, navigate } = usePlayLab();
   const { lifetime } = useProgressState();
-  const { sayLetterName, sayWord, sfx } = useSpeech();
+  const { sayLetterName, sayLetterSound, sayWord, sfx } = useSpeech();
   const letters = content.letters;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [replays, setReplays] = useState(0);
   const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
   const [goalDone, setGoalDone] = useState(false);
+  /** true while the child's microphone is on: the speech buttons are off then, so nothing is said over the child */
+  const [listening, setListening] = useState(false);
   const { burst, fire, clear } = useBurst();
   const upperRef = useRef<AnimatedLetterHandle>(null);
   const lowerRef = useRef<AnimatedLetterHandle>(null);
@@ -125,7 +129,9 @@ export default function AlphabetActivity() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-8">
         {/* ------------------------------- stage ------------------------------- */}
-        <div className="sticky top-2 z-20 lg:top-4 lg:self-start">
+        {/* on a phone and a tablet the stage scrolls away with the page, so it never covers the letter grid. On desktop it sits beside the
+            grid and scrolls with the page too: the grid is shorter than the stage, so a sticky stage would have nothing to move within */}
+        <div className="lg:self-start">
           <section
             aria-label="Selected letter"
             className="pl-board relative overflow-hidden rounded-[2.4rem] p-3 sm:p-5"
@@ -143,6 +149,7 @@ export default function AlphabetActivity() {
                         label={`Uppercase ${selected.upper}. Tap to hear it again`}
                         className="h-[4.6rem] w-[3.9rem] text-[4.2rem] sm:h-[9rem] sm:w-[8rem] sm:text-[8rem] lg:h-[11.5rem] lg:w-[10rem] lg:text-[10.5rem]"
                         draggable
+                        disabled={listening}
                         onTap={replay}
                       />
                       <p className="sr-only sm:not-sr-only sm:text-sm sm:font-semibold sm:uppercase sm:tracking-wide sm:text-ink-soft">Big</p>
@@ -156,6 +163,7 @@ export default function AlphabetActivity() {
                         label={`Lowercase ${selected.lower}. Tap to hear it again`}
                         className="h-[4.6rem] w-[3.6rem] text-[4.2rem] sm:h-[9rem] sm:w-[7rem] sm:text-[8rem] lg:h-[11.5rem] lg:w-[9rem] lg:text-[10.5rem]"
                         draggable
+                        disabled={listening}
                         onTap={replay}
                       />
                       <p className="sr-only sm:not-sr-only sm:text-sm sm:font-semibold sm:uppercase sm:tracking-wide sm:text-ink-soft">Small</p>
@@ -175,12 +183,22 @@ export default function AlphabetActivity() {
                   </div>
 
                   <div className="flex w-full flex-wrap justify-center gap-2">
-                    <PronunciationControl label="Say it" collapse accent="coral" onPlay={() => sayLetterName(selected)} />
-                    <PronunciationControl label="Hear the word" collapse accent="sky" onPlay={() => sayWord(selected.word.text, selected.audio?.word)} />
-                    <Button variant="primary" accent="coral" icon="replay" onClick={replay} aria-label="Play again">
+                    <PronunciationControl label="Say it" collapse accent="coral" disabled={listening} onPlay={() => sayLetterName(selected)} />
+                    <PronunciationControl label="Hear the sound" collapse accent="plum" disabled={listening} onPlay={() => sayLetterSound(selected)} />
+                    <PronunciationControl label="Hear the word" collapse accent="sky" disabled={listening} onPlay={() => sayWord(selected.word.text, selected.audio?.word)} />
+                    <Button variant="primary" accent="coral" icon="replay" onClick={replay} aria-label="Play again" disabled={listening}>
                       <span className="sr-only sm:not-sr-only">Play again</span>
                     </Button>
                     <LikeButton kind="letter" id={selected.id} label={`${selected.upper}${selected.lower}`} />
+                  </div>
+                  <div className="w-full">
+                    <VoiceTaskPanel
+                      key={selected.id}
+                      task={letterNameTask(selected)}
+                      prompt="Say the letter's name."
+                      playModel={() => sayLetterName(selected)}
+                      onListeningChange={setListening}
+                    />
                   </div>
                   <p className="sr-only" role="status">
                     Selected uppercase {selected.upper} and lowercase {selected.lower}. {selected.upper} is for {selected.word.text}.

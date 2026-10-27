@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { englishLetters } from '../../data/en/alphabet';
+import { SOUND_LEAD_IN } from '../../hooks/useAudio';
 import { audioLog } from '../../test/fakeAudio';
 import { renderPlayLab } from '../../test/utils';
 
@@ -20,11 +21,12 @@ describe('Phonics: discover', () => {
     await user.click(screen.getByRole('button', { name: 'Say the name' }));
     expect(audioLog.at(-1)?.text).toBe('ay');
     await user.click(screen.getByRole('button', { name: 'Play the sound' }));
-    expect(audioLog.at(-1)?.text).toBe('aah');
+    // the sound is heard inside its example word, never as a made-up respelling
+    expect(audioLog.slice(-2).map((r) => r.text)).toEqual([SOUND_LEAD_IN, 'apple']);
     await user.click(screen.getByRole('button', { name: 'Hear the word' }));
     expect(audioLog.at(-1)?.text).toBe('apple');
     await user.click(screen.getByRole('button', { name: 'Hear all three' }));
-    expect(audioLog.slice(-3).map((r) => r.text)).toEqual(['ay', 'aah', 'apple']);
+    expect(audioLog.slice(-3).map((r) => r.text)).toEqual(['ay', SOUND_LEAD_IN, 'apple']);
   });
 
   it('switches letters from the grid', async () => {

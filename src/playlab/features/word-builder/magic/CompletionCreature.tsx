@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { Mascot } from '../../../components/Mascot';
 import { StarBurst } from '../../../moments/StarBurst';
+import { CREATURE_HOP_MS } from '../../../moments/timing';
 
-/** How long Pip takes to hop from the picture onto the word. The landing (the squash, the burst and the fanfare) happens at its end. */
-export const CREATURE_HOP_MS = 480;
+export { CREATURE_HOP_MS } from '../../../moments/timing';
 
 interface CompletionCreatureProps {
   /** counts each completion: the hop plays again only when this changes (0 = not yet) */

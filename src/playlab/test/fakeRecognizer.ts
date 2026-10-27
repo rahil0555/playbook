@@ -1,4 +1,5 @@
 import type { RecognizerFactory, SpeechRecognizerLike } from '../services/speechInput/recognizer';
+import { order } from './order';
 
 /** A browser recogniser a test drives by hand: it records what it was asked to do and fires events on demand. */
 export class FakeRecognizer implements SpeechRecognizerLike {
@@ -15,12 +16,15 @@ export class FakeRecognizer implements SpeechRecognizerLike {
   aborted = false;
   start() {
     this.started = true;
+    order.push('mic on');
   }
   stop() {
     this.stopped = true;
+    order.push('mic off');
   }
   abort() {
     this.aborted = true;
+    order.push('mic off');
   }
   begin() {
     this.onstart?.();

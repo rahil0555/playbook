@@ -160,15 +160,51 @@ test.describe('Missing Letter: the letter travels into the gap', () => {
     throw new Error('none of the choices was the right letter');
   }
 
+  /**
+   * Records, in page time, each change to what the child can see here: the gap, the flight, and the feedback line. It is only read
+   * if the test fails (see expectNextVisible), so a rare failure leaves a timeline behind instead of only a timeout.
+   */
+  async function watchFeedback(page: Page) {
+    await page.evaluate(() => {
+      const log: string[] = [];
+      (window as unknown as { __feedback: string[] }).__feedback = log;
+      const started = performance.now();
+      let last = '';
+      new MutationObserver(() => {
+        const blank = document.querySelector('[data-blank]')?.textContent ?? '';
+        const flying = document.querySelectorAll('[data-magic-flight]').length;
+        const feedback = [...document.querySelectorAll('h2, h3, p, strong')].map((e) => e.textContent ?? '').find((t) => /Hooray|Which letter|Try again|needs the letter/.test(t)) ?? '';
+        const next = [...document.querySelectorAll('button')].some((b) => /^(Next word|Finish)$/.test(b.textContent?.trim() ?? ''));
+        const state = `gap="${blank}" flying=${flying} next=${next} feedback="${feedback.slice(0, 40)}"`;
+        if (state !== last) {
+          last = state;
+          log.push(`${(performance.now() - started).toFixed(0)} ms ${state}`);
+        }
+      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+    });
+  }
+
+  /** The Next/Finish button must appear; on a failure the recorded timeline is attached to the report first. */
+  async function expectNextVisible(page: Page) {
+    try {
+      await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    } catch (error) {
+      const timeline = await page.evaluate(() => (window as unknown as { __feedback?: string[] }).__feedback ?? []);
+      await test.info().attach('missing-letter-timeline.txt', { body: timeline.join('\n') || '(nothing recorded)', contentType: 'text/plain' });
+      throw error;
+    }
+  }
+
   test('the missing letter is not shown before it is chosen, and flies into the gap when it is', async ({ page }) => {
     await recordMoments(page);
     await openMissingLetter(page);
+    await watchFeedback(page);
     const gap = page.locator('[data-blank]');
     await expect(gap).toHaveText('');
     const { flying } = await pickMissingLetter(page);
     expect(flying, 'the chosen letter flies out of its button').toBe(true);
     await expect(gap).toHaveText(/^[a-z]$/i, { timeout: 2000 });
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expectNextVisible(page);
     expect((await tones(page)).find((t) => t.f === 523), 'the celebration sound plays').toBeTruthy();
   });
 

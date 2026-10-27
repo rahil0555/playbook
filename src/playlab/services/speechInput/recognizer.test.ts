@@ -68,6 +68,22 @@ describe('listenOnce: one phrase, one outcome', () => {
     expect(cb.onError).not.toHaveBeenCalled();
   });
 
+  it('interim results are asked for only by a caller that shows them, and never replace the final answer', () => {
+    const { made, factory, cb } = setup();
+    const onInterim = vi.fn();
+    listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, { ...cb, onInterim });
+    const r = made[0]!;
+    expect(r.interimResults, 'interim results are on when a caller shows them').toBe(true);
+    r.begin();
+    r.onresult?.({ results: [{ isFinal: false, length: 1, 0: { transcript: 'bal' } }] });
+    expect(onInterim).toHaveBeenCalledWith('bal');
+    r.heard('ball', 0.9);
+    r.onresult?.({ results: [{ isFinal: false, length: 1, 0: { transcript: 'ball ball' } }] });
+    r.end();
+    expect(cb.onResult).toHaveBeenCalledTimes(1);
+    expect(cb.onResult).toHaveBeenCalledWith({ transcript: 'ball', confidence: 0.9 });
+  });
+
   it('a confidence of exactly 0 is not a measurement: it is reported as unknown, not as "not confident"', () => {
     const { made, factory, cb } = setup();
     listenOnce(factory, { lang: 'en-US', timeoutMs: 8000 }, cb);

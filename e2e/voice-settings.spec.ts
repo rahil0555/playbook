@@ -123,15 +123,17 @@ test.describe('voice selector', () => {
     await expect(select(page)).toHaveValue('');
   });
 
-  test('speech style: conservative defaults, and isolated sounds are spoken slower', async ({ page }) => {
+  test('speech style: conservative defaults, and a letter sound is heard in its example word at the same rate', async ({ page }) => {
     await installSynth(page, DEVICE);
     await page.goto('/#/phonics');
     await page.getByRole('button', { name: 'Say the name' }).click();
     await expect.poll(async () => (await spoken(page)).length).toBe(1);
     expect(await spoken(page)).toMatchObject([{ rate: 0.9, pitch: 1.05 }]);
     await page.getByRole('button', { name: 'Play the sound' }).click();
-    await expect.poll(async () => (await spoken(page)).length).toBe(2);
-    expect((await spoken(page))[1]).toMatchObject({ text: 'aah', rate: 0.8, pitch: 1.05 });
+    await expect.poll(async () => (await spoken(page)).length).toBe(3);
+    // the lead-in and the example word are spoken at the normal rate: a slowed word would be distorted, not clearer
+    expect((await spoken(page))[1]).toMatchObject({ text: 'Listen for the sound in', rate: 0.9, pitch: 1.05 });
+    expect((await spoken(page))[2]).toMatchObject({ text: 'apple', rate: 0.9, pitch: 1.05 });
   });
 
   test('with Sound off, Preview explains instead of speaking, and nothing is spoken', async ({ page }) => {

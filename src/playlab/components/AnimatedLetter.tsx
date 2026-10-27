@@ -22,6 +22,8 @@ interface AnimatedLetterProps {
   pressed?: boolean;
   /** Plain (non-interactive) glyph, e.g. inside a tile that is already a button */
   decorative?: boolean;
+  /** Not tappable (and dimmed) while something else is using the sound, e.g. the microphone is listening */
+  disabled?: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ interface AnimatedLetterProps {
  * handler; nothing awaits audio or state.
  */
 export const AnimatedLetter = forwardRef<AnimatedLetterHandle, AnimatedLetterProps>(function AnimatedLetter(
-  { glyph, color, animation, className = '', onTap, draggable = false, label, pressed, decorative = false },
+  { glyph, color, animation, className = '', onTap, draggable = false, label, pressed, decorative = false, disabled = false },
   ref,
 ) {
   const controls = useAnimationControls();
@@ -64,10 +66,11 @@ export const AnimatedLetter = forwardRef<AnimatedLetterHandle, AnimatedLetterPro
   return (
     <motion.button
       type="button"
+      disabled={disabled}
       animate={controls}
       aria-label={label}
       aria-pressed={pressed}
-      whileTap={{ scale: 0.9 }}
+      whileTap={disabled ? undefined : { scale: 0.9 }}
       {...(draggable
         ? {
             drag: true,
@@ -90,7 +93,7 @@ export const AnimatedLetter = forwardRef<AnimatedLetterHandle, AnimatedLetterPro
         onRippleClick(e);
         trigger();
       }}
-      className={`relative inline-flex select-none items-center justify-center font-display font-bold leading-none ${draggable ? 'pl-draggable cursor-grab active:cursor-grabbing' : ''} ${className}`}
+      className={`relative inline-flex select-none items-center justify-center font-display font-bold leading-none disabled:opacity-60 ${draggable ? 'pl-draggable cursor-grab active:cursor-grabbing' : ''} ${className}`}
       style={{ color }}
     >
       {rippleLayer}
