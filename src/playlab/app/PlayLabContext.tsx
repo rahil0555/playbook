@@ -15,15 +15,12 @@ import type { PlayLabLearner } from '../types/api';
 
 export interface PlayLabContextValue {
   content: ContentPack;
+  /** the level every child plays at (all the words and stories); a host that passes `level` sets it */
   level: DifficultyLevel;
-  /** true when the host passed `level`, so the in-app picker is hidden */
+  /** true when the host passed `level` */
   levelLocked: boolean;
-  setLevel: (level: DifficultyLevel) => void;
   soundEnabled: boolean;
   setSoundEnabled: (on: boolean) => void;
-  /** Saved browser voice id (null = automatic) */
-  voice: string | null;
-  setVoice: (voiceId: string | null) => void;
   /** OS preference OR host-forced */
   reducedMotion: boolean;
   audio: AudioService;

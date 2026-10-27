@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
-import { LetterMonster } from '../../../components/LetterMonster';
+import { LetterTileFace } from '../../../components/LetterTile';
 import { wave } from '../../../motion/variants';
 import { SnapBurst } from '../../../moments/SnapBurst';
 import { StarBurst } from '../../../moments/StarBurst';
@@ -86,7 +86,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
           ) : null}
           {/* hop wave when the word is finished */}
           <motion.span initial="idle" animate={done ? 'go' : 'idle'} custom={index} variants={wave} className="block h-full w-full">
-            {/* squash-and-stretch as the monster snaps in */}
+            {/* squash-and-stretch as the tile snaps into its spot */}
             <motion.span
               aria-hidden="true"
               className="relative block h-full w-full"
@@ -94,7 +94,9 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
               animate={snap ? { scaleX: [1.25, 0.88, 1.05, 1], scaleY: [0.74, 1.2, 0.96, 1], y: [4, -12, 0, -3, 0] } : { scaleX: 1, scaleY: 1, y: 0 }}
               transition={{ duration: 0.46, ease: 'easeOut' }}
             >
-              <LetterMonster letter={letter} color={color} mood={celebrated ? 'cheer' : 'idle'} bounce={celebrated && !reducedMotion} phase={index * 0.2} blinkDelay={(index * 0.9) % 4} />
+              <span className={`block h-full w-full ${celebrated && !reducedMotion ? 'pl-tile-cheer' : ''}`}>
+                <LetterTileFace text={letter} color={color} />
+              </span>
             </motion.span>
           </motion.span>
           {fresh ? <SnapBurst color={color} seed={index + 1} count={grand ? 16 : 10} /> : null}

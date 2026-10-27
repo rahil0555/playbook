@@ -28,14 +28,12 @@ describe('Alphabet playground', () => {
     expect(await screen.findByText('Letter Explorer', {}, { timeout: 8000 })).toBeInTheDocument();
   }, 40_000);
 
-  it('plays a tone and the letter name on tap, and never needs audio to animate or select', async () => {
+  it('plays a tone on tap, then the teacher gives the letter’s instruction, and never needs audio to animate or select', async () => {
     const { user } = renderPlayLab({ initialActivity: 'alphabet' });
     await user.click(await tile('b'));
     expect(sfxLog).toContain('pop');
-    expect(audioLog.at(-1)?.text).toBe('bee');
-    // pronunciation controls on the stage
-    await user.click(screen.getByRole('button', { name: 'Hear the word' }));
-    expect(audioLog.at(-1)?.text).toBe('ball');
+    expect(audioLog.some((r) => r.text === 'Say B for ball!')).toBe(true);
+    expect(await screen.findByTestId('lesson-instruction')).toHaveTextContent('Say B for ball!');
   });
 
   it('supports keyboard activation (Enter and Space) on letters', async () => {
@@ -63,14 +61,12 @@ describe('Alphabet playground', () => {
     expect(a).toHaveFocus();
   });
 
-  it('replays the interaction: tapping the same letter again and "Play again" keep it selected and speak again', async () => {
+  it('tapping the same letter again keeps it selected and starts its lesson again', async () => {
     const { user } = renderPlayLab({ initialActivity: 'alphabet' });
     await user.click(await tile('e'));
-    const before = audioLog.length;
-    await user.click(screen.getByRole('button', { name: 'Play again' }));
-    expect(audioLog.length).toBe(before + 1);
     await user.click(await tile('e'));
     expect(await tile('e')).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByTestId('lesson-instruction')).toHaveTextContent('Say E for egg!');
   });
 
   it('completes the 5-letter goal once: fires onActivityComplete, then lets the child keep exploring', async () => {
@@ -88,8 +84,8 @@ describe('Alphabet playground', () => {
     expect(screen.getByText('Letters found: 0 of 5')).toBeInTheDocument();
   });
 
-  it('shows an encouraging prompt before any letter is chosen', async () => {
+  it('opens on A with the teacher’s instruction shown as text, so the lesson can be followed without hearing it', async () => {
     renderPlayLab({ initialActivity: 'alphabet' });
-    expect(await screen.findByText('Tap a letter!')).toBeInTheDocument();
+    expect(await screen.findByTestId('lesson-instruction')).toHaveTextContent('Say A for apple!');
   });
 });

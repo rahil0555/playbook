@@ -99,3 +99,39 @@ describe('resolveVoice', () => {
     expect(resolveVoice([...raw, V('Hindi', 'hi-IN')], 'hi-IN', 'daisy-uri')?.name).toBe('Hindi');
   });
 });
+
+describe('pickAutoVoice: the one teacher voice', () => {
+  it('prefers a named American teacher voice over a plain American voice', () => {
+    expect(pickAutoVoice([V('Local US', 'en-US'), V('Samantha (Enhanced)', 'en-US')], 'en-US')?.name).toBe('Samantha (Enhanced)');
+  });
+
+  it('keeps speech on the device when a preferred voice is installed there (no text sent to a vendor)', () => {
+    expect(pickAutoVoice([V('Microsoft Aria Online (Natural)', 'en-US', false), V('Microsoft Zira Desktop', 'en-US')], 'en-US')?.name).toBe(
+      'Microsoft Zira Desktop',
+    );
+  });
+
+  it('uses a preferred online voice when no preferred voice is on the device', () => {
+    expect(pickAutoVoice([V('Local US', 'en-US'), V('Google US English', 'en-US', false)], 'en-US')?.name).toBe('Google US English');
+  });
+
+  it('gives the same voice whatever order the browser lists the voices in', () => {
+    const voices = [V('Local US', 'en-US'), V('Samantha', 'en-US'), V('Zoe', 'en-US'), V('Google US English', 'en-US', false)];
+    const forward = pickAutoVoice(voices, 'en-US')?.name;
+    expect(forward).toBe('Samantha');
+    expect(pickAutoVoice([...voices].reverse(), 'en-US')?.name).toBe(forward);
+    expect(pickAutoVoice(voices, 'en-US')?.name).toBe(forward);
+  });
+
+  it('falls back to a stable American voice when none of the preferred ones is installed', () => {
+    const voices = [V('Zoe', 'en-US'), V('Local US', 'en-US'), V('Daisy', 'en-GB')];
+    expect(pickAutoVoice(voices, 'en-US')?.name).toBe('Local US');
+    expect(pickAutoVoice([...voices].reverse(), 'en-US')?.name).toBe('Local US');
+  });
+
+  it('a request for an English saved voice still beats the automatic teacher choice', () => {
+    const voices = [V('Samantha', 'en-US'), V('Daisy', 'en-GB', true, 'daisy')];
+    expect(resolveVoice(voices, 'en-US', 'daisy')?.name).toBe('Daisy');
+    expect(resolveVoice(voices, 'en-US', null)?.name).toBe('Samantha');
+  });
+});

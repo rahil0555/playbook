@@ -46,8 +46,8 @@ async function startSampler(page: Page) {
     const t0 = performance.now();
     const tick = () => {
       const fly = document.querySelector('[data-magic-flight]');
-      // the bubble is the monster's body (its centre is the flight's centre); a plain tile's letter is its centre
-      const bubble = (fly?.querySelector('.pl-monster') ?? fly?.querySelector('span.font-display')) as HTMLElement | null | undefined;
+      // the flying copy is one BOOK tile (its centre is the flight's centre)
+      const bubble = (fly?.querySelector('.pl-tile') ?? fly?.querySelector('span.font-display')) as HTMLElement | null | undefined;
       let flyer: Sample['flyer'] = null;
       if (bubble) {
         const r = bubble.getBoundingClientRect();

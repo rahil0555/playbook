@@ -407,6 +407,58 @@
 }
 /* gloss on buttons */
 .pl-root.pl-root .pl-gel { background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 58%); }
+/* ---- the letter tile (BOOK style, see components/LetterTile): one design everywhere. The letter is sized to the tile through
+   container units, so a placed letter in a smaller slot looks the same as the tray tile, only smaller. ---- */
+.pl-root.pl-root .pl-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  container-type: inline-size;
+  border-radius: 26%;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 70%, #ffffff) 0%, var(--tile) 46%, color-mix(in srgb, var(--tile) 78%, #000000) 100%);
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.4), inset 0 -6px 0 rgba(0, 0, 0, 0.14), 0 6px 0 color-mix(in srgb, var(--tile) 58%, #000000),
+    0 14px 18px -10px rgba(18, 49, 44, 0.5);
+}
+.pl-root.pl-root .pl-tile--word {
+  container-type: normal;
+  aspect-ratio: auto;
+  width: auto;
+  min-width: 4.75rem;
+  border-radius: 1.4rem;
+  padding-inline: 0.9rem;
+}
+.pl-root.pl-root .pl-tile__gloss {
+  position: absolute;
+  left: 14%;
+  top: 9%;
+  width: 40%;
+  height: 22%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+  transform: rotate(-14deg);
+  pointer-events: none;
+}
+.pl-root.pl-root .pl-tile__letter {
+  position: relative;
+  line-height: 1;
+  color: #ffffff;
+  font-size: 54cqw;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+.pl-root.pl-root .pl-tile--word .pl-tile__letter {
+  font-size: 1.7rem;
+  white-space: nowrap;
+}
+@media (min-width: 640px) {
+  .pl-root.pl-root .pl-tile--word .pl-tile__letter {
+    font-size: 2.1rem;
+  }
+}
+
 /* the word's slots: one row for every word (the longest is five letters); the squares shrink to fit a phone */
 .pl-root.pl-root .pl-slot-row {
   display: grid;
@@ -445,151 +497,6 @@
   50% { opacity: 1; transform: scale(1.08); }
 }
 .pl-aura { animation: pl-aura 1.6s ease-in-out infinite; }
-
-/* ---------- Magic Letters: the letter monsters and the storybook ---------- */
-
-@keyframes pl-eye-blink {
-  0%, 88%, 100% { transform: scaleY(1); }
-  92% { transform: scaleY(0.1); }
-}
-
-/* a letter is a squishy, glossy monster. Everything inside is sized in em: the font size is the monster's size. */
-.pl-root.pl-root .pl-monster {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  font-size: 1.36rem;
-  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.95) 0 7%, rgba(255, 255, 255, 0) 20%),
-    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--gem) 55%, white) 0%, var(--gem) 58%, color-mix(in srgb, var(--gem) 66%, black) 100%);
-  box-shadow:
-    inset 0 -0.42em 0 rgba(0, 0, 0, 0.13),
-    inset 0 0.16em 0.22em rgba(255, 255, 255, 0.38),
-    0 0.26em 0 color-mix(in srgb, var(--gem) 52%, black),
-    0 0.7em 0.9em -0.35em rgba(40, 20, 60, 0.42);
-}
-@media (min-width: 640px) {
-  .pl-root.pl-root .pl-monster {
-    font-size: 1.8rem;
-  }
-}
-/* two little feet */
-.pl-root.pl-root .pl-monster::before,
-.pl-root.pl-root .pl-monster::after {
-  content: '';
-  position: absolute;
-  bottom: -0.3em;
-  width: 0.9em;
-  height: 0.46em;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--gem) 60%, black);
-  box-shadow: inset 0 -0.1em 0 rgba(0, 0, 0, 0.15);
-}
-.pl-root.pl-root .pl-monster::before { left: 18%; }
-.pl-root.pl-root .pl-monster::after { right: 18%; }
-
-.pl-root.pl-root .pl-monster-eyes {
-  position: absolute;
-  left: 15%;
-  right: 15%;
-  top: 14%;
-  height: 40%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.pl-root.pl-root .pl-monster-eye {
-  position: relative;
-  width: 40%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 34%, #ffffff 0 52%, #e6edf8 100%);
-  box-shadow: inset 0 -0.12em 0 rgba(20, 30, 60, 0.14), 0 0.07em 0 rgba(0, 0, 0, 0.18);
-  transform-origin: center 60%;
-  animation: pl-eye-blink 4.6s ease-in-out infinite;
-  transition: scale 0.15s ease-out;
-}
-/* googly pupils: they roll toward the way the monster is moving (--lx / --ly, set by the component) */
-.pl-root.pl-root .pl-monster-pupil {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  width: 46%;
-  aspect-ratio: 1;
-  margin: -23% 0 0 -23%;
-  border-radius: 50%;
-  background: #1f1733;
-  transform: translate(calc(var(--lx, 0) * 0.16em), calc(var(--ly, 0) * 0.12em));
-  transition: transform 0.12s linear;
-}
-.pl-root.pl-root .pl-monster-pupil::after {
-  content: '';
-  position: absolute;
-  left: 22%;
-  top: 18%;
-  width: 26%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #fff;
-}
-
-/* the mouth: a smile, unless the mood says otherwise */
-.pl-root.pl-root .pl-monster-mouth {
-  position: absolute;
-  left: 50%;
-  top: 55%;
-  width: 34%;
-  height: 0.2em;
-  transform: translateX(-50%);
-  border-bottom: 0.14em solid #2a1838;
-  border-radius: 0 0 999px 999px;
-}
-.pl-root.pl-root .pl-monster--scream .pl-monster-mouth {
-  top: 54%;
-  width: 0.46em;
-  height: 0.46em;
-  border: 0;
-  border-radius: 50%;
-  background: #2a1838;
-}
-.pl-root.pl-root .pl-monster--cheer .pl-monster-mouth {
-  top: 53%;
-  width: 46%;
-  height: 0.5em;
-  border: 0;
-  background: #2a1838;
-  border-radius: 0 0 999px 999px;
-}
-.pl-root.pl-root .pl-monster--think .pl-monster-mouth {
-  top: 58%;
-  width: 24%;
-  border-radius: 0;
-}
-.pl-root.pl-root .pl-monster--oops .pl-monster-mouth {
-  top: 58%;
-  width: 26%;
-  border-bottom-width: 0.12em;
-  transform: translateX(-50%) rotate(-10deg);
-}
-.pl-root.pl-root .pl-monster--scream .pl-monster-eye { scale: 1.18; }
-.pl-root.pl-root .pl-monster--scream .pl-monster-pupil { scale: 0.62; }
-.pl-root.pl-root .pl-monster--oops .pl-monster-eye { scale: 0.9; }
-.pl-root.pl-root .pl-monster--cheer .pl-monster-eye { scale: 1.06; }
-
-.pl-root.pl-root .pl-monster-letter {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 3%;
-  text-align: center;
-  font-size: 1.12em;
-  font-weight: 800;
-  line-height: 1;
-  color: #fff;
-  text-shadow: 0 0.12em 0 rgba(40, 20, 60, 0.3);
-}
-.pl-root[data-motion='reduce'] .pl-monster-eye { animation: none; }
 
 /* storybook canvas: a pastel page with soft shadows, for the board, the word strip and the letter tray */
 .pl-root.pl-root .pl-story-board {

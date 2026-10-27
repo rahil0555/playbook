@@ -83,8 +83,30 @@ export function listEnglishVoices(raw: readonly VoiceLike[]): VoiceOption[] {
 }
 
 /**
- * Automatic choice for `lang`: an exact language match first, otherwise any voice of the same language;
- * on-device voices are preferred (they work offline and send nothing to a vendor service).
+ * The one teacher voice PlayLab prefers, most wanted first: clear, warm American English voices that the common browsers and
+ * systems provide. Matched by name, so the same voice is chosen every time on the same device.
+ */
+export const TEACHER_VOICE_PREFERENCE: readonly string[] = [
+  'Google US English',
+  'Microsoft Aria',
+  'Microsoft Jenny',
+  'Microsoft Ava',
+  'Samantha',
+  'Ava',
+  'Microsoft Zira',
+];
+
+/** Position of the voice in TEACHER_VOICE_PREFERENCE, or the list length when it is not one of them. */
+function preferenceRank(name: string): number {
+  const lower = name.toLowerCase();
+  const at = TEACHER_VOICE_PREFERENCE.findIndex((preferred) => lower.includes(preferred.toLowerCase()));
+  return at < 0 ? TEACHER_VOICE_PREFERENCE.length : at;
+}
+
+/**
+ * Automatic choice for `lang`. For English, the preferred teacher voice wins when the device has one. Otherwise: an exact language
+ * match first, then any voice of the same language; on-device voices are preferred (they work offline and send nothing to a vendor
+ * service). The same device always gets the same voice, and the list order cannot change the answer.
  */
 export function pickAutoVoice<T extends VoiceLike>(raw: readonly T[], lang: string): T | null {
   const want = normalizeLang(lang);
@@ -92,7 +114,14 @@ export function pickAutoVoice<T extends VoiceLike>(raw: readonly T[], lang: stri
   const exact = raw.filter((v) => normalizeLang(v.lang) === want);
   const loose = raw.filter((v) => normalizeLang(v.lang).split('-')[0] === base);
   const pool = exact.length ? exact : loose;
-  return pool.find((v) => v.localService !== false) ?? pool[0] ?? null;
+  if (base === 'en') {
+    const preferred = [...pool]
+      .filter((v) => preferenceRank(v.name) < TEACHER_VOICE_PREFERENCE.length)
+      .sort((a, b) => preferenceRank(a.name) - preferenceRank(b.name) || a.name.localeCompare(b.name));
+    if (preferred.length) return preferred.find((v) => v.localService !== false) ?? preferred[0] ?? null;
+  }
+  const ordered = [...pool].sort((a, b) => a.name.localeCompare(b.name));
+  return ordered.find((v) => v.localService !== false) ?? ordered[0] ?? null;
 }
 
 /**

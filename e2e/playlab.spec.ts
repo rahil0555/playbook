@@ -1,5 +1,5 @@
 import { englishWords } from '../src/playlab/data/en/words';
-import { expect, installFakeSpeech, nextOrFinish, solveSentence, solveWord, spoken, test } from './helpers';
+import { expect, installFakeSpeech, installScriptedSpeech, nextOrFinish, solveSentence, solveWord, spoken, test } from './helpers';
 
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 const VIEWS = ['home', 'progress', 'alphabet', 'phonics', 'word-builder', 'sentences', 'matching'];
@@ -41,8 +41,8 @@ test.describe('alphabet', () => {
       await expect(stage.getByRole('button', { name: new RegExp(`Uppercase ${l.toUpperCase()}\\.`) })).toBeVisible();
       await expect(stage.getByText(new RegExp(`^${l.toUpperCase()} is for `))).toBeVisible();
     }
-    // the letter name was spoken for the last letter
-    expect((await spoken(page)).at(-1)).toBe('zee');
+    // the teacher's line for the last letter was the last thing said: each tap starts that letter's lesson
+    expect((await spoken(page)).at(-1)).toBe('Say Z for zebra!');
     await expect(page.getByText('26 of 26 letters found so far')).toBeVisible();
     await expect(page.getByText('Letter Explorer')).toBeVisible(); // badge toast
   });
@@ -100,11 +100,13 @@ test.describe('alphabet', () => {
     await page.addInitScript(() => {
       Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true });
     });
+    // no speech recognition either, so the lesson is not listening and "Hear it" can be pressed
+    await installScriptedSpeech(page, { supported: false });
     await page.goto('/#/alphabet');
     await page.locator('[data-letter="a"]').click();
     await expect(page.locator('[data-letter="a"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText(/no spoken voice for this browser/)).toBeVisible();
-    await page.getByRole('button', { name: 'Hear the word' }).click(); // does not throw
+    await page.getByRole('button', { name: 'Hear it', exact: true }).click(); // does not throw
     await expect(page.getByText(/Sound can’t play on this device|no spoken voice for this browser/).first()).toBeVisible();
   });
 
@@ -122,14 +124,13 @@ test.describe('alphabet', () => {
 });
 
 test.describe('phonics', () => {
-  test('shows name vs sound, and the listen-and-choose game can be completed', async ({ page }) => {
+  test('the sound is asked for before its example word is shown, and the listen-and-choose game can be completed', async ({ page }) => {
     await installFakeSpeech(page);
+    await installScriptedSpeech(page);
     await page.goto('/#/phonics');
-    await expect(page.getByText('/ă/').first()).toBeVisible();
-    await page.getByRole('button', { name: 'Say the name' }).click();
-    await page.getByRole('button', { name: 'Play the sound' }).click();
-    // the sound is heard inside its example word, after the lead-in: never as an invented respelling
-    await expect.poll(async () => (await spoken(page)).slice(-3)).toEqual(['ay', 'Listen for the sound in', 'apple']);
+    // Sound Discovery asks for a word with the sound; the example word stays hidden until the child has answered
+    await expect(page.getByRole('heading', { name: 'Say a word for it' })).toBeVisible();
+    await expect(page.getByText('apple', { exact: true })).toHaveCount(0);
 
     await page.getByRole('tab', { name: 'Listen & choose' }).click();
     const map: Record<string, string[]> = { aah: ['a'], eh: ['e'] }; // helper for readability only

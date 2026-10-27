@@ -15,11 +15,16 @@ interface TaskBase {
   /** names the question: a result for another key is never judged for this one, so a late answer cannot change it */
   key: string;
 }
-/** The letter's name, e.g. "bee" for B. The letter itself is accepted too. */
+/**
+ * The letter's name, e.g. "bee" for B. The letter itself is accepted too, and so is the name or the letter followed by its example
+ * word ("B for ball", "B is for ball"), which is how a child naturally says it.
+ */
 export interface LetterNameTask extends TaskBase {
   kind: 'letter-name';
   letter: string;
   name: string;
+  /** the example word the letter is taught with, e.g. "ball" */
+  example?: string;
 }
 /**
  * The sound a letter makes. The child says one word from `words`: a short, explicit list of words that carry the sound (for B:
@@ -94,10 +99,19 @@ type Judgement = [VoiceOutcome, string];
 
 function judgeLetterName(task: LetterNameTask, phrase: string): Judgement {
   const forms = [...new Set([task.letter, task.name].map(normalizeAnswer))];
+  const example = task.example ? normalizeAnswer(task.example) : '';
   const said = dedupeRepeats(phrase);
-  if (forms.includes(said)) return ['correct', `Yes! That's ${quoted(task.name)}.`];
-  const wordsInside = said.includes(' ') && forms.some((form) => containsWords(said, form));
-  if (wordsInside) return ['uncertain', `Say just the letter's name: ${quoted(task.name)}.`];
+  // the accepted ways to say it: the letter or its name alone, or either with its example word
+  const accepted = new Set<string>(forms);
+  if (example) for (const form of forms) accepted.add(`${form} for ${example}`).add(`${form} is for ${example}`);
+  // the whole phrase first: an example that is itself a repeat ("yo-yo" becomes "yo yo") must not be shortened into another word
+  if (accepted.has(phrase) || accepted.has(said)) return ['correct', `Yes! That's ${quoted(task.name)}.`];
+  const letterSaid = forms.some((form) => containsWords(said, form));
+  // a sentence about a different letter ("b for ball" when the letter is A) is a wrong answer, not a failure to hear
+  if (said.includes(' ') && /\bfor\b/.test(said)) return ['incorrect', `Good try. This letter is called ${quoted(task.name)}. Let's try again.`];
+  // the example word on its own is not the letter's name: it cannot be checked as the letter, so the child is asked for the name
+  if (example && containsWords(said, example) && !letterSaid) return ['uncertain', `Say the letter's name first: ${quoted(task.name)}, then the word.`];
+  if (letterSaid) return ['uncertain', `Say just the letter's name: ${quoted(task.name)}.`];
   if (said.includes(' ')) return ['uncertain', `I'm not sure I heard that. Say the letter's name: ${quoted(task.name)}.`];
   return ['incorrect', `Good try. This letter is called ${quoted(task.name)}. Let's try again.`];
 }
@@ -109,12 +123,15 @@ function judgePhonicsSound(task: PhonicsSoundTask, phrase: string): Judgement {
   // the whole phrase first: a listed word that is itself a repeat ("yo-yo" becomes "yo yo") must not be shortened into another word
   const match = accepted.find(([form]) => form === phrase || form === said);
   if (match) return ['correct', `Yes! That sound is in ${quoted(match[1])}.`];
+  // "B for ball" or "B is for ball": the letter, then a listed word for its sound
+  const lettered = accepted.find(([form]) => forms.some((letter) => said === `${letter} for ${form}` || said === `${letter} is for ${form}`));
+  if (lettered) return ['correct', `Yes! That sound is in ${quoted(lettered[1])}.`];
   // the sound is a sound, not a letter name: saying the name of the letter is not an answer to this question
   if (forms.includes(said)) return ['incorrect', "That's the letter's name. Say a word that has the sound, not the name."];
   if (said.includes(' ') && accepted.some(([form]) => containsWords(said, form))) return ['uncertain', 'Say just one word that has the sound.'];
   if (said.includes(' ')) return ['uncertain', "I'm not sure I heard one word. Say one word that has the sound."];
-  // a real word that is not on this question's list is not marked wrong: it cannot be checked yet, so the child is asked for another
-  return ['uncertain', `I can't check ${quoted(said)} for this sound yet. Try another word that has the sound.`];
+  // a real word that is not on this question's list is not a checked answer: the child is kindly asked for another word that has the sound
+  return ['incorrect', `Good try. Try another word that has the sound of ${task.letter.toUpperCase()}.`];
 }
 
 function judgeSpokenWord(task: SpokenWordTask, phrase: string): Judgement {
@@ -201,8 +218,8 @@ export const FAILURE_COPY: Record<VoiceFailure, string> = {
 };
 
 /** "Say this letter's name", for the letter with lowercase id `id` and its spoken name `name` (e.g. "b", "bee"). */
-export function letterNameTask(letter: { id: string; name: string }): LetterNameTask {
-  return { kind: 'letter-name', key: `letter-name:${letter.id}`, letter: letter.id, name: letter.name };
+export function letterNameTask(letter: { id: string; name: string; word?: { text: string } }): LetterNameTask {
+  return { kind: 'letter-name', key: `letter-name:${letter.id}`, letter: letter.id, name: letter.name, example: letter.word?.text };
 }
 
 /** "Say a word that has this sound": any of `words` is right, and the letter's name never is. */

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Button } from '../../components/Button';
-import { LikeButton } from '../../components/LikeButton';
 import { StoryBook } from '../../components/StoryBook';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
 import { FeedbackMessage } from '../../components/FeedbackMessage';
@@ -54,7 +53,6 @@ function SolvedSentence({ sentence }: { sentence: SentenceEntry }) {
       ))}
       <span aria-hidden="true" className="font-display text-4xl font-bold text-brand-800">{sentence.punctuation}</span>
     </motion.p>
-    <LikeButton kind="sentence" id={sentence.id} label={fullText(sentence)} />
     </div>
   );
 }

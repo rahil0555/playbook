@@ -1,9 +1,9 @@
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { LayoutGroup, motion, type PanInfo } from 'framer-motion';
 import { usePlayLab } from '../app/PlayLabContext';
 import { useMoments } from '../moments/useMoments';
 import { StarBurst } from '../moments/StarBurst';
-import { letterColor } from '../lib/accents';
+import { LETTER_TILE_PALETTE, LetterTileFace, letterTileColor } from './LetterTile';
 import { elementUnder } from '../lib/dom';
 import { isPlaced, type SlotState, type Slots, type Tile } from '../lib/tiles';
 import { dragProps, springs } from '../motion/variants';
@@ -34,12 +34,11 @@ const PICK_UP_MS = 150;
 /** if a placed word never reports that its glide has finished, it still lands after this long (a safety net only) */
 const LANDING_FALLBACK_MS = 1100;
 
+/** A letter tile is the BOOK-style square; a word tile is a wider tile of the same design (its text sized in LetterTile). */
 const SIZE = {
-  letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]', text: 'text-[2.6rem] sm:text-[3.2rem]' },
-  word: { box: 'h-[3.75rem] min-w-[4.75rem] px-4 sm:h-[4.5rem] sm:px-6', text: 'text-[1.7rem] sm:text-[2.1rem]' },
+  letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]' },
+  word: { box: 'h-[3.75rem] sm:h-[4.5rem]' },
 } as const;
-/** Tile colours: every word gets its own colour, all with white text at >= 3:1 (large text). */
-const GEMS = ['#e8573f', '#16a286', '#2f8fd8', '#8a5cc7', '#d9741c'] as const;
 
 function slotAt(info: PanInfo): number | null {
   const slot = elementUnder(info, '[data-slot]');
@@ -116,7 +115,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
 
   const renderTile = (tile: Tile, placedIn: number | null) => {
     const isLifted = lifting.has(tile.id);
-    const color = kind === 'letter' ? letterColor(tile.value.charCodeAt(0)) : (GEMS[Math.max(0, tiles.indexOf(tile)) % GEMS.length] as string);
+    // a letter has its own tile colour (the same on every screen); a word takes the palette in turn
+    const color = kind === 'letter' ? letterTileColor(tile.value) : (LETTER_TILE_PALETTE[Math.max(0, tiles.indexOf(tile)) % LETTER_TILE_PALETTE.length] as string);
     const isHint = hintTileId === tile.id;
     return (
       <motion.button
@@ -170,11 +170,10 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
           if (placedIn !== null) onRemove(tile.id);
           else pickUp(tile);
         }}
-        className={`pl-draggable pl-gem relative z-10 inline-flex cursor-grab items-center justify-center rounded-[1.5rem] font-display font-bold leading-none active:cursor-grabbing ${size.box} ${size.text} ${isLifted ? 'ring-4 ring-white' : ''}`}
-        style={{ '--gem': color } as CSSProperties}
+        className={`pl-draggable relative z-10 inline-flex cursor-grab items-center justify-center rounded-[1.6rem] active:cursor-grabbing ${size.box} ${isLifted ? 'ring-4 ring-white' : ''}`}
       >
         {isHint ? <span aria-hidden="true" className="pointer-events-none absolute -inset-1.5 rounded-[1.9rem] border-4 border-sky-300" /> : null}
-        <span aria-hidden="true">{format(tile.value)}</span>
+        <LetterTileFace text={format(tile.value)} color={color} word={kind === 'word'} className="h-full" />
         {isHint ? <span aria-hidden="true" className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-sky-700 text-xs text-white">★</span> : null}
       </motion.button>
     );
@@ -208,7 +207,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
                         : 'border-amber-400/80 bg-white/75'
               }`}
             >
-              {tile ? renderTile(tile, i) : guide?.[i] ? <span aria-hidden="true" className={`font-display font-bold text-black/15 ${size.text}`}>{format(guide[i] as string)}</span> : null}
+              {tile ? renderTile(tile, i) : guide?.[i] ? <span aria-hidden="true" className={`font-display font-bold text-black/15 ${kind === 'letter' ? 'text-[2.6rem] sm:text-[3.2rem]' : 'text-[1.7rem] sm:text-[2.1rem]'}`}>{format(guide[i] as string)}</span> : null}
               {landings[i] ? <StarBurst key={landings[i]} seed={landings[i]! + i} count={6} spread={46} /> : null}
             </div>
           );

@@ -80,6 +80,55 @@ describe('reduceProgress', () => {
   });
 });
 
+describe('each badge unlocks at its own threshold: one short does not earn it, the threshold does', () => {
+  const badgesFor = (events: ProgressEvent[]) => run(events).badges;
+  const answers = (n: number, over: Partial<AnswerResult> = {}) => Array.from({ length: n }, (_, i) => answer({ questionId: `q${i}`, ...over }));
+  const game = (variant: string) => completion({ activityId: 'matching', variant: variant as ActivityCompletion['variant'] });
+  const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const explored = (ls: string[]) => ls.map<ProgressEvent>((letter) => ({ type: 'letter_explored', letter, timestamp: 1 }));
+
+  it('First Steps: no round, then one finished round', () => {
+    expect(badgesFor([])).not.toContain('first-steps');
+    expect(badgesFor([completion()])).toContain('first-steps');
+  });
+
+  it('Letter Explorer: 25 different letters, then all 26', () => {
+    expect(badgesFor(explored(letters.slice(0, 25)))).not.toContain('letter-explorer');
+    expect(badgesFor(explored(letters))).toContain('letter-explorer');
+  });
+
+  it('Sound Detective: 4 right listening answers, then 5', () => {
+    expect(badgesFor(answers(4, { activityId: 'phonics' }))).not.toContain('sound-detective');
+    expect(badgesFor(answers(5, { activityId: 'phonics' }))).toContain('sound-detective');
+  });
+
+  it('Word Builder: 4 words spelled right, then 5', () => {
+    expect(badgesFor(answers(4, { activityId: 'word-builder' }))).not.toContain('word-builder');
+    expect(badgesFor(answers(5, { activityId: 'word-builder' }))).toContain('word-builder');
+  });
+
+  it('Sentence Star: 4 sentences right, then 5', () => {
+    expect(badgesFor(answers(4, { activityId: 'sentences' }))).not.toContain('sentence-star');
+    expect(badgesFor(answers(5, { activityId: 'sentences' }))).toContain('sentence-star');
+  });
+
+  it('Match Maker: two different games, then all three; the same game twice counts once', () => {
+    expect(badgesFor([game('letter-picture'), game('sound-letter')])).not.toContain('match-maker');
+    expect(badgesFor([game('letter-picture'), game('letter-picture'), game('sound-letter')])).not.toContain('match-maker');
+    expect(badgesFor([game('letter-picture'), game('sound-letter'), game('word-completion')])).toContain('match-maker');
+  });
+
+  it('Super Streak: 4 right on the first try in a row, then 5', () => {
+    expect(badgesFor(answers(4, { activityId: 'matching' }))).not.toContain('super-streak');
+    expect(badgesFor(answers(5, { activityId: 'matching' }))).toContain('super-streak');
+  });
+
+  it('Super Streak: a retried right answer breaks the run, so 4 + retry + 4 is not 5 in a row', () => {
+    const events = [...answers(4, { activityId: 'matching' }), answer({ activityId: 'matching', attempt: 2 }), ...answers(4, { activityId: 'matching' })];
+    expect(badgesFor(events)).not.toContain('super-streak');
+  });
+});
+
 describe('stars and snapshots', () => {
   it('always awards at least one star', () => {
     expect(starsForScore(0, 5)).toBe(1);

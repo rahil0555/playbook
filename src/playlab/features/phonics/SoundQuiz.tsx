@@ -15,6 +15,7 @@ import { PRAISE, pickLine, TRY_AGAIN } from '../../lib/messages';
 import { buildSoundQuestion, type SoundQuestion } from '../../lib/questions';
 import { pickFresh } from '../../lib/random';
 import { incorrectVariants, correctVariants } from '../../motion/variants';
+import { LESSON_CHEER_MS } from '../../hooks/useVoiceLesson';
 
 interface QuestionProps {
   round: Round<SoundQuestion>;
@@ -28,6 +29,16 @@ function Question({ round, question }: QuestionProps) {
   const [showRetry, setShowRetry] = useState(false);
   const [lastWrong, setLastWrong] = useState<string | null>(null);
   const answer = question.answer;
+  // a right answer moves on by itself once its praise has been heard; a tap on Next moves on at once and cancels that
+  const advance = useRef<ReturnType<typeof setTimeout>>();
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+      clearTimeout(advance.current);
+    },
+    [],
+  );
 
   // Play the sound as the question appears (the child has already tapped to get here).
   useEffect(() => {
@@ -43,7 +54,12 @@ function Question({ round, question }: QuestionProps) {
       fire('burst', { x: 50, y: 55 });
       sfx('correct');
       setShowRetry(false);
-      void sayWord(`${answer.upper}. ${answer.word.text}`);
+      void Promise.resolve(sayWord(`${answer.upper}. ${answer.word.text}`)).then(() => {
+        if (!alive.current) return;
+        advance.current = setTimeout(() => {
+          if (alive.current) round.next();
+        }, LESSON_CHEER_MS);
+      });
     } else {
       sfx('oops');
       setWrong((w) => [...w, id]);
@@ -109,7 +125,14 @@ function Question({ round, question }: QuestionProps) {
               key="ok"
               tone="success"
               title={pickLine(PRAISE, round.index)}
-              action={{ label: round.index + 1 < round.total ? 'Next' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
+              action={{
+                label: round.index + 1 < round.total ? 'Next' : 'Finish',
+                onClick: () => {
+                  clearTimeout(advance.current);
+                  round.next();
+                },
+                icon: 'arrow-right',
+              }}
             >
               {answer.upper} says {answer.sound.symbol} like in <strong>{answer.word.text}</strong>.
             </FeedbackMessage>

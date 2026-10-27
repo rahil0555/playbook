@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, installScriptedSpeech, setHearing, test } from './helpers';
+import { expect, installFakeSpeech, installScriptedSpeech, setHearing, test } from './helpers';
 
 // Letter Playground on phones, tablets and desktop. Below the desktop breakpoint (1024 px) the letter stage (with its voice panel)
 // scrolls away with the page, so it can never sit on top of the letter grid. Every letter and every voice control must be
@@ -16,6 +16,8 @@ const SIZES = [
 ] as const;
 
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+/** the one main voice button of the lesson: Speak, or Stop while listening, or Next letter when the browser cannot listen */
+const MAIN_VOICE_BUTTON = /^(Speak|Stop listening|Next letter)$/;
 
 /**
  * Checks that nothing covers `target` at three scroll positions (the element at the top, the middle and the bottom of the
@@ -38,12 +40,20 @@ async function coveredBy(target: Locator) {
   });
 }
 
+/** the teacher's voice and the scripted microphone, so the lesson's lines finish and the layout is checked in the same state each run */
+async function speakingPage(page: Page) {
+  await installFakeSpeech(page);
+  await installScriptedSpeech(page);
+}
+
 for (const size of SIZES) {
   test(`${size.name}: every letter and voice control is reachable, nothing covers them, and nothing scrolls sideways`, async ({ page }) => {
+    await speakingPage(page);
     await page.setViewportSize({ width: size.width, height: size.height });
     await page.goto('/#/alphabet');
     await page.getByRole('button', { name: /^Letter B,/ }).click();
-    await expect(page.getByRole('region', { name: 'Your turn' })).toBeVisible();
+    const turn = page.getByRole('region', { name: 'Your turn' });
+    await expect(turn).toBeVisible();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, 'no sideways scrolling').toBeLessThanOrEqual(0);
@@ -57,13 +67,8 @@ for (const size of SIZES) {
     }
 
     const controls: [string, Locator][] = [
-      ['Play again', page.getByRole('button', { name: 'Play again' })],
-      ['Listen again', page.getByRole('region', { name: 'Your turn' }).getByRole('button', { name: 'Listen again' })],
-      ['Speak now', page.getByRole('region', { name: 'Your turn' }).getByRole('button', { name: 'Speak now' })],
-      ['Say it', page.getByRole('button', { name: 'Say it' })],
-      ['Hear the sound', page.getByRole('button', { name: 'Hear the sound' })],
-      ['Hear the word', page.getByRole('button', { name: 'Hear the word' })],
-      ['Love this letter', page.getByRole('button', { name: 'Love this letter' })],
+      ['Speak, Stop or Next letter', turn.getByRole('button', { name: MAIN_VOICE_BUTTON })],
+      ['Hear it', page.getByRole('button', { name: 'Hear it', exact: true })],
     ];
     for (const [name, control] of controls) {
       expect(await coveredBy(control), `${name} is reachable and not covered`).toBe('ok');
@@ -114,32 +119,33 @@ test('on desktop the letter stage sits beside the grid: the two do not overlap, 
 
 test('at 320px the longest message (a refused microphone) fits on screen and covers nothing', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
-  await installScriptedSpeech(page);
+  await speakingPage(page);
   await page.goto('/#/alphabet');
   await page.getByRole('button', { name: /^Letter B,/ }).click();
   await setHearing(page, { error: 'not-allowed' });
   const turn = page.getByRole('region', { name: 'Your turn' });
-  await turn.getByRole('button', { name: 'Speak now' }).click();
-  await expect(turn.getByRole('status')).toContainText('did not get to use the microphone', { timeout: 10000 });
-  const again = turn.getByRole('button', { name: 'Try again' });
-  expect(await coveredBy(again), 'Try again is not covered after the longest message').toBe('ok');
-  const box = await again.boundingBox();
-  expect(box!.x + box!.width, 'Try again is on screen sideways').toBeLessThanOrEqual(320);
+  await expect(turn.getByTestId('lesson-status')).toContainText('did not get to use the microphone', { timeout: 10000 });
+  // a refused microphone leaves the tap fallback: Next letter is the one way on, and it must be reachable under the longest message
+  const next = turn.getByRole('button', { name: 'Next letter' });
+  expect(await coveredBy(next), 'Next letter is not covered after the longest message').toBe('ok');
+  const box = await next.boundingBox();
+  expect(box!.x + box!.width, 'Next letter is on screen sideways').toBeLessThanOrEqual(320);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, 'no sideways scrolling with the longest message').toBeLessThanOrEqual(0);
 });
 
 for (const size of SIZES) {
   test(`Sound Discovery at ${size.name}: the letters and the "Your turn" controls are reachable and uncovered`, async ({ page }) => {
+    await speakingPage(page);
     await page.setViewportSize({ width: size.width, height: size.height });
     await page.goto('/#/phonics');
     const turn = page.getByRole('region', { name: 'Your turn' });
     await expect(turn).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, 'no sideways scrolling').toBeLessThanOrEqual(0);
-    expect(await coveredBy(turn.getByRole('button', { name: 'Speak now' })), 'Speak now is reachable and not covered').toBe('ok');
-    // the question has no "Listen again" (it would give the answer away): its teaching button, beside the letter card, is checked instead
-    expect(await coveredBy(page.getByRole('button', { name: 'Play the sound' })), 'Play the sound is reachable and not covered').toBe('ok');
+    expect(await coveredBy(turn.getByRole('button', { name: MAIN_VOICE_BUTTON })), 'the main voice button is reachable and not covered').toBe('ok');
+    // the sound's teaching button sits beside the letter card: it is checked here, as the answer is not given away by any other control
+    expect(await coveredBy(page.getByRole('button', { name: 'Hear the sound' })), 'Hear the sound is reachable and not covered').toBe('ok');
     for (const letter of ['a', 'm', 'z']) {
       expect(await coveredBy(page.locator(`button[aria-label^="Letter ${letter.toUpperCase()},"]`)), `letter ${letter.toUpperCase()} is reachable`).toBe('ok');
     }

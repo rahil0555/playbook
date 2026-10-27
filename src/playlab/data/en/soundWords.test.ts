@@ -77,7 +77,7 @@ describe('judging against each sound', () => {
     for (const letter of englishLetters) {
       const other = englishLetters.find((candidate) => candidate.id !== letter.id)!;
       const task = phonicsSoundTask(letter, soundWordsFor(letter.id));
-      expect(evaluateVoiceTask(task, soundWordsFor(other.id)[0]!).outcome, `${other.id}'s word for ${letter.id}`).toBe('uncertain');
+      expect(evaluateVoiceTask(task, soundWordsFor(other.id)[0]!).outcome, `${other.id}'s word for ${letter.id}`).toBe('incorrect');
     }
   });
 });

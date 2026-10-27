@@ -14,7 +14,6 @@ import type { WordEntry } from '../../../types/learning';
 import { FlyingTile, type Flight } from '../../../moments/FlyingTile';
 import { CompletionCreature, WordSplash } from './CompletionCreature';
 import { useMoments } from '../../../moments/useMoments';
-import { LikeButton } from '../../../components/LikeButton';
 import { measureTile, LooseLetter, TILE_BOX, tilesPerRow } from './LooseLetter';
 import { createRepeatGate, PHONICS_DELAY_MS, PHONICS_GAP_MS } from './magicFeel';
 import type { Scheduled } from '../../../services/audioService';
@@ -24,7 +23,7 @@ import { VoiceAnswer } from '../../../components/VoiceAnswer';
 import { VoicePractice } from '../../../components/VoicePractice';
 import { StorySentence, type StoryStage } from '../../story/StorySentence';
 import { TennisScene } from '../../story/TennisScene';
-import { LETTER_TILE_COLOR } from '../../story/storyRounds';
+import { letterTileColor } from '../../../components/LetterTile';
 import { evaluateVoiceAnswer, normalizeAnswer } from '../../../services/speechInput/evaluate';
 import type { RecognizedResult } from '../../../services/speechInput/recognizer';
 import { StorybookCutscene } from './StorybookCutscene';
@@ -36,8 +35,8 @@ const VOICE_LETTER_GAP_MS = 380;
 /** One Magic Letters question. State resets per word (keyed by word id in the parent). */
 /** `storyStage` is set on the read-along story: the sentence replaces the picture, and it carries the word's hint. */
 export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEntry>; word: WordEntry; storyStage?: StoryStage }) {
-  // every letter tile has the same colour, in Magic Letters and in the story alike (see LETTER_TILE_COLOR)
-  const colorOf = (_letter: string) => LETTER_TILE_COLOR;
+  // every letter has its own tile colour, the same on every screen (see letterTileColor in components/LetterTile)
+  const colorOf = (letter: string) => letterTileColor(letter);
   const { content, level, reducedMotion, audio } = usePlayLab();
   const { speak, sfx, stop, loopPhonic } = useSpeech();
   const moments = useMoments();
@@ -216,7 +215,6 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
       generation: generation.current,
       from: { ...from, cx: from.cx - box.left, cy: from.cy - box.top },
       to: { x: s.left + s.width / 2 - box.left, y: s.top + s.height / 2 - box.top },
-      face: 'monster',
     };
   };
 
@@ -473,7 +471,6 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
                     <LooseLetter
                       tile={tile}
                       color={colorOf(tile.value)}
-                      glyph={storyActive}
                       index={i}
                       selected={selected === tile.id}
                       hinted={hint?.tileId === tile.id}
@@ -539,8 +536,6 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
               <Button variant="secondary" accent="brand" icon="refresh" onClick={startAgain} className="shrink-0 self-end sm:mb-1">
                 Shuffle letters
               </Button>
-            ) : complete ? (
-              <LikeButton kind="word" id={word.id} label={word.text} className="shrink-0 self-end sm:mb-1" />
             ) : null}
           </div>
           {/* the same answer, spoken: judged by heardSpeech with the rules for a typed letter. It sits below the feedback, so the

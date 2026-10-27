@@ -80,11 +80,12 @@ describe('Configuration', () => {
     expect(screen.queryByRole('radio', { name: /Starter/ })).toBeNull();
   });
 
-  it('lets the child change level in settings when the host does not lock it', async () => {
+  it('every child plays at the full level: the settings have no level picker, and Magic Letters has its decoys', async () => {
     const { user } = renderPlayLab({ initialActivity: 'word-builder' });
-    await user.click(await screen.findByRole('button', { name: 'Settings' }));
-    await user.click(screen.getByRole('radio', { name: /Starter/ }));
-    await vi.waitFor(() => expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(3));
+    await screen.findByRole('heading', { level: 1, name: 'Magic Letters' });
+    expect(document.querySelectorAll('[data-magic-tile][data-decoy="true"]').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.queryByRole('radio', { name: /Starter|Explorer|Adventurer/ })).toBeNull();
   });
 
   it('applies a custom brand colour as CSS variables, and forced reduced motion as a data attribute', async () => {

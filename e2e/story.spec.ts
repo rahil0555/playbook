@@ -92,7 +92,7 @@ test.describe('the story: reduced motion and no spoken voice', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openStory(page);
     await expect(page.locator('[data-playlab]')).toHaveAttribute('data-motion', 'reduce');
-    await expect(page.locator('[data-letter-glyph]').first()).not.toHaveClass(/pl-float/);
+    await expect(page.locator('[data-magic-tile] .pl-float')).toHaveCount(0);
     await spellCurrent(page);
     await expect(page.locator('[data-story-tennis]')).toBeVisible();
   });
@@ -137,7 +137,7 @@ test.describe('the story at phone widths', () => {
       expect(counts.length, 'rows').toBe(Math.ceil(tiles.length / 4));
       expect(Math.max(...counts) - Math.min(...counts), 'rows are even').toBeLessThanOrEqual(1);
       // layout heights, not bounding boxes: the tiles spring in, and a spring overshoots the box while it moves
-      const taller = await page.locator('[data-letter-glyph]').evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetHeight > (e.closest('li') as HTMLElement).offsetHeight + 1).length);
+      const taller = await page.locator('.pl-tile__letter').evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetHeight > (e.closest('li') as HTMLElement).offsetHeight + 1).length);
       expect(taller, 'letters inside their tiles').toBe(0);
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

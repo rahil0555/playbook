@@ -73,14 +73,14 @@ describe('phonics sound: only the listed words are accepted, and the letter name
   it('does not accept a real word that is not on the list, or a near miss of a listed word (no fuzzy matching)', () => {
     for (const heard of ['dog', 'bal', 'bells', 'bass']) {
       const verdict = evaluateVoiceTask(ballSound, heard);
-      expect(verdict.outcome, heard).toBe('uncertain');
-      expect(verdict.message, heard).toContain("can't check");
+      expect(verdict.outcome, heard).toBe('incorrect');
+      expect(verdict.message, heard).toContain('Try another word that has the sound');
     }
   });
 
   it("does not accept another letter's word for this sound", () => {
-    expect(evaluateVoiceTask(ballSound, 'apple').outcome).toBe('uncertain');
-    expect(evaluateVoiceTask(appleSound, 'ball').outcome).toBe('uncertain');
+    expect(evaluateVoiceTask(ballSound, 'apple').outcome).toBe('incorrect');
+    expect(evaluateVoiceTask(appleSound, 'ball').outcome).toBe('incorrect');
   });
 
   it('asks again for speech of more than one word, instead of marking it', () => {
@@ -226,5 +226,44 @@ describe('task keys and failure copy', () => {
   it('keeps a microphone problem distinct from a speech-service problem', () => {
     expect(FAILURE_COPY['no-microphone']).not.toBe(FAILURE_COPY['speech-service']);
     expect(FAILURE_COPY['speech-service']).not.toMatch(/microphone/i);
+  });
+});
+
+describe('letter names: the way a child naturally says it', () => {
+  const letterA = { kind: 'letter-name' as const, key: 'letter-name:a', letter: 'a', name: 'ay', example: 'apple' };
+  it('accepts the letter, its name, and the letter or name with its example word', () => {
+    for (const said of ['A', 'ay', 'A for apple', 'A is for apple', 'ay for apple', 'Ay is for Apple!']) {
+      expect(evaluateVoiceTask(letterA, said).outcome, said).toBe('correct');
+    }
+    expect(evaluateVoiceTask(letterA, 'bee for apple').outcome).toBe('incorrect'); // a different letter's name with the example is not this answer
+  });
+  it('does not accept the example word alone as the letter', () => {
+    expect(evaluateVoiceTask(letterA, 'apple').outcome).not.toBe('correct');
+    expect(evaluateVoiceTask(letterA, 'apple').outcome).toBe('uncertain');
+  });
+  it('marks a different letter with its example as wrong, kindly, and does not mark unrelated speech right', () => {
+    expect(evaluateVoiceTask(letterA, 'B for ball').outcome).toBe('incorrect');
+    expect(evaluateVoiceTask(letterA, 'dog').outcome).toBe('incorrect');
+    expect(evaluateVoiceTask(letterA, 'the big dog ran').outcome).toBe('uncertain');
+  });
+});
+
+describe('sound words: "B for ball" is accepted when ball is a listed word, and a letter name is not', () => {
+  it('accepts the letter then a listed word for its sound', () => {
+    expect(evaluateVoiceTask(ballSound, 'B for ball').outcome).toBe('correct');
+    expect(evaluateVoiceTask(ballSound, 'B is for ball').outcome).toBe('correct');
+    expect(evaluateVoiceTask(ballSound, 'bee for ball').outcome).toBe('correct');
+  });
+  it('still never accepts the letter name on its own, or a word that is not listed for the sound', () => {
+    expect(evaluateVoiceTask(ballSound, 'bee').outcome).toBe('incorrect');
+    expect(evaluateVoiceTask(ballSound, 'B for dog').outcome).not.toBe('correct');
+  });
+});
+
+describe('letter names: an example word that repeats itself is kept whole', () => {
+  it('accepts "Y for yo-yo", whose example is a repeat', () => {
+    const yoyo = { kind: 'letter-name' as const, key: 'letter-name:y', letter: 'y', name: 'why', example: 'yo-yo' };
+    expect(evaluateVoiceTask(yoyo, 'Y for yo-yo').outcome).toBe('correct');
+    expect(evaluateVoiceTask(yoyo, 'why for yo yo').outcome).toBe('correct');
   });
 });

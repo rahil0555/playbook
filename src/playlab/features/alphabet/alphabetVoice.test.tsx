@@ -1,12 +1,16 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { sfxLog } from '../../test/fakeAudio';
+import { englishLetters } from '../../data/en/alphabet';
+import { ENCOURAGE_LINES, PRAISE_LINES } from '../../lib/lessonLines';
 import { fakeRecognizers } from '../../test/fakeRecognizer';
 import { order } from '../../test/order';
 import { renderPlayLab } from '../../test/utils';
+import { audioLog } from '../../test/fakeAudio';
 
-// Letter Playground: tap a letter, then speak its name. The browser's recogniser is replaced by a fake, so these tests show what
-// the app does with each result. They do not show what a real microphone hears (see docs/VOICE.md).
+// Letter Playground, the guided lesson: the teacher says "Say A for apple!", listening starts by itself after the teacher, a right
+// answer is celebrated and the next letter comes by itself, a wrong one is encouraged, and the child can always tap. The browser's
+// recogniser is a fake, so these tests show what the app does with each result. They do not show what a real microphone hears
+// (see docs/VOICE.md).
 
 let fake: ReturnType<typeof fakeRecognizers>;
 beforeEach(() => {
@@ -20,11 +24,11 @@ afterEach(() => {
   Reflect.deleteProperty(window, 'SpeechRecognition');
 });
 
-const stage = () => screen.getByRole('region', { name: 'Selected letter' });
-const panel = () => screen.getByRole('region', { name: 'Your turn' });
+const instruction = () => screen.findByTestId('lesson-instruction');
+const status = () => screen.getByTestId('lesson-status');
+const stop = () => screen.getByRole('button', { name: 'Stop listening' });
+const speak = () => screen.getByRole('button', { name: 'Speak' });
 const tile = (letter: string) => screen.findByRole('button', { name: new RegExp(`^Letter ${letter.toUpperCase()},`) });
-const speakNow = () => screen.getByRole('button', { name: 'Speak now' });
-const status = () => within(screen.getByRole('region', { name: 'Your turn' })).getByRole('status');
 
 /** one listening attempt: the browser starts, hears the words, and finishes */
 function hear(transcript: string) {
@@ -36,153 +40,146 @@ function hear(transcript: string) {
   });
 }
 
-async function openLetter(letter: string, user: ReturnType<typeof renderPlayLab>['user']) {
-  await user.click(await tile(letter));
-  return screen.findByRole('region', { name: 'Your turn' });
-}
+const sayLine = (text: string) => order.indexOf(`say:${text}`);
 
-describe('Letter Playground: on a page that is not secure, the letters still work and the page says why', () => {
-  const secureBefore = window.isSecureContext;
-  afterEach(() => Object.defineProperty(window, 'isSecureContext', { value: secureBefore, configurable: true }));
-
-  it('offers no Speak now button, explains the address, and tapping a letter still shows it', async () => {
-    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
-    expect(status()).toHaveTextContent("Speaking can't work on this address");
-    await user.click(await tile('c'));
-    expect(stage()).toHaveTextContent('C is for cat');
-  });
-});
-
-describe('Letter Playground: say the letter name', () => {
-  it('a correct spoken name is praised, and progress does not change (the letter was already found by tapping it)', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    expect(screen.getByText(/1 of 26 letters found so far/)).toBeInTheDocument();
-    await user.click(speakNow());
-    hear('bee');
-    expect(status()).toHaveTextContent("Yes! That's “bee”.");
-    expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
-    expect(screen.getByText(/1 of 26 letters found so far/)).toBeInTheDocument();
-    expect(stage()).toHaveTextContent('B is for ball');
+describe('Letter Playground: the guided lesson', () => {
+  it('the teacher says the instruction first, and only then the microphone turns on by itself', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    expect(await instruction()).toHaveTextContent('Say A for apple!');
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    expect(sayLine('Say A for apple!')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('mic on')).toBeGreaterThan(sayLine('Say A for apple!'));
+    expect(stop()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Speak now$/ })).toBeNull();
   });
 
-  it('a wrong name says the right name, and "Try again" starts a new attempt', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
+  it('a right answer is praised with a cheer, and the next letter comes by itself after the praise', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    hear('A for apple');
+    expect(await screen.findByTestId('lesson-success')).toBeInTheDocument();
+    expect(status()).toHaveTextContent(PRAISE_LINES[0]);
+    expect(await screen.findByText('Say B for ball!', {}, { timeout: 4000 })).toBeInTheDocument();
+    // the praise was said in full before the next instruction: the next step never cut it off
+    await waitFor(() => expect(sayLine('Say B for ball!')).toBeGreaterThanOrEqual(0));
+    expect(sayLine(PRAISE_LINES[0])).toBeGreaterThanOrEqual(0);
+    expect(sayLine(PRAISE_LINES[0])).toBeLessThan(sayLine('Say B for ball!'));
+  }, 10_000);
+
+  it('the natural ways a child says it are right: the letter, its name, and the letter with its example', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    hear('ay');
+    expect(await screen.findByTestId('lesson-success')).toBeInTheDocument();
+  }, 10_000);
+
+  it('a wrong answer is encouraged and the child may try again, without being marked as having failed', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
     hear('dog');
-    expect(status()).toHaveTextContent('This letter is called “bee”');
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(fake.latest().started).toBe(true);
-    hear('bee');
-    expect(status()).toHaveTextContent("Yes! That's “bee”.");
-  });
+    expect(await screen.findByText(ENCOURAGE_LINES[0], { exact: false })).toBeInTheDocument();
+    // listening starts again for another try, and the same instruction is still there
+    await waitFor(() => expect(fake.made.filter((r) => r.started).length).toBeGreaterThanOrEqual(2));
+    expect(await instruction()).toHaveTextContent('Say A for apple!');
+    expect(screen.queryByText(/fail|wrong|incorrect/i)).toBeNull();
+  }, 10_000);
 
-  it('nothing heard: the browser has stopped listening, the speech buttons are back, and the child can try again', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => {
-      fake.latest().begin();
-      fake.latest().end();
-    });
-    expect(status()).toHaveTextContent("I couldn't hear anything");
-    expect(within(panel()).queryByRole('button', { name: 'Stop' })).toBeNull();
-    expect(within(panel()).getByRole('button', { name: 'Listen again' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Hear the sound' })).toBeEnabled();
-    expect(within(panel()).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-  });
+  it('unclear speech asks the child to repeat it, and listening starts again', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    hear('the big dog ran');
+    expect(await screen.findByText('Could you say that again?')).toBeInTheDocument();
+    await waitFor(() => expect(fake.made.filter((r) => r.started).length).toBeGreaterThanOrEqual(2));
+  }, 10_000);
 
-  it('while the child is listening, every button that says a sound is off, and they come back when listening stops', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => fake.latest().begin());
-    for (const name of ['Say it', 'Hear the sound', 'Hear the word', 'Play again']) {
-      expect(screen.getByRole('button', { name }), name).toBeDisabled();
+  it('after three wrong answers the letter is taught together, and the lesson moves on without a reward', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    for (let i = 0; i < 3; i++) {
+      await waitFor(() => expect(fake.latest()?.started).toBe(true));
+      hear('dog');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
     }
-    expect(within(panel()).getByRole('button', { name: 'Listen again' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Uppercase B\. Tap to hear it again/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Lowercase b\. Tap to hear it again/ })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Stop' }));
-    for (const name of ['Say it', 'Hear the sound', 'Hear the word', 'Play again']) {
-      expect(screen.getByRole('button', { name }), name).toBeEnabled();
+    expect(await screen.findByText('A is for apple. Let’s learn it together!')).toBeInTheDocument();
+    expect(await screen.findByText('Say B for ball!', {}, { timeout: 4000 })).toBeInTheDocument();
+  }, 15_000);
+
+  it('Stop ends listening at once and says nothing; Speak starts it again', async () => {
+    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    const said = order.length;
+    await user.click(await screen.findByRole('button', { name: 'Stop listening' }));
+    expect(status()).toHaveTextContent('Tap Speak when you’re ready.');
+    expect(order.slice(said).filter((x) => x.startsWith('say:'))).toEqual([]);
+    await user.click(speak());
+    await waitFor(() => expect(fake.made.filter((r) => r.started).length).toBeGreaterThanOrEqual(2));
+    expect(stop()).toBeInTheDocument();
+  });
+
+  it('tapping a letter in the grid starts that letter’s lesson', async () => {
+    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
+    await user.click(await tile('c'));
+    expect(await instruction()).toHaveTextContent('Say C for cat!');
+    const stage = screen.getByRole('region', { name: 'Selected letter' });
+    expect(within(stage).getByText(/^C is for /)).toBeInTheDocument();
+  });
+
+  it('without a microphone (an insecure page), the lesson is a tap lesson: Next letter moves on, and the letters still work', async () => {
+    const secure = window.isSecureContext;
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    try {
+      const { user } = renderPlayLab({ initialActivity: 'alphabet' });
+      expect(await screen.findByRole('button', { name: 'Next letter' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Speak' })).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Next letter' }));
+      expect(await instruction()).toHaveTextContent('Say B for ball!');
+      expect(fake.made.filter((r) => r.started)).toHaveLength(0);
+    } finally {
+      Object.defineProperty(window, 'isSecureContext', { value: secure, configurable: true });
     }
   });
 
-  it('a letter tapped while the child is listening: listening stops before its name is said, and a late result is not judged', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => fake.latest().begin());
-    const listening = fake.latest();
-    const mark = order.length;
-    await user.click(await tile('c'));
-    const said = order.slice(mark);
-    expect(said, 'the microphone is off before the letter is spoken').toContain('say:see');
-    expect(said.indexOf('mic off')).toBeLessThan(said.indexOf('say:see'));
-    act(() => {
-      listening.heard('see');
-      listening.end();
-    });
-    expect(status()).not.toHaveTextContent('Yes!');
-    expect(screen.getByRole('button', { name: 'Speak now' })).toBeInTheDocument();
+  it('the teacher’s voice is never heard as an answer: the teaching line ends before listening starts', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    const teaching = sayLine('Say A for apple!');
+    const micOn = order.indexOf('mic on');
+    expect(teaching).toBeGreaterThanOrEqual(0);
+    expect(micOn).toBeGreaterThan(teaching);
+    // nothing is said while the microphone is on (the praise and the next line come only after a verdict, when listening has ended)
+    const during = order.slice(micOn + 1).find((x) => x.startsWith('say:'));
+    expect(during).toBeUndefined();
   });
 
-  it('a tap on a letter while the child listens makes no pop (it could be picked up), and the pop comes back after Stop', async () => {
+  it('the one speaker control is off while listening, and says the letter, its sound and its word when the child is not listening', async () => {
     const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => fake.latest().begin());
-    const mark = sfxLog.length;
-    await user.click(await tile('c'));
-    expect(sfxLog.slice(mark), 'no pop while listening').not.toContain('pop');
-    await user.click(await tile('b'));
-    await user.click(await screen.findByRole('button', { name: 'Speak now' }));
-    act(() => fake.latest().begin());
-    await user.click(screen.getByRole('button', { name: 'Stop' }));
-    const afterStop = sfxLog.length;
-    await user.click(await tile('c'));
-    expect(sfxLog.slice(afterStop), 'the pop plays again once listening has stopped').toContain('pop');
+    await waitFor(() => expect(fake.latest()?.started).toBe(true));
+    expect(screen.getByRole('button', { name: 'Hear it' })).toBeDisabled();
+    await user.click(await screen.findByRole('button', { name: 'Stop listening' }));
+    const before = audioLog.length;
+    await user.click(screen.getByRole('button', { name: 'Hear it' }));
+    await waitFor(() => expect(audioLog.length).toBeGreaterThan(before));
+    const said = audioLog.slice(before).map((r) => r.text);
+    expect(said[0]).toBe(englishLetters[0]!.nameSpeech);
+    expect(said).toContain('apple');
   });
 
-  it('a refused microphone is explained, and tapping letters still works', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => fake.latest().fail('not-allowed'));
-    expect(status()).toHaveTextContent('The browser did not get to use the microphone');
-    await user.click(await tile('c'));
-    expect(stage()).toHaveTextContent('C is for cat');
-  });
-
-  it('Stop ends listening without judging anything', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(speakNow());
-    act(() => fake.latest().begin());
-    await user.click(screen.getByRole('button', { name: 'Stop' }));
-    expect(fake.latest().aborted).toBe(true);
-    expect(screen.getByRole('button', { name: 'Speak now' })).toBeInTheDocument();
-    expect(status()).not.toHaveTextContent('Yes!');
-  });
-
-  it('a browser with no speech recognition says so, and offers no microphone', async () => {
-    Reflect.deleteProperty(window, 'SpeechRecognition');
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    expect(status()).toHaveTextContent("This browser can't listen for speech");
-    expect(screen.queryByRole('button', { name: 'Speak now' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Hear the sound' })).toBeInTheDocument();
-  });
-
-  it('the sound is heard inside its example word, from the same stage', async () => {
-    const { user } = renderPlayLab({ initialActivity: 'alphabet' });
-    await openLetter('b', user);
-    await user.click(within(stage()).getByRole('button', { name: 'Hear the sound' }));
-    expect(stage()).toHaveTextContent('B is for ball');
-  });
+  it('reaching Z celebrates the whole alphabet and offers to start again', async () => {
+    renderPlayLab({ initialActivity: 'alphabet' });
+    for (const letter of englishLetters) {
+      const lineIndex = englishLetters.indexOf(letter);
+      await waitFor(() => expect(fake.latest()?.started).toBe(true), { timeout: 3000 });
+      expect(await instruction()).toHaveTextContent(`Say ${letter.upper} for ${letter.word.text}!`);
+      hear(`${letter.upper} for ${letter.word.text}`);
+      if (lineIndex < englishLetters.length - 1) {
+        await screen.findByText(`Say ${englishLetters[lineIndex + 1]!.upper} for ${englishLetters[lineIndex + 1]!.word.text}!`, {}, { timeout: 4000 });
+      }
+    }
+    expect(await screen.findByText('You know the whole alphabet!', {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Start again' }).click();
+    expect(await instruction()).toHaveTextContent('Say A for apple!');
+  }, 90_000);
 });

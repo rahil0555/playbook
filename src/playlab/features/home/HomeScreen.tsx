@@ -10,14 +10,11 @@ import { ACTIVITIES } from '../../data/activities';
 import { BADGES } from '../../data/badges';
 import { STICKERS, STICKER_SLOTS, stickerSummary } from '../../data/stickers';
 import { useSpeech } from '../../hooks/useAudio';
-import { useLikes } from '../../hooks/useLikes';
 import { letterColor } from '../../lib/accents';
 import { animationFor } from '../../motion/variants';
-import type { Like } from '../../services/likesService';
 import { visitLine } from './visitLine';
 
 const HERO_WORD = ['p', 'l', 'a', 'y'];
-const KIND_NAME = { letter: 'letter', word: 'word', sentence: 'sentence' } as const;
 
 function Stat({ icon, value, label, color }: { icon: 'star' | 'check' | 'trophy' | 'sparkle'; value: number | string; label: string; color: string }) {
   return (
@@ -36,8 +33,7 @@ function Stat({ icon, value, label, color }: { icon: 'star' | 'check' | 'trophy'
 export default function HomeScreen() {
   const { navigate, learner, content } = usePlayLab();
   const { lifetime, session, hydrated } = useProgressState();
-  const { sayLetterName, speak, sfx } = useSpeech();
-  const { likes } = useLikes();
+  const { sayLetterName, sfx } = useSpeech();
   const handles = useRef<Record<string, AnimatedLetterHandle | null>>({});
   const featured = ACTIVITIES[2]!;
   const heroLetters = useMemo(() => HERO_WORD.map((id) => content.letters.find((l) => l.id === id)).filter((l) => !!l), [content]);
@@ -45,17 +41,6 @@ export default function HomeScreen() {
   const { unlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
   // until the saved progress has loaded, the stats show a placeholder rather than zeros that would change a moment later
   const shown = (value: number | string) => (hydrated ? value : '…');
-
-  /** Tap a loved thing to hear it again. Letters say their name, words and sentences are read aloud. */
-  const hearLike = (like: Like) => {
-    sfx('tap');
-    if (like.kind === 'letter') {
-      const letter = content.letters.find((l) => l.id === like.id);
-      if (letter) void sayLetterName(letter);
-      return;
-    }
-    void speak(like.label);
-  };
 
   const pipSays =
     lifetime.activitiesCompleted === 0
@@ -127,36 +112,6 @@ export default function HomeScreen() {
         <p className="mt-3 inline-block rounded-[1.4rem] bg-white/85 px-4 py-1.5 text-ink shadow-soft" data-testid="visit-line">
           {visitLine(hydrated, session)}
         </p>
-      </section>
-
-      <section aria-labelledby="pl-love-title">
-        <h2 id="pl-love-title" className="pl-wood mb-3 inline-block rounded-full px-5 py-1 font-display text-2xl font-bold">
-          Things you love
-        </h2>
-        {likes.length === 0 ? (
-          <p className="pl-paper flex items-center gap-3 rounded-[1.8rem] p-4 text-ink">
-            <Icon name="heart" size={26} className="shrink-0 text-coral-500" />
-            Tap “Love it” on a letter, word or sentence you enjoy. It will wait for you here!
-          </p>
-        ) : (
-          <ul aria-label="Things you love" className="flex flex-wrap gap-3">
-            {likes.slice(0, 12).map((l) => (
-              <li key={`${l.kind}-${l.id}`}>
-                <button
-                  type="button"
-                  onClick={() => hearLike(l)}
-                  aria-label={`Hear ${KIND_NAME[l.kind]}: ${l.label}`}
-                  className="pl-paper flex min-h-[3.25rem] items-center gap-2 rounded-full px-4 font-display text-xl font-bold text-ink"
-                >
-                  <Icon name="heart" size={20} filled className="text-coral-500" />
-                  <span aria-hidden="true" className={l.kind === 'letter' ? '' : 'max-w-[18rem] truncate text-lg'}>
-                    {l.label}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section aria-labelledby="pl-stickers-title">

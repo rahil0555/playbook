@@ -52,6 +52,8 @@ describe('the alphabet goal is rewarded once per learner', () => {
     const { user, adapter } = renderPlayLab({ initialActivity: 'alphabet', progressAdapter: createMemoryAdapter() });
     await tapLetters(user, GOAL_LETTERS);
     expect(await screen.findByText('5 letters found! 3 stars!')).toBeInTheDocument();
+    // the goal is a finished round, so its sticker is revealed the first time it is earned
+    expect(screen.getByTestId('sticker-reveal')).toHaveTextContent('New sticker: Apple!');
     expect(adapter.load()).toMatchObject({ stars: 3, activitiesCompleted: 1 });
   });
 
@@ -64,6 +66,7 @@ describe('the alphabet goal is rewarded once per learner', () => {
     await tapLetters(user, GOAL_LETTERS);
     expect(await screen.findByText('5 letters found again!')).toBeInTheDocument();
     expect(screen.queryByText(/3 stars!/)).toBeNull();
+    expect(screen.queryByTestId('sticker-reveal')).toBeNull(); // no new sticker was earned, so none is shown
     expect(adapter.load()).toMatchObject({ stars: 3, activitiesCompleted: 1 });
   });
 });

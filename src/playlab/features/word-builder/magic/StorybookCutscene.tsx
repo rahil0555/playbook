@@ -1,8 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
-import { LetterMonster } from '../../../components/LetterMonster';
+import { LetterTileFace, letterTileColor } from '../../../components/LetterTile';
 import { Illustration } from '../../../illustrations/Illustration';
-import { letterColor } from '../../../lib/accents';
 import type { WordEntry } from '../../../types/learning';
 
 interface StorybookCutsceneProps {
@@ -44,14 +43,9 @@ export function StorybookCutscene({ word, open }: StorybookCutsceneProps) {
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-center gap-1">
                 {letters.map((letter, i) => (
                   <div key={i} className="h-12 w-12 sm:h-16 sm:w-16">
-                    <LetterMonster
-                      letter={letter}
-                      color={letterColor(letter.charCodeAt(0))}
-                      mood="cheer"
-                      bounce={!reducedMotion}
-                      phase={i * 0.18}
-                      blinkDelay={(i * 0.9) % 4}
-                    />
+                    <motion.span className="block h-full w-full" animate={reducedMotion ? undefined : { y: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12 }}>
+                      <LetterTileFace text={letter} color={letterTileColor(letter)} />
+                    </motion.span>
                   </div>
                 ))}
               </div>

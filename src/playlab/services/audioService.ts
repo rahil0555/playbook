@@ -20,7 +20,7 @@ import { listEnglishVoices, resolveVoice, type VoiceOption } from './voiceCatalo
  * a little slower than normal for young listeners, with only a slight lift in pitch.
  */
 export const SPEECH_STYLE = {
-  rate: 0.9,
+  rate: 0.85,
   pitch: 1.05,
 } as const;
 
@@ -29,6 +29,8 @@ export const SPEECH_STYLE = {
  * begin, so they get more time than the voices on the device.
  */
 export const START_TIMEOUT_MS = 2500;
+/** How long speech waits for the browser's voice list before it speaks with whichever voice the browser gives. */
+export const VOICE_WAIT_MS = 1200;
 export const ONLINE_START_TIMEOUT_MS = 6000;
 
 export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error' | 'cancelled';
@@ -114,6 +116,8 @@ export interface AudioEnv {
   AudioContextCtor?: typeof AudioContext;
   /** ms to wait for speech to actually start before declaring it unavailable */
   startTimeoutMs?: number;
+  /** ms to wait for the browser to list its voices before speaking with whichever voice it has (0 = do not wait) */
+  voiceWaitMs?: number;
 }
 
 function defaultEnv(): AudioEnv {
@@ -217,12 +221,26 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     if (v && v.name !== snapshot.voiceName) set({ voiceName: v.name });
   };
 
+  /**
+   * Speech asked for before the browser has listed its voices waits for the list (see `speak`), so the teacher voice is chosen
+   * whenever the browser can offer it. Each waiting line resolves when the list arrives, or gives up after the wait.
+   */
+  let voiceWaiters: ((listed: boolean) => void)[] = [];
+  /** once a wait has run out on a device that never lists voices, later speech does not wait again */
+  let voiceWaitGivenUp = false;
+  const releaseVoiceWaiters = () => {
+    const waiting = voiceWaiters;
+    voiceWaiters = [];
+    waiting.forEach((release) => release(true));
+  };
+
   /** Re-read the English voice list; the snapshot only changes when the list really changed (stable for React). */
   const refreshVoices = () => {
     const next = listEnglishVoices(rawVoices());
     const same = next.length === snapshot.voices.length && next.every((o, i) => o.id === snapshot.voices[i]?.id && o.label === snapshot.voices[i]?.label);
     if (!same) set({ voices: next });
     refreshName();
+    if (rawVoices().length > 0) releaseVoiceWaiters();
   };
 
   // Browsers (notably Chrome) load voices asynchronously and announce it with `voiceschanged`.
@@ -236,7 +254,7 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     [300, 1200, 3000].forEach((ms) => setTimeout(refreshVoices, ms));
   }
 
-  const speak = (req: PlayRequest): Promise<SpeakOutcome> => {
+  const speakNow = (req: PlayRequest): Promise<SpeakOutcome> => {
     const { synth, Utterance } = env;
     if (!synth || !Utterance) {
       set({ unavailable: true });
@@ -301,6 +319,30 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
         set({ unavailable: true });
         finish('error');
       }
+    });
+  };
+
+  /**
+   * Speaks `req` with the browser's teacher voice. A device whose voice list has not arrived yet waits a moment for it, so the first
+   * line is not spoken in the browser's default voice. A line stopped while it waits (`stop`) is not spoken at all.
+   */
+  const speak = (req: PlayRequest): Promise<SpeakOutcome> => {
+    const waitMs = env.voiceWaitMs ?? VOICE_WAIT_MS;
+    const mustWait = !voiceWaitGivenUp && env.synth !== undefined && env.synth !== null && waitMs > 0 && rawVoices().length === 0;
+    if (!mustWait) return speakNow(req);
+    const asked = token;
+    return new Promise<SpeakOutcome>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const release = (listed: boolean) => {
+        clearTimeout(timer);
+        if (!listed) voiceWaitGivenUp = true;
+        resolve(token === asked ? speakNow(req) : 'cancelled');
+      };
+      voiceWaiters.push(release);
+      timer = setTimeout(() => {
+        voiceWaiters = voiceWaiters.filter((r) => r !== release);
+        release(false);
+      }, waitMs);
     });
   };
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The global test setup replaces createAudioService with a fake; here we want the real one.
-const { createAudioService, SPEECH_STYLE } = await vi.importActual<typeof import('./audioService')>('./audioService');
+const { createAudioService, SPEECH_STYLE, VOICE_WAIT_MS } = await vi.importActual<typeof import('./audioService')>('./audioService');
 
 type Handlers = { onstart?: () => void; onend?: () => void; onerror?: (e: { error: string }) => void };
 
@@ -281,7 +281,7 @@ describe('audioService: voice selection', () => {
     await vi.advanceTimersByTimeAsync(10);
     await b;
     expect(d.spoken.at(-1)).toMatchObject({ rate: 0.7, pitch: SPEECH_STYLE.pitch });
-    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch]).toEqual([0.9, 1.05]);
+    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch]).toEqual([0.85, 1.05]); // a slower, clear pace for young listeners
   });
 
   it('tells listeners before a line starts, so the microphone can stop first', async () => {
@@ -376,7 +376,8 @@ describe('speech that waits for a fanfare', () => {
         this.text = text;
       }
     }
-    return { said, env: { synth, Utterance, startTimeoutMs: 60_000 } as unknown as Parameters<typeof createAudioService>[0] };
+    // this fake has no voice list at all: it is not a device waiting for voices, so the wait is off for these timing tests
+    return { said, env: { synth, Utterance, startTimeoutMs: 60_000, voiceWaitMs: 0 } as unknown as Parameters<typeof createAudioService>[0] };
   }
 
   it('says a line once its delay has passed, and not before', async () => {
@@ -408,6 +409,58 @@ describe('speech that waits for a fanfare', () => {
       audio.stop();
       vi.advanceTimersByTime(1000);
       expect(said).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('audioService: waiting for the teacher voice', () => {
+  it('a line asked for before the voice list arrives waits for it, then uses the teacher voice', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = voiceSynth([]);
+      const audio = createAudioService(d.env);
+      const pending = audio.play({ text: 'Hi there' });
+      d.setVoices(DEVICE);
+      await vi.advanceTimersByTimeAsync(10);
+      await pending;
+      expect(d.spoken).toHaveLength(1);
+      expect(d.spoken[0]).toMatchObject({ text: 'Hi there', voice: { name: 'Local US' }, rate: SPEECH_STYLE.rate });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stop() while a line waits for the voice list means that line is never spoken', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = voiceSynth([]);
+      const audio = createAudioService(d.env);
+      const pending = audio.play({ text: 'Too late' });
+      audio.stop();
+      d.setVoices(DEVICE);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(await pending).toBe('cancelled');
+      expect(d.spoken).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a device that never lists a voice speaks after the short wait, and later lines do not wait again', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = voiceSynth([]);
+      const audio = createAudioService(d.env);
+      const first = audio.play({ text: 'First' });
+      await vi.advanceTimersByTimeAsync(VOICE_WAIT_MS + 10);
+      await first;
+      expect(d.spoken.map((s) => s.text)).toEqual(['First']);
+      const second = audio.play({ text: 'Second' });
+      await vi.advanceTimersByTimeAsync(10);
+      await second;
+      expect(d.spoken.map((s) => s.text)).toEqual(['First', 'Second']);
     } finally {
       vi.useRealTimers();
     }

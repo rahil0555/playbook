@@ -292,17 +292,14 @@ test.describe('learning integrity: the answer is never shown before it is placed
   });
 });
 
-test.describe('levels', () => {
-  for (const [level, decoys] of [['Starter', 0], ['Explorer', 1], ['Adventurer', 2]] as const) {
-    test(`${level}: ${decoys} decoy letter(s)`, async ({ page }) => {
-      await page.goto('/#/word-builder');
-      await page.getByRole('button', { name: 'Settings' }).click();
-      await page.getByRole('radio', { name: new RegExp(level) }).click();
-      await page.keyboard.press('Escape');
-          await page.locator('[data-magic-slot="0"]').waitFor();
-      await expect(page.locator('[data-decoy="true"]')).toHaveCount(decoys);
-    });
-  }
+test.describe('one level for every child', () => {
+  test('Magic Letters always uses the full level: two decoy letters, and no level choice in Settings', async ({ page }) => {
+    await page.goto('/#/word-builder');
+    await page.locator('[data-magic-slot="0"]').waitFor();
+    await expect(page.locator('[data-decoy="true"]')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('radio')).toHaveCount(0);
+  });
 });
 
 test.describe('reduced motion and accessibility', () => {

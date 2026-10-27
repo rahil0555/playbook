@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { expect, test } from './helpers';
 
-// Voice selector (browser Web Speech API only). Headless Chromium has no voices, so a fake synthesizer is installed.
+// One teacher voice for every activity (browser Web Speech API only). Headless Chromium has no voices, so a fake synthesizer is installed.
 
 interface FakeVoice {
   name: string;
@@ -64,132 +64,70 @@ async function openSettings(page: Page, hash = 'home') {
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
 }
-const select = (page: Page) => page.getByRole('combobox', { name: 'Voice' });
 
-test.describe('voice selector', () => {
-  test('lists Automatic plus English voices only, with accents and online voices labelled', async ({ page }) => {
+const TEACHER = 'Zoe'; // the device's first American on-device voice: the same choice every time (see voiceCatalog)
+
+test.describe('one teacher voice everywhere', () => {
+  test('Settings has no voice choice: no selector, no preview, no Use this voice', async ({ page }) => {
     await installSynth(page, DEVICE);
     await openSettings(page);
-    const options = await select(page).locator('option').allTextContents();
-    expect(options).toEqual(['Automatic (best American English)', 'Zoe (American English)', 'Remote Rita (American English, online)', 'Daisy (British English)']);
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await expect(dialog.getByRole('combobox')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: /Preview voice|Use this voice/ })).toHaveCount(0);
+    await expect(dialog.getByRole('switch', { name: 'Sound' })).toBeVisible();
   });
 
-  test('Preview plays the sample in the highlighted voice and does not save it', async ({ page }) => {
+  test('every line, on every screen, uses the same voice at the slower teaching rate', async ({ page }) => {
     await installSynth(page, DEVICE);
-    await openSettings(page);
-    await select(page).selectOption('daisy');
-    await page.getByRole('button', { name: 'Preview voice' }).click();
-    await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Daisy');
-    expect((await spoken(page)).at(-1)?.text).toMatch(/Let.s learn our letters together/);
-    expect(await savedVoice(page)).toBeNull();
-    await page.reload();
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(select(page)).toHaveValue(''); // still Automatic after a refresh
-  });
-
-  test('Use this voice saves it; it is used across the app and survives a refresh', async ({ page }) => {
-    await installSynth(page, DEVICE);
-    await openSettings(page, 'alphabet');
-    await select(page).selectOption('daisy');
-    await page.getByRole('button', { name: 'Use this voice' }).click();
-    await expect(page.getByText('Saved: Daisy.')).toBeVisible();
-    expect(await savedVoice(page)).toBe('daisy');
-    await page.keyboard.press('Escape');
-    await page.locator('[data-letter="b"]').click();
-    await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Daisy');
-
-    await page.reload(); // persists
-    await page.locator('[data-letter="c"]').click();
-    await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Daisy');
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(select(page)).toHaveValue('daisy');
-  });
-
-  test('Word Builder (Magic Letters) speaks with the chosen voice', async ({ page }) => {
-    await installSynth(page, DEVICE);
-    await page.addInitScript(() => localStorage.setItem('edurance.playlab.settings.v1', JSON.stringify({ sound: true, level: 'adventurer', voice: 'rita' })));
-    await page.goto('/#/word-builder');
-    await page.getByRole('button', { name: 'Hear the clue' }).click();
-    await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Remote Rita');
-  });
-
-  test('a saved voice that this device does not have falls back to automatic without any error', async ({ page }) => {
-    await installSynth(page, DEVICE);
-    await page.addInitScript(() => localStorage.setItem('edurance.playlab.settings.v1', JSON.stringify({ sound: true, level: 'adventurer', voice: 'voice-from-another-phone' })));
+    // each screen is opened on its own: a reload starts a fresh record of what was said
     await page.goto('/#/alphabet');
-    await page.locator('[data-letter="a"]').click();
-    await expect.poll(async () => (await spoken(page)).at(-1)?.voice).toBe('Zoe'); // best local American voice
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(select(page)).toHaveValue('');
+    await page.getByRole('button', { name: /^Letter A,/ }).click();
+    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(0);
+    const alphabet = await spoken(page);
+    await page.goto('/#/word-builder');
+    await page.getByRole('button', { name: 'Hear the clue' }).first().click();
+    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(0);
+    const magic = await spoken(page);
+    for (const lines of [alphabet, magic]) {
+      expect(new Set(lines.map((l) => l.voice))).toEqual(new Set([TEACHER]));
+      expect(new Set(lines.map((l) => l.rate))).toEqual(new Set([0.85]));
+    }
   });
 
-  test('speech style: conservative defaults, and a letter sound is heard in its example word at the same rate', async ({ page }) => {
+  test('a voice saved by an older version is ignored, and the teacher voice is still used', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('edurance.playlab.settings.v1', JSON.stringify({ sound: true, level: 'adventurer', voice: 'daisy' })));
     await installSynth(page, DEVICE);
-    await page.goto('/#/phonics');
-    await page.getByRole('button', { name: 'Say the name' }).click();
-    await expect.poll(async () => (await spoken(page)).length).toBe(1);
-    expect(await spoken(page)).toMatchObject([{ rate: 0.9, pitch: 1.05 }]);
-    await page.getByRole('button', { name: 'Play the sound' }).click();
-    await expect.poll(async () => (await spoken(page)).length).toBe(3);
-    // the lead-in and the example word are spoken at the normal rate: a slowed word would be distorted, not clearer
-    expect((await spoken(page))[1]).toMatchObject({ text: 'Listen for the sound in', rate: 0.9, pitch: 1.05 });
-    expect((await spoken(page))[2]).toMatchObject({ text: 'apple', rate: 0.9, pitch: 1.05 });
+    await page.goto('/#/alphabet');
+    await page.getByRole('button', { name: /^Letter B,/ }).click();
+    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(0);
+    expect(new Set((await spoken(page)).map((l) => l.voice))).toEqual(new Set([TEACHER]));
+    expect(await savedVoice(page)).toBe('daisy');
   });
 
-  test('with Sound off, Preview explains instead of speaking, and nothing is spoken', async ({ page }) => {
-    await installSynth(page, DEVICE);
-    await openSettings(page);
-    await page.getByRole('switch', { name: 'Sound' }).click();
-    await page.getByRole('button', { name: 'Preview voice' }).click();
-    await expect(page.getByText(/Sound is off/).first()).toBeVisible();
-    expect(await spoken(page)).toEqual([]);
-  });
-
-  test('voices that load late (voiceschanged) appear in the selector', async ({ page }) => {
+  test('voices that arrive late do not change the teacher voice', async ({ page }) => {
     await installSynth(page, DEVICE, { late: true });
-    await openSettings(page);
-    await expect(page.getByTestId('voice-unavailable')).toBeVisible();
+    await page.goto('/#/alphabet');
+    await page.getByRole('button', { name: /^Letter C,/ }).click();
     await page.evaluate(() => (window as unknown as { __voicesArrive: () => void }).__voicesArrive());
-    await expect(select(page)).toBeVisible();
-    await expect(select(page).locator('option')).toHaveCount(4);
+    await page.getByRole('button', { name: /^Letter D,/ }).click();
+    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(1);
+    expect(new Set((await spoken(page)).map((l) => l.voice))).toEqual(new Set([TEACHER]));
   });
-});
 
-test.describe('devices without ideal voices', () => {
-  test('no American voice: other English voices listed with a clear note', async ({ page }) => {
-    await installSynth(page, [DEVICE[2]!, DEVICE[3]!]);
+  test('a device with no English voice: the activities still work and nothing is thrown', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await installSynth(page, [{ name: 'Mandarin', lang: 'zh-CN', voiceURI: 'zh', localService: true }]);
+    await page.goto('/#/alphabet');
+    await page.getByRole('button', { name: /^Letter E,/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Letter Playground' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('Settings with the sound switch has no WCAG 2.1 A/AA violations', async ({ page }) => {
+    await installSynth(page, DEVICE);
     await openSettings(page);
-    expect(await select(page).locator('option').allTextContents()).toEqual(['Automatic (best American English)', 'Daisy (British English)']);
-    await expect(page.getByText(/No American English voice was found/)).toBeVisible();
+    const results = await new AxeBuilder({ page }).include('[role="dialog"][aria-label="Settings"]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    expect(results.violations, JSON.stringify(results.violations.map((v) => v.id))).toEqual([]);
   });
-
-  test('no English voice: no selector, a plain message, and the app still works', async ({ page }) => {
-    await installSynth(page, [DEVICE[3]!, DEVICE[4]!]);
-    await openSettings(page);
-    await expect(select(page)).toHaveCount(0);
-    await expect(page.getByTestId('voice-unavailable')).toContainText('No English voice was found');
-    await page.getByRole('radio', { name: /Explorer/ }).click();
-  });
-
-  test('no speech synthesis at all: Settings explains, activities still work', async ({ page }) => {
-    await page.addInitScript(() => Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true }));
-    await openSettings(page, 'alphabet');
-    await expect(page.getByTestId('voice-unavailable')).toContainText('cannot speak out loud');
-    await page.keyboard.press('Escape');
-    await page.locator('[data-letter="a"]').click();
-    await expect(page.locator('[data-letter="a"]')).toHaveAttribute('aria-pressed', 'true');
-  });
-});
-
-test('accessibility: Settings with the voice selector has no WCAG 2.1 A/AA violations, and works by keyboard', async ({ page }) => {
-  await installSynth(page, DEVICE);
-  await openSettings(page);
-  await page.waitForTimeout(300);
-  const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(r.violations.map((v) => `${v.id}: ${v.nodes[0]?.html.slice(0, 120)}`)).toEqual([]);
-  await select(page).focus();
-  await page.keyboard.press('ArrowDown');
-  await page.getByRole('button', { name: 'Preview voice' }).focus();
-  await page.keyboard.press('Enter');
-  await expect.poll(async () => (await spoken(page)).length).toBe(1);
 });

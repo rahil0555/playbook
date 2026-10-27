@@ -71,13 +71,7 @@ How it plays:
 * **Keyboard and assistive tech.** Letters and slots are real buttons (Enter on a letter, then Enter on a slot). Typing a letter places it in the first matching empty slot. Every placement, miss and hint is announced through a polite live region.
 * **Reduced motion.** With the OS setting (or `theme.motion: 'reduce'`) nothing moves: no jiggle, no flight, no trail; letters appear in their slot instantly, the star burst is omitted, the glow becomes an opacity fade, and the slot's filled colour plus the announcement still make the result clear.
 
-Difficulty levels (same three bands as the rest of PlayLab; the words come from the shared Word Builder list):
-
-| Level | Words | Decoy letters in the tray |
-| --- | --- | --- |
-| Starter | 3-letter words | **0** (easiest) |
-| Explorer | 3- and 4-letter words | **1** |
-| Adventurer (default) | all words | **2** |
+Every child plays at the full level: all the words, with two decoy letters in the tray. There is no level choice for a child; a host app that passes the `level` prop can still set one.
 
 **Decoy letters** are extra loose letters that are *not* in the word, so they fit no slot and dropping one just gives the gentle "different spot" feedback. They are chosen only from letters absent from the word, so a decoy can never stand in for a needed letter and **every word stays completable** at every level (checked by a unit test that solves all 18 words at all 3 levels).
 
@@ -87,25 +81,22 @@ Design rules followed everywhere: no timers, no penalties, no "wrong" wording, a
 
 ### Difficulty levels
 
-`starter` (Pre-K): 3-letter words, 5 short sentences, 3 answer choices, 3 pairs, no decoy letters in Word Builder ·
-`explorer` (K): adds 4-letter words and sentences ·
-`adventurer` (Grade 1, default): all content, 5 pairs, 4 choices.
-The host app can lock the level with the `level` prop; otherwise it is a setting (gear icon).
+The learner settings have no level choice (the Starter, Explorer and Adventurer picker was removed), and every child plays the full content: `adventurer` (all words and sentences, 5 pairs, 4 choices) is the default. The host app can still pass the `level` prop to set `starter`, `explorer` or `adventurer` for everyone; a saved level in an older device's settings is ignored.
 
 ---
 
-## Rewards and "things you love" (for children)
+## Rewards (for children)
 
 Built for children aged about 4–10, so nothing needs reading to be understood: pictures, sounds and big tap targets come first.
 
-* **Sticker book.** Every finished round earns the next sticker (a picture from the set: apple, cat, sun, fish, kite, dog, moon, whale, zebra, lion, tree, nest). Round 1 gives the first one. The book has twelve slots; locked slots show their number, and after twelve rounds the stickers repeat (the book shows the extra count). The round summary reveals the new sticker with a bounce, and the sticker book shows on **Home** and in **My Stars**. Stickers are not stored separately: they come from the rounds-finished count that progress already keeps, so there is no new data to lose or sync.
-* **Love it (hearts).** A big "Love it" button appears on the letter you are looking at in Letter Playground, on a word once you have spelled it in Magic Letters, and on a sentence once you have built it. Tap it to keep it, tap again to take it out. Loved things wait in **Things you love** on Home (tap one to hear it again) and in My Stars (with a Remove button). They are saved on this device, per learner, and contain no personal data. If the device blocks storage, the hearts still work for the visit.
+* **Sticker book.** Every finished round earns the next sticker (a picture from the set: apple, cat, sun, fish, kite, dog, moon, whale, zebra, lion, tree, nest). Round 1 gives the first one. The book has twelve slots; locked slots show their number, and after twelve rounds the stickers repeat (the book shows the extra count). The round summary reveals the new sticker with a bounce, and the sticker book shows on **Home** and in **My Stars**. The Letter Playground goal (five letters found) is a finished round too, so its sticker is revealed the first time it is earned. A round after the twelfth says "Extra sticker" and adds a repeat. Stickers are not stored separately: they come from the rounds-finished count that progress already keeps, so there is no new data to lose or sync.
+* **No "things you love".** The hearts and the Things you love lists were removed for children. Their saved data is kept on the device and is not shown.
 * **Magic Moments.** Touch answers feel alike across activities. A tapped word lifts and pops, and a tapped card pops; a placed word or letter travels into its spot and lands with a chime. A finished Magic Letters word makes its picture hop and throw stars; a finished sentence shows its key word big for a moment; a Missing Letter answer flies into the gap; a matched pair joins with a glowing line. Praise is spoken after the sound it follows, never on top of it, and nothing waits: the next step is there at once. Reduced motion keeps the sounds and drops the movement; sound off keeps the movement. The shared code is in `src/playlab/moments/` (`useMoments`, `FlyingTile`, `StarBurst`, `KeyWordReward`).
 * **Quality pass (completion and timing).** A finished Magic Letters word brings Pip hopping onto the picture's corner with a small burst; the spoken cheer and the sentence read-aloud now wait for their whole fanfare (the fanfare is 0.6 s long, and the old 0.45 s wait talked over it). The landing chime and burst fire when a Sentence Fun word has actually arrived, not on a timer. Feedback messages wrap their action button underneath on narrow screens instead of squeezing the text.
 * **Pip, the teacher.** Pip's speech bubble on Home reacts to progress ("Hi! I’m Pip, let’s learn together!" for a new child, then the sticker count). Pip also reacts with a hop after a right answer and a kind smile after a miss.
 * **Numbered stations.** The five activities on Home are numbered 1–5 like stops on an adventure trail, so a child can see the route.
 
-Reduced motion keeps all of this: stickers and hearts still appear and change; only the bounces, wobbles and hops are removed.
+Reduced motion keeps all of this: stickers still appear and change; only the bounces, wobbles and hops are removed.
 
 ## Visual system (storybook world)
 
