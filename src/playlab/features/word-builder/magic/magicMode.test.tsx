@@ -47,16 +47,18 @@ describe('Magic Letters: tap-to-select fallback', () => {
 
     await user.click(realTile('a'));
     expect(realTile('a')).toHaveAttribute('aria-pressed', 'true');
-    await user.click(slot(3)); // wrong slot (needs L)
-    expect(slot(3)).toHaveAttribute('data-state', 'empty');
-    expect(await screen.findByText(/different spot/)).toBeInTheDocument();
+    await user.click(slot(3)); // wrong slot (needs L): the letter lands there and stays, so the child can move it
+    expect(slot(3)).toHaveAttribute('data-state', 'wrong');
+    expect(slot(3).textContent).toBe('A');
+    expect(await screen.findByText(/isn’t in the right spot yet/)).toBeInTheDocument();
     expect(onAnswerSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ correct: false, expected: 'apple', response: 'a@4' }));
     expect(sfxLog).toContain('oops');
-    expect(realTile('a')).toHaveAttribute('aria-pressed', 'false'); // put down after a miss, still in the tray
+    expect(realTile('a')).toHaveAttribute('aria-pressed', 'false'); // put down after a miss, and still on the board
 
-    await place(user, 'a', 0);
+    await place(user, 'a', 0); // picked up from its wrong spot, and moved to the right one
     expect(slot(0)).toHaveAttribute('aria-label', 'Slot 1: A, done');
-    await vi.waitFor(() => expect(screen.queryByText(/different spot/)).toBeNull(), { timeout: 5000 }); // message clears after a good drop (after its exit animation)
+    expect(slot(3)).toHaveAttribute('data-state', 'empty');
+    await vi.waitFor(() => expect(screen.queryByText(/isn’t in the right spot yet/)).toBeNull(), { timeout: 5000 }); // message clears once nothing is in a wrong spot
   });
 
   it('tapping a slot with nothing picked up asks to pick a letter first (no miss recorded)', async () => {
@@ -103,7 +105,7 @@ describe('Magic Letters: decoys', () => {
     if (decoys[0]) {
       await user.click(decoys[0]);
       await user.click(slot(0));
-      expect(slot(0)).toHaveAttribute('data-state', 'empty');
+      expect(slot(0)).toHaveAttribute('data-state', 'wrong'); // it fits nowhere, so it is a wrong letter wherever it is put
     }
     typeWord(word);
     expect(await screen.findByText(/You spelled/, {}, { timeout: 4000 })).toBeInTheDocument();
@@ -111,26 +113,23 @@ describe('Magic Letters: decoys', () => {
 });
 
 describe('Magic Letters: hints, retry and typed letters', () => {
-  it('offers a hint after two misses: glowing slot + starred tile', async () => {
+  it('offers a hint after two misses: a glowing spot, and the starred letter that belongs there', async () => {
     const { user } = await openMagic();
-    for (let i = 0; i < 2; i++) {
-      await user.click(realTile('a'));
-      await user.click(slot(4));
-    }
-    await user.click(await screen.findByRole('button', { name: 'Start this word again' }));
-    expect(await screen.findByText('Need a hint?')).toBeInTheDocument();
-    expect(slot(0)).toHaveAttribute('data-state', 'hint');
-    expect(realTile('a').querySelector('.border-sky-300')).not.toBeNull(); // the sky-blue hint ring
+    await place(user, 'a', 4); // a wrong spot: the letter stays there
+    await place(user, 'p', 3); // another wrong spot
+    expect(slot(0)).toHaveAttribute('data-state', 'hint'); // the first spot that is not right yet
+    expect(realTile('a').querySelector('.border-sky-300')).not.toBeNull(); // the sky-blue hint ring is on the A that belongs there
   });
 
-  it('"Start this word again" clears placed letters and reshuffles', async () => {
+  it('Shuffle letters clears every placed letter and reshuffles, and nothing forces it', async () => {
     const { user } = await openMagic();
     await place(user, 'a', 0);
-    await user.click(realTile('p'));
-    await user.click(slot(4)); // miss
-    await user.click(await screen.findByRole('button', { name: 'Start this word again' }));
+    await place(user, 'p', 4); // a wrong spot: it stays, and nothing restarts the word by itself
+    expect(await screen.findByText(/isn’t in the right spot yet/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start this word again' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Shuffle letters' }));
     expect(slot(0)).toHaveAttribute('data-state', 'empty');
-    await vi.waitFor(() => expect(screen.queryByText(/different spot/)).toBeNull(), { timeout: 5000 });
+    await vi.waitFor(() => expect(screen.queryByText(/isn’t in the right spot yet/)).toBeNull(), { timeout: 5000 });
     expect(document.querySelectorAll('[data-magic-tile]')).toHaveLength(7); // all letters back in the tray
   });
 

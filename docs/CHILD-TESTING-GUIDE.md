@@ -87,11 +87,13 @@ letter on its glowing outline. Do each step on each device.
 1. **Tap-and-tap:** tap a letter, then tap its outline. The letter should fly to the outline and stay there.
 2. **Drag:** press a letter, drag it onto its outline, and let go. It should snap in. Try a drag that misses: the letter
    should spring back to where it came from, without a penalty.
-3. **Wrong spot:** put a letter on the wrong outline. The message should be kind ("That letter goes in a different
-   spot"), and the letter should go back to the pile. Note whether the word still reads as the answer.
+3. **Wrong spot:** put a letter on the wrong outline. The letter stays there, and the message should be kind ("That letter
+   isn't in the right spot yet"). Now move it: drag it to the outline that needs it, or tap it and then tap the outline.
+   Drag one letter onto another wrong letter: the two should swap. Note whether any letter was lost or doubled.
 4. **Hint:** after two misses, a hint appears (a glowing spot and a star on a letter). Check it helps and does not give
    the whole word away.
-5. **Retry:** tap **Start this word again** or **Shuffle letters**. The letters should be mixed again.
+5. **No restart needed:** a wrong letter never sends you back to the start. **Shuffle letters** is still there if you
+   want a fresh pile of letters.
 6. **Typing:** on a laptop, type the word on the keyboard, quickly. Each letter should go to the first free outline
    that matches it.
 7. **Completion:** finish a word. Check: the picture hops, Pip (the green helper) jumps up beside the picture with a
@@ -109,8 +111,9 @@ advance.) This is a release-blocking problem if it happens.
 1. Tap the words in the order you would say them. Each word should lift, a spot should glow, and the word should fly
    into it with a small chime.
 2. Tap quickly, several words in a row. Every word should end up in its own spot, none should disappear or swap.
-3. Put the words in the wrong order, then tap **Check my sentence**. The message should explain which words are right,
-   and **Try again** should be there.
+3. Put the words in the wrong order. Each word is checked as it lands (green when it is right, sun-coloured when it is
+   not). Drag a wrong word onto another word: the two should swap. Tap a wrong word, then tap the spot you want: it should
+   move there. A right word stays put. Check that a sentence fixed by swaps alone is celebrated.
 4. Put the words in the right order. Check the celebration: the key word appears big for a moment, the fanfare plays,
    and then the whole sentence is read aloud. The next sentence comes by itself once the celebration is over; there is no button to press.
 5. Fill-in sentences: tap the word that fits the gap. A wrong word should be kind and easy to try again.

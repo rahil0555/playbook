@@ -3,13 +3,16 @@ import type { PanInfo } from 'framer-motion';
 /**
  * The first element matching `selector` under the pointer at the end of a drag.
  * `elementsFromPoint` sees through the dragged element itself, so the drop
- * target underneath is found even though the tile is on top.
+ * target underneath is found even though the tile is on top. Pass the dragged
+ * element as `dragged`: it is skipped, because its own slot (its DOM parent) is
+ * where it came from, not where it is being dropped.
  */
-export function elementUnder(info: PanInfo, selector: string): HTMLElement | null {
+export function elementUnder(info: PanInfo, selector: string, dragged?: Element | null): HTMLElement | null {
   if (typeof document === 'undefined' || !document.elementsFromPoint) return null;
   const x = info.point.x - window.scrollX;
   const y = info.point.y - window.scrollY;
   for (const el of document.elementsFromPoint(x, y)) {
+    if (dragged?.contains(el)) continue;
     const hit = (el as HTMLElement).closest?.(selector) as HTMLElement | null;
     if (hit) return hit;
   }

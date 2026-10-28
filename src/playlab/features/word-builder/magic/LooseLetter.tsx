@@ -47,6 +47,8 @@ interface LooseLetterProps {
   onHoldStart: (tileId: string) => void;
   /** the letter is let go (before it is dropped): its sound stops at once */
   onHoldEnd: () => void;
+  /** the letter sits in a spot (a wrong one): it fills the spot instead of keeping the tray's size */
+  fill?: boolean;
 }
 
 /** Where the tile was when let go: the pointer position plus the grab offset, with the scale/tilt it had. */
@@ -67,7 +69,7 @@ function nearestSlot(el: HTMLElement | null): number | null {
  * let it go and it snaps back. A miss makes it wobble. Drag it onto a spot, or tap it to pick it up (then tap a spot). The drag
  * target is the outer button; the motion runs on inner spans so they never fight the drag.
  */
-export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop, onHoldStart, onHoldEnd }: LooseLetterProps) {
+export function LooseLetter({ tile, color, index, selected, hinted, disabled, wobbleKey, onTap, onHover, onDrop, onHoldStart, onHoldEnd, fill = false }: LooseLetterProps) {
   const { reducedMotion } = usePlayLab();
   const { sfx } = useSpeech();
   const squish = useAnimationControls();
@@ -176,7 +178,7 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
         feelTap();
         onTap(tile.id);
       }}
-      className={`pl-draggable relative z-10 grid cursor-grab place-items-center active:cursor-grabbing ${TILE_BOX}`}
+      className={`pl-draggable relative z-10 grid cursor-grab place-items-center active:cursor-grabbing ${fill ? 'h-full w-full' : TILE_BOX}`}
     >
       {selected && sparkle > 0 && !reducedMotion ? <StarBurst key={sparkle} seed={sparkle + index} count={5} spread={38} /> : null}
       {/* selected / hinted ring (a separate layer, so the tile keeps its shadow) */}

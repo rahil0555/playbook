@@ -1,18 +1,20 @@
+import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { usePlayLab } from '../../../app/PlayLabContext';
 import { LetterTileFace } from '../../../components/LetterTile';
 import { wave } from '../../../motion/variants';
 import { SnapBurst } from '../../../moments/SnapBurst';
 import { StarBurst } from '../../../moments/StarBurst';
+import type { MagicTile } from './magicBoard';
 
 interface OutlineSlotProps {
   index: number;
   /** the target letter for this slot (lowercase) */
   letter: string;
   color: string;
-  /** id of the tile that landed here */
-  landedId: string | null;
-  /** the flying letter has arrived: only now does the slot show its own letter (logic is already filled) */
+  /** the tile in this spot, once it has been put here (it may be a wrong letter) */
+  placed: MagicTile | null;
+  /** the letter has arrived: only now does the slot show it (logic is already filled) */
   landed: boolean;
   /** just landed: play the snap, the squash and the burst */
   fresh: boolean;
@@ -28,41 +30,63 @@ interface OutlineSlotProps {
   done: boolean;
   /** the word has landed its celebration: each monster cheers, in turn, left to right */
   celebrated: boolean;
-  /** is a tile currently picked up (tap fallback)? */
+  /** a letter is picked up (tap fallback): this spot is a place it can go */
   armed: boolean;
   onActivate: (index: number) => void;
+  /** a wrong letter that has landed here: the draggable letter itself */
+  children?: ReactNode;
 }
 
 /** a square that fills its column of the word's row (the row sets the size, see .pl-slot-row) */
 const TILE = 'aspect-square w-full';
 
 /**
- * A soft, glowing EMPTY outline (it never shows its target letter). The right letter flies in on its own layer (FlyingTile);
- * when it arrives the outline becomes that letter's monster, which snaps in with a squash, a glow flash, a burst of dots and
- * stars. The slot is a real button so the tap-to-place fallback works with mouse, touch and keyboard.
+ * A soft, glowing EMPTY outline (it never shows its target letter). The right letter flies in on its own layer (FlyingTile); when it
+ * arrives the outline becomes that letter's monster, which snaps in with a squash, a glow flash, a burst of dots and stars. A letter
+ * that is in the wrong spot stays here as a sun-coloured spot holding the letter, which can be dragged or tapped away.
+ * The slot is a real button when it is empty, so the tap-to-place fallback works with mouse, touch and keyboard.
  */
-export function OutlineSlot({ index, letter, color, landedId, landed, fresh, grand, over, hinted, next, done, celebrated, armed, onActivate }: OutlineSlotProps) {
+export function OutlineSlot({ index, letter, color, placed, landed, fresh, grand, over, hinted, next, done, celebrated, armed, onActivate, children }: OutlineSlotProps) {
   const { reducedMotion } = usePlayLab();
-  const filled = landedId !== null;
-  const label = filled ? `Slot ${index + 1}: ${letter.toUpperCase()}, done` : `Slot ${index + 1}, empty${armed ? '. Tap to place the letter you picked up' : ''}`;
+  const right = landed && placed !== null && placed.value === letter;
+  const wrong = landed && placed !== null && placed.value !== letter;
   const snap = fresh && !reducedMotion;
+
+  if (placed && wrong) {
+    return (
+      <div
+        data-magic-slot={index}
+        data-state={over ? 'over' : 'wrong'}
+        role="group"
+        aria-label={`Slot ${index + 1}: ${placed.value.toUpperCase()}, not this spot`}
+        onClick={(event) => event.target === event.currentTarget && onActivate(index)}
+        className={`relative grid place-items-center rounded-[1.8rem] ring-[3px] transition-[transform,background-color,box-shadow] ${TILE} ${
+          over || armed ? 'ring-sky-500 bg-sky-100' : 'ring-sun-500 bg-sun-100'
+        }`}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  const label = right ? `Slot ${index + 1}: ${letter.toUpperCase()}, done` : `Slot ${index + 1}, empty${armed ? '. Tap to place the letter you picked up' : ''}`;
   return (
     <button
       type="button"
       data-magic-slot={index}
-      data-state={filled ? 'filled' : over ? 'over' : hinted ? 'hint' : 'empty'}
+      data-state={right ? 'filled' : placed ? 'flying' : over ? 'over' : hinted ? 'hint' : 'empty'}
       data-landed={landed ? 'true' : 'false'}
       aria-label={label}
-      aria-disabled={filled}
-      onClick={() => !filled && onActivate(index)}
+      aria-disabled={right}
+      onClick={() => onActivate(index)}
       className={`relative grid place-items-center rounded-[1.8rem] transition-[transform,background-color,border-color] ${TILE} ${
-        landed
+        right
           ? ''
           : `border-[3px] border-dashed ${over ? 'pl-drop-pulse scale-105 border-sky-500 bg-sky-100' : armed ? 'border-sky-500 bg-white' : 'border-amber-400/90 bg-white/80'}`
       }`}
-      style={landed ? undefined : { boxShadow: over || armed ? undefined : 'inset 0 0 18px rgba(255,200,80,0.45), 0 0 0 4px rgba(255,255,255,0.6), 0 6px 0 rgba(160,110,60,0.12)' }}
+      style={right ? undefined : { boxShadow: over || armed ? undefined : 'inset 0 0 18px rgba(255,200,80,0.45), 0 0 0 4px rgba(255,255,255,0.6), 0 6px 0 rgba(160,110,60,0.12)' }}
     >
-      {!landed && (next || hinted || armed) ? (
+      {!right && (next || hinted || armed) ? (
         <span
           aria-hidden="true"
           className={`pointer-events-none absolute -inset-3 -z-10 rounded-[2.2rem] ${reducedMotion ? '' : 'pl-aura'}`}
@@ -72,7 +96,7 @@ export function OutlineSlot({ index, letter, color, landedId, landed, fresh, gra
 
       {/* An unfilled slot is an EMPTY glowing outline: the target letter is never drawn here (no ghost, watermark or
           stroke glyph), so the word cannot be read before the child has placed its letters. */}
-      {landed ? (
+      {right ? (
         <span className="relative block h-full w-full">
           {fresh ? (
             <motion.span

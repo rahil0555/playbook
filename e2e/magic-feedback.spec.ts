@@ -29,7 +29,7 @@ test.describe('Magic Letters feedback', () => {
     await tap(page, word[0]!);
     // "Spell the word!" is leaving now, and the clock is paused, so its exit has not finished
     await drop(page, wrong); // the first letter is wrong in this spot
-    await expect(page.getByText(/That letter goes in a different spot/)).toBeVisible();
+    await expect(page.getByText(/isn’t in the right spot yet/)).toBeVisible();
     await expect(page.getByText('Nice pick!')).toHaveCount(0);
   });
 

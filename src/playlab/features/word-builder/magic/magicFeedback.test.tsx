@@ -34,7 +34,7 @@ describe('Magic Letters feedback: a quick pick and drop', () => {
     const { user } = await openRound();
     await user.click(realTile('p'));
     await user.click(slot(1)); // the spot for I, so P is wrong here
-    expect(await screen.findByText(/That letter goes in a different spot/)).toBeInTheDocument();
+    expect(await screen.findByText(/isn’t in the right spot yet/)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Nice pick!')).not.toBeInTheDocument());
   });
 

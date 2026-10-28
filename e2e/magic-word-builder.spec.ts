@@ -66,25 +66,31 @@ test.describe('dragging', () => {
     await expect(slot.locator('svg')).toHaveCount(0, { timeout: 3000 }); // burst is brief
   });
 
-  test('a drop on the wrong slot springs back, shows kind feedback and nothing lands', async ({ page }) => {
+  test('a drop on the wrong slot lands and stays there as a letter that can be moved, with kind feedback and no restart', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     const wrongSlot = [...w.text].findIndex((c) => c !== w.text[0]);
     test.skip(wrongSlot < 0, 'word has one repeated letter only');
-    const tile = realTile(page, w.text[0]!);
-    const before = (await tile.boundingBox())!;
-    const scrollBefore = await page.evaluate(() => window.scrollY);
-    await dragTo(page, tile, wrongSlot);
-    await expect(page.getByText(/different spot/)).toBeVisible();
-    await expect(page.locator(`[data-magic-slot="${wrongSlot}"]`)).toHaveAttribute('data-state', 'empty');
-    await page.waitForTimeout(900);
-    const after = (await realTile(page, w.text[0]!).boundingBox())!;
-    // compared on the page, not the screen: the page may scroll a little to show the retry message (bounded below)
-    const scrollAfter = await page.evaluate(() => window.scrollY);
-    expect(scrollAfter - scrollBefore).toBeLessThan(80);
-    expect(Math.abs(after.x - before.x)).toBeLessThan(6);
-    expect(Math.abs(after.y + scrollAfter - (before.y + scrollBefore))).toBeLessThan(6);
+    await dragTo(page, realTile(page, w.text[0]!), wrongSlot);
+    await expect(page.getByText(/isn’t in the right spot yet/)).toBeVisible();
+    const spot = page.locator(`[data-magic-slot="${wrongSlot}"]`);
+    await expect(spot).toHaveAttribute('data-state', 'wrong');
+    await expect(spot.locator(`[data-magic-tile][data-value="${w.text[0]}"]`)).toHaveCount(1); // the letter is still on the board
+    await expect(page.getByRole('button', { name: 'Start this word again' })).toHaveCount(0);
     expect(await page.getByText(/wrong/i).count()).toBe(0);
+  });
+
+  test('a wrong letter is dragged from its spot onto the spot that needs it, and the spot it left is empty again', async ({ page }) => {
+    await openMagic(page);
+    const w = await currentWord(page);
+    const wrongSlot = [...w.text].findIndex((c) => c !== w.text[0]);
+    test.skip(wrongSlot < 0, 'word has one repeated letter only');
+    await dragTo(page, realTile(page, w.text[0]!), wrongSlot); // the letter stays in its wrong spot...
+    const placed = page.locator(`[data-magic-slot="${wrongSlot}"] [data-magic-tile]`);
+    await expect(page.locator(`[data-magic-slot="${wrongSlot}"]`)).toHaveAttribute('data-state', 'wrong');
+    await dragTo(page, placed, 0); // ...and is dragged from there to the spot that needs it
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'filled');
+    await expect(page.locator(`[data-magic-slot="${wrongSlot}"]`)).toHaveAttribute('data-state', 'empty');
   });
 
   test('releasing a tile in empty space just springs it back (no miss)', async ({ page }) => {
@@ -96,7 +102,7 @@ test.describe('dragging', () => {
     await page.mouse.down();
     await page.mouse.move(b.x + 200, b.y + 120, { steps: 8 });
     await page.mouse.up();
-    await expect(page.getByText(/different spot/)).toHaveCount(0);
+    await expect(page.getByText(/isn’t in the right spot yet|doesn’t go there/)).toHaveCount(0);
   });
 
   test('touch: a finger drag (CDP touch events) lands a letter without scrolling the page', async ({ browser }) => {
@@ -178,19 +184,19 @@ test.describe('rounds, progress, success and retry', () => {
     expect([...done].sort()).toEqual(englishWords.map((w) => w.id).sort());
   });
 
-  test('retry feedback offers "Start this word again" and a hint appears after two misses', async ({ page }) => {
+  test('retry feedback offers no restart, and a hint appears after two misses', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     const wrongSlot = [...w.text].findIndex((c) => c !== w.text[0]);
-    test.skip(wrongSlot < 0, 'degenerate word');
-    for (let i = 0; i < 2; i++) {
-      await realTile(page, w.text[0]!).click();
-      await page.locator(`[data-magic-slot="${wrongSlot}"]`).click();
-    }
-    await expect(page.getByRole('button', { name: 'Start this word again' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start this word again' }).click();
-    await expect(page.getByText('Need a hint?')).toBeVisible();
-    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'hint');
+    test.skip(wrongSlot < 0 || w.text.length < 3 || w.text[1] === w.text[0], 'degenerate word');
+    // two misses: the first letter goes to a wrong spot, and the second letter to the first spot, which it does not fit either
+    await realTile(page, w.text[0]!).click();
+    await page.locator(`[data-magic-slot="${wrongSlot}"]`).click();
+    await realTile(page, w.text[1]!).click();
+    await page.locator('[data-magic-slot="0"]').click();
+    await expect(page.getByRole('button', { name: 'Start this word again' })).toHaveCount(0);
+    // the hint is a star on the letter that belongs in the first spot that is not right yet
+    await expect(page.locator('[data-magic-tile]').filter({ hasText: '★' })).toHaveCount(1);
   });
 
   test('a finished word hops its letters, reads aloud, and the next word comes by itself', async ({ page }) => {
@@ -259,17 +265,18 @@ test.describe('learning integrity: the answer is never shown before it is placed
     expect(seen.size).toBe(englishWords.length);
   });
 
-  test('a wrong try (tap or drag) leaves the slot as an empty outline', async ({ page }) => {
+  test('a wrong try by tap keeps the letter in its wrong spot, and the answer stays hidden', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     const wrong = [...w.text].findIndex((c) => c !== w.text[0]);
+    test.skip(wrong < 0, 'degenerate word');
     await realTile(page, w.text[0]!).click();
     await page.locator(`[data-magic-slot="${wrong}"]`).click();
-    await expect(page.getByText(/different spot/)).toBeVisible();
-    await expectAnswerHidden(page, w.text);
-    await dragTo(page, realTile(page, w.text[0]!), wrong);
+    await expect(page.getByText(/isn’t in the right spot yet/)).toBeVisible();
+    // the letter the child put down is shown (it is theirs); the spots they have not filled still show nothing
+    await expectAnswerHidden(page, w.text, [wrong]);
     await page.waitForTimeout(700);
-    await expectAnswerHidden(page, w.text);
+    await expectAnswerHidden(page, w.text, [wrong]);
   });
 
   test('while the letter is flying the slot is still empty; the letter shows only once it has landed', async ({ page }) => {

@@ -142,19 +142,19 @@ test.describe('tap: the same bubble flies from the tray to the slot', () => {
     await expect(tile).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('a wrong slot never receives the letter: no flight, wobble and kind feedback instead', async ({ page }) => {
+  test('a wrong letter flies to its spot, wobbles there, and stays as a letter that can be moved; the feedback is kind', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     const wrong = w.text.split('').findIndex((c) => c !== w.text[0]);
+    test.skip(wrong < 0, 'degenerate word');
     await startSampler(page);
     await realTile(page, w.text[0]!).click();
     await slot(page, wrong).click();
     await page.waitForTimeout(900);
-    const frames = airborne(await stopSampler(page));
-    expect(frames).toHaveLength(0);
-    await expect(slot(page, wrong)).not.toHaveAttribute('data-state', 'filled');
-    await expect(page.getByText('That letter goes in a different spot')).toBeVisible();
-    await expect(realTile(page, w.text[0]!)).toBeVisible(); // still in the tray
+    expect(airborne(await stopSampler(page)).length).toBeGreaterThan(0); // it does fly, the same as a right letter
+    await expect(slot(page, wrong)).toHaveAttribute('data-state', 'wrong');
+    await expect(slot(page, wrong).locator('[data-magic-tile]')).toHaveCount(1); // it stays there, to be moved
+    await expect(page.getByText('That letter isn’t in the right spot yet. Drag it to another spot, or tap it and then tap a spot.')).toBeVisible();
   });
 
   test('tapping fast: several letters in flight at once all land correctly, nothing is blocked', async ({ page }) => {
@@ -247,14 +247,14 @@ test.describe('drag: the bubble travels on from where it was let go', () => {
     await expect(slot(page, 0)).toHaveAttribute('data-state', 'filled');
   });
 
-  test('a wrong drop springs back: the bubble never enters the slot', async ({ page }) => {
+  test('a wrong drop lands in its spot and stays there: the letter is shown and can be moved on from it', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     const wrong = w.text.split('').findIndex((c) => c !== w.text[0]);
+    test.skip(wrong < 0, 'degenerate word');
     const tile = realTile(page, w.text[0]!);
     const f = center((await tile.boundingBox())!);
     const to = center((await slot(page, wrong).boundingBox())!);
-    const scrollBefore = await page.evaluate(() => window.scrollY);
     await startSampler(page);
     await page.mouse.move(f.x, f.y);
     await page.mouse.down();
@@ -262,14 +262,13 @@ test.describe('drag: the bubble travels on from where it was let go', () => {
     await page.waitForTimeout(150);
     await page.mouse.up();
     await page.waitForTimeout(900);
-    expect(airborne(await stopSampler(page))).toHaveLength(0);
-    await expect(slot(page, wrong)).not.toHaveAttribute('data-state', 'filled');
-    await expect(tile).toBeVisible();
-    // compared on the page: the page may scroll a little to show the retry message (bounded below)
-    const scrollAfter = await page.evaluate(() => window.scrollY);
-    const back = center((await tile.boundingBox())!);
-    expect(scrollAfter - scrollBefore).toBeLessThan(80);
-    expect(Math.hypot(back.x - f.x, back.y + scrollAfter - (f.y + scrollBefore))).toBeLessThan(8); // sprang back to its spot
+    expect(airborne(await stopSampler(page)).length).toBeGreaterThan(0);
+    await expect(slot(page, wrong)).toHaveAttribute('data-state', 'wrong');
+    await expect(slot(page, wrong).locator(`[data-magic-tile][data-value="${w.text[0]}"]`)).toHaveCount(1);
+    // the spot it sits in is where the eye goes: the letter is centred on the spot
+    const spot = center((await slot(page, wrong).boundingBox())!);
+    const letter = center((await slot(page, wrong).locator('[data-magic-tile]').boundingBox())!);
+    expect(Math.hypot(letter.x - spot.x, letter.y - spot.y)).toBeLessThan(8);
   });
 });
 

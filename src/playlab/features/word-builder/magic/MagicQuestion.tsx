@@ -27,7 +27,7 @@ import { letterTileColor } from '../../../components/LetterTile';
 import { evaluateVoiceAnswer, normalizeAnswer } from '../../../services/speechInput/evaluate';
 import type { RecognizedResult } from '../../../services/speechInput/recognizer';
 import { StorybookCutscene } from './StorybookCutscene';
-import { buildMagicTiles, emptyMagicSlots, isMagicDone, isTilePlaced, nextHint, slotFor, tryPlace, type MagicSlots, type MagicTile } from './magicBoard';
+import { buildMagicTiles, emptyMagicSlots, isRightAt, isSpelled, isTilePlaced, misplacedSlots, moveTile, nextHint, slotFor, type MagicSlots, type MagicTile } from './magicBoard';
 
 /** the gap between the letters of a word spelled by voice: each one flies in on its own */
 const VOICE_LETTER_GAP_MS = 380;
@@ -56,6 +56,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   const [over, setOver] = useState<number | null>(null);
   const [fresh, setFresh] = useState<number | null>(null);
   const [wobble, setWobble] = useState<Record<string, number>>({});
+  /** a letter is in the wrong spot (or a typed letter did not fit): the child is told, gently, and can move it */
   const [missed, setMissed] = useState(false);
   /** feedback for a spoken answer: `counted` when it was judged (a wrong word is an attempt); otherwise the child is asked to say it again */
   const [voiceNote, setVoiceNote] = useState<{ text: string; counted: boolean } | null>(null);
@@ -66,6 +67,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   const [landed, setLanded] = useState<ReadonlySet<number>>(() => new Set());
   const [grand, setGrand] = useState<number | null>(null);
   const landedRef = useRef(new Set<number>());
+  /** spots a flying letter is on its way to: nothing else is dropped there until that letter has landed */
+  const inFlight = useRef(new Set<number>());
   const generation = useRef(0);
   const scene = useRef<HTMLDivElement>(null);
   const freshTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -118,9 +121,12 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebrated]);
 
-  const done = isMagicDone(slots);
-  /** every letter is in place AND has finished landing: now the word is "complete" */
+  /** the word is spelled: every spot holds its own letter (a wrong board is never spelled) */
+  const done = isSpelled(target, slots, tiles);
+  /** spelled AND every letter has finished landing: now the word is "complete" */
   const complete = done && landed.size === target.length;
+  /** the spots that hold a letter that does not belong there yet */
+  const misplaced = misplacedSlots(target, slots, tiles);
   const hint = !done && round.attempts >= 2 ? nextHint(target, slots, tiles) : null;
   /** a finished story word plays the tennis reward once: the counter moves when the word becomes complete, not on every render */
   const storyActive = storyStage !== undefined;
@@ -129,10 +135,11 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     if (storyActive && complete) setTennisRun((n) => n + 1);
   }, [complete, storyActive]);
 
+  /** A typed letter that fits nowhere: it is not placed, the child is told, and it wobbles. */
   const miss = useCallback(
-    (tile: MagicTile, slotIndex: number | null) => {
+    (tile: MagicTile) => {
       sfx('oops');
-      round.submit(`${tile.value}${slotIndex === null ? '' : `@${slotIndex + 1}`}`, word.text, false);
+      round.submit(`${tile.value}`, word.text, false);
       setWobble((w) => ({ ...w, [tile.id]: (w[tile.id] ?? 0) + 1 }));
       setMissed(true);
       setVoiceNote(null);
@@ -151,9 +158,9 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   };
 
   /**
-   * Pip has landed on the word: one event. The letters take their gold finish, the strip shows a green ring, the
-   * confetti bursts, and the fanfare plays now. The spoken cheer follows the fanfare's first note, not the whole fanfare,
-   * so it is heard during the celebration. (Scheduled by Pip's hop in CompletionCreature.)
+   * The word is spelled and its last letter has landed: one event. Pip hops on, the letters take their gold finish, the strip shows
+   * a green ring, the confetti bursts, and the fanfare plays now. The spoken cheer follows the fanfare's first note, not the whole
+   * fanfare, so it is heard during the celebration. (Scheduled by Pip's hop in CompletionCreature.)
    */
   const onCreatureLand = useCallback(() => {
     setCelebrated(true);
@@ -166,41 +173,41 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     cheered.current = lastDone.then(() => (gen === generation.current ? moments.say(`Hooray! You spelled ${word.text}!`).done : undefined));
   }, [fire, moments, stripRing, word.text]);
 
-  /** A letter has arrived visually: show it in its slot, and on the last one start the completion (Pip's hop, then the landing). */
-  const land = useCallback(
-    (slotIndex: number, tileId: string) => {
-      if (landedRef.current.has(slotIndex)) return;
-      landedRef.current.add(slotIndex);
-      setLanded(new Set(landedRef.current));
-      const last = landedRef.current.size === target.length;
-      setFresh(slotIndex);
-      setGrand(last ? slotIndex : null);
-      clearTimeout(freshTimer.current);
-      freshTimer.current = setTimeout(() => setFresh(null), 1200);
-      if (last) {
-        // beat 1: the last letter lands, a gold splash spreads under the word and the picture gives a small shake as Pip
-        // leaps off it. Beat 2 (about half a second later): Pip lands on the word and the landing happens (onCreatureLand).
-        sfx('sparkle');
-        setSplash((n) => n + 1);
-        if (!reducedMotion) void animal.start({ rotate: [0, -7, 6, -3, 0], scale: [1, 1.06, 1], transition: { duration: 0.5, ease: 'easeOut' } });
-        setCreature((c) => ({ n: c.n + 1, from: launchOffset() }));
-      } else {
-        sfx('chime');
-      }
-      // the letter's own sound for this word, after its chime; not said again if it was said when the tile was picked up
-      const alreadySaid = soundedTiles.current.delete(tileId);
-      const id = word.sounds[slotIndex];
-      if (id && !alreadySaid && phonicsGate.allow(id)) lastSound.current = moments.sayPhonic(id);
-    },
-    [target.length, sfx, reducedMotion, animal, word.sounds, moments, phonicsGate],
-  );
+  /** the last letter has landed: a gold splash, a small shake of the picture, and Pip leaps off it toward the word */
+  const finishWord = (slotIndex: number) => {
+    sfx('sparkle');
+    setSplash((n) => n + 1);
+    setGrand(slotIndex);
+    if (!reducedMotion) void animal.start({ rotate: [0, -7, 6, -3, 0], scale: [1, 1.06, 1], transition: { duration: 0.5, ease: 'easeOut' } });
+    setCreature((c) => ({ n: c.n + 1, from: launchOffset() }));
+  };
 
-  const onFlightLand = useCallback(
-    (f: Flight) => {
-      if (f.generation === generation.current) land(f.slotIndex, f.id);
-    },
-    [land],
-  );
+  /**
+   * A letter has arrived in a spot. A right letter gets its chime and its own sound, and when it completes the word, the completion
+   * starts (Pip's hop, then the landing). A wrong letter is simply there, to be moved: no chime, no sound.
+   */
+  const land = (slotIndex: number, tileId: string) => {
+    inFlight.current.delete(slotIndex);
+    if (landedRef.current.has(slotIndex)) return;
+    landedRef.current.add(slotIndex);
+    setLanded(new Set(landedRef.current));
+    setFresh(slotIndex);
+    clearTimeout(freshTimer.current);
+    freshTimer.current = setTimeout(() => setFresh(null), 1200);
+    // a letter already said when its tile was picked up is not said again
+    const alreadySaid = soundedTiles.current.delete(tileId);
+    const value = tiles.find((t) => t.id === tileId)?.value;
+    if (value !== target[slotIndex]) return;
+    if (isSpelled(target, slotsRef.current, tiles) && landedRef.current.size === target.length) finishWord(slotIndex);
+    else sfx('chime');
+    // the letter's own sound for this word, after its chime
+    const id = word.sounds[slotIndex];
+    if (id && !alreadySaid && phonicsGate.allow(id)) lastSound.current = moments.sayPhonic(id);
+  };
+
+  const onFlightLand = (f: Flight) => {
+    if (f.generation === generation.current) land(f.slotIndex, f.id);
+  };
   const onFlightDone = useCallback((f: Flight) => setFlights((all) => all.filter((x) => x.id !== f.id)), []);
 
   /** Where the bubble is now and where its slot is, relative to the scene; null when nothing can be measured. */
@@ -225,36 +232,81 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     };
   };
 
-  /** Judge one drop (drag, tap-tap, or typed letter). `pose` = where a dragged bubble was let go. */
-  const attempt = useCallback(
-    (tileId: string, slotIndex: number, pose: Pose | null = null) => {
-      if (done) return;
-      const tile = tiles.find((t) => t.id === tileId);
-      if (!tile) return;
-      const result = tryPlace(target, slotsRef.current, tiles, tileId, slotIndex);
-      if (result.kind === 'placed') {
-        commitSlots(result.slots);
-        setSelected(null);
-        setMissed(false);
-        setVoiceNote(null);
-        if (isMagicDone(result.slots)) round.submit(word.text, word.text, true);
-        // the success message is itself a live region, so the status line never repeats "You spelled…"
-        setAnnounce(`${tile.value.toUpperCase()} placed in slot ${slotIndex + 1}.`);
-        const flight = reducedMotion ? null : planFlight(tile, slotIndex, pose);
-        if (flight) setFlights((all) => [...all, flight]);
-        else land(slotIndex, tileId); // reduced motion (or nothing to measure): appear in place, no travel
-      } else if (result.kind === 'wrong') {
-        miss(tile, slotIndex);
-      } else if (result.kind === 'occupied') {
-        setAnnounce(`Slot ${slotIndex + 1} is already filled.`);
-        setSelected(null);
-      }
-    },
-    [done, tiles, target, round, word.text, reducedMotion, land, miss],
-  );
+  /**
+   * Put a letter on a spot: a letter from the tray (dragged, tapped, or spelled by voice), or a letter already on the board that is
+   * moved or swapped. `pose` = where a dragged letter was let go. Every drop is judged at once: a letter in the wrong spot stays
+   * there, and it can be moved on from there.
+   */
+  const attempt = (tileId: string, slotIndex: number, pose: Pose | null = null) => {
+    if (done) return;
+    const tile = tiles.find((t) => t.id === tileId);
+    if (!tile) return;
+    if (inFlight.current.has(slotIndex)) {
+      setAnnounce(`Wait for the letter to land in slot ${slotIndex + 1}.`);
+      return;
+    }
+    const result = moveTile(target, slotsRef.current, tiles, tileId, slotIndex);
+    if (result.kind === 'locked') {
+      setAnnounce(`Slot ${slotIndex + 1} already has its letter.`);
+      return;
+    }
+    if (result.kind !== 'moved') return;
+    const right = tile.value === target[slotIndex];
+    const next = result.slots;
+    commitSlots(next);
+    setSelected(null);
+    setVoiceNote(null);
+    setMissed(misplacedSlots(target, next, tiles).length > 0);
+    if (right) {
+      setAnnounce(`${tile.value.toUpperCase()} placed in slot ${slotIndex + 1}.`);
+    } else {
+      sfx('oops');
+      round.submit(`${tile.value}@${slotIndex + 1}`, word.text, false);
+      setWobble((w) => ({ ...w, [tile.id]: (w[tile.id] ?? 0) + 1 }));
+      setAnnounce(`${tile.value.toUpperCase()} doesn’t go in slot ${slotIndex + 1}. Move it to another spot.`);
+    }
+    if (isSpelled(target, next, tiles)) round.submit(word.text, word.text, true);
 
+    if (result.from !== null) {
+      // a letter moved by hand is there at once: it does not fly. The spot it left is empty, unless a letter was swapped into it.
+      if (next[result.from] === null) landedRef.current.delete(result.from);
+      setLanded(new Set(landedRef.current));
+      landedRef.current.delete(slotIndex);
+      land(slotIndex, tileId);
+      return;
+    }
+    // a letter from the tray flies to its spot (or appears at once with reduced motion, or when nothing can be measured). A letter
+    // it replaces has gone back to the tray, so the spot is empty until the new letter lands.
+    landedRef.current.delete(slotIndex);
+    setLanded(new Set(landedRef.current));
+    const flight = reducedMotion ? null : planFlight(tile, slotIndex, pose);
+    if (flight) {
+      inFlight.current.add(slotIndex);
+      setFlights((all) => [...all, flight]);
+    } else land(slotIndex, tileId);
+  };
+
+  /** A letter in the tray: picked up (with its sound), or, with another letter picked up, that letter goes to its spot. */
   const tapTile = (tileId: string) => {
     if (done) return;
+    const at = slotsRef.current.indexOf(tileId);
+    if (at >= 0) {
+      // a letter already on the board: with another letter picked up, that one goes to this spot (a swap, or a replacement)
+      if (selected !== null && selected !== tileId) {
+        tapSlot(at);
+        return;
+      }
+      if (isRightAt(target, slotsRef.current, tiles, at)) {
+        setAnnounce('That letter is already in the right spot.');
+        return;
+      }
+      const picking = selected !== tileId;
+      setSelected(picking ? tileId : null);
+      setVoiceNote(null);
+      setPicks((n) => n + 1);
+      setAnnounce(picking ? `${tiles.find((t) => t.id === tileId)?.value.toUpperCase()} picked up. Now choose a spot.` : 'Put the letter down.');
+      return;
+    }
     // the pop itself is played by the tile (LooseLetter); here the picked-up letter's phonics sound is spoken
     const t = tiles.find((x) => x.id === tileId);
     const picking = selected !== tileId;
@@ -264,7 +316,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     if (picking && t) {
       // the sound this letter makes in THIS word: the spot it is heading for is the first empty one with that letter.
       // A decoy, a spare copy, or a silent letter has no sound here: picking it still stops the sound before it.
-      const slot = slotFor(target, slotsRef.current, t.value);
+      const slot = slotFor(target, slotsRef.current, tiles, t.value);
       const id = slot !== null ? (word.sounds[slot] ?? null) : null;
       // a sound just said for this letter is not repeated (rapid taps)
       if (id === null || phonicsGate.allow(id)) {
@@ -284,18 +336,36 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
       void animal.start({ rotate: [0, -10, 8, -6, 3, 0], scale: [1, 1.1, 0.94, 1.04, 1], transition: { duration: 0.6, ease: 'easeInOut' } });
     }
   };
+  /** a spot is tapped: the letter picked up goes there (a move, a swap, or a replacement) */
   const tapSlot = (slotIndex: number) => {
-    if (selected) attempt(selected, slotIndex);
+    if (isRightAt(target, slotsRef.current, tiles, slotIndex)) setAnnounce(`Slot ${slotIndex + 1} already has its letter.`);
+    else if (selected) attempt(selected, slotIndex);
     else setAnnounce('Pick up a letter first, then choose a spot.');
   };
   const dropTile = (tileId: string, slotIndex: number | null, pose: Pose | null) => {
-    if (slotIndex === null) return; // dropped in empty space: it just springs back
+    if (slotIndex === null) {
+      // dropped in empty space: a letter that was in a spot goes back to the tray; a letter from the tray springs back
+      if (isTilePlaced(slotsRef.current, tileId)) takeBack(tileId);
+      return;
+    }
     attempt(tileId, slotIndex, pose);
+  };
+  /** a letter dragged out of its spot and let go in empty space goes back to the tray; its spot is empty again */
+  const takeBack = (tileId: string) => {
+    const at = slotsRef.current.indexOf(tileId);
+    if (at < 0) return;
+    const next = slotsRef.current.map((id) => (id === tileId ? null : id));
+    landedRef.current.delete(at);
+    setLanded(new Set(landedRef.current));
+    commitSlots(next);
+    setSelected(null);
+    setMissed(misplacedSlots(target, next, tiles).length > 0);
+    setAnnounce(`${tiles.find((t) => t.id === tileId)?.value.toUpperCase()} is back in the tray.`);
   };
   /** A letter held down repeats the sound it makes in this word, until it is let go (only one sound at a time). */
   const holdTile = (tileId: string) => {
     const t = tiles.find((x) => x.id === tileId);
-    const slot = t ? slotFor(target, slotsRef.current, t.value) : null;
+    const slot = t ? slotFor(target, slotsRef.current, tiles, t.value) : null;
     const id = slot !== null ? (word.sounds[slot] ?? null) : null;
     stop();
     if (id) loopPhonic(id);
@@ -309,15 +379,13 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
 
   /**
    * A correct spoken word is spelled the way a child would spell it: one letter after another, each through the same judgement
-   * as a tap or a drag. The completion that follows is the one drops already use, so there is a single completion path.
+   * as a tap or a drag. The spot that is not right yet is the one filled next; a letter still flying there is waited for.
    */
   const spellByVoice = () => {
     const step = () => {
-      const now = slotsRef.current;
-      const slot = now.findIndex((s) => s === null);
-      const tile = slot < 0 ? undefined : tiles.find((t) => !t.decoy && t.value === target[slot] && !isTilePlaced(now, t.id));
-      if (slot < 0 || !tile) return;
-      attemptRef.current(tile.id, slot);
+      const now = nextHint(target, slotsRef.current, tiles);
+      if (!now) return;
+      if (!inFlight.current.has(now.slotIndex)) attemptRef.current(now.tileId, now.slotIndex);
       voiceTimer.current = setTimeout(step, VOICE_LETTER_GAP_MS);
     };
     clearTimeout(voiceTimer.current);
@@ -350,7 +418,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     setVoiceNote({ text: verdict.feedback, counted: true });
   };
 
-  // Typing a letter places it in the first matching empty slot (keyboard / screen-reader friendly).
+  // Typing a letter puts it in the first spot that needs it (keyboard / screen-reader friendly), exactly as a drop would: a
+  // wrong letter there is replaced. A copy of the letter already on the board in a wrong spot is moved from there.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || done || !/^[a-z]$/i.test(e.key)) return;
@@ -358,11 +427,13 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const value = e.key.toLowerCase();
       const now = slotsRef.current;
-      const tile = tiles.find((x) => x.value === value && !isTilePlaced(now, x.id));
+      const spot = slotFor(target, now, tiles, value);
+      const tile =
+        tiles.find((x) => x.value === value && !isTilePlaced(now, x.id)) ??
+        (spot === null ? undefined : tiles.find((x) => x.value === value && !isRightAt(target, now, tiles, now.indexOf(x.id))));
       if (!tile) return;
-      const idx = slotFor(target, now, value);
-      if (idx === null) miss(tile, null);
-      else attempt(tile.id, idx);
+      if (spot === null) miss(tile);
+      else attempt(tile.id, spot);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -382,6 +453,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     stripRing.set({ opacity: 0 });
     generation.current += 1; // flights still in the air belong to the old round
     landedRef.current = new Set();
+    inFlight.current.clear();
     setLanded(new Set());
     setFlights([]);
     setGrand(null);
@@ -394,6 +466,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   };
 
   const nextSlot = slots.findIndex((x) => x === null);
+  const selectedOnBoard = selected !== null && isTilePlaced(slots, selected);
   const mood = complete ? 'cheer' : missed ? 'oops' : selected ? 'think' : 'happy';
 
   return (
@@ -446,25 +519,49 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
             {storyStage && tennisRun > 0 ? <TennisScene key={`tennis-${tennisRun}`} reducedMotion={reducedMotion} /> : null}
             {splash > 0 && !reducedMotion ? <WordSplash key={splash} /> : null}
             <motion.span aria-hidden="true" initial={{ opacity: 0 }} animate={stripRing} className="pointer-events-none absolute inset-0 rounded-[2rem] border-4 border-brand-500" />
-            {target.map((letter, i) => (
-              <OutlineSlot
-                key={i}
-                index={i}
-                letter={letter}
-                color={colorOf(letter)}
-                landedId={slots[i] ?? null}
-                landed={landed.has(i)}
-                fresh={fresh === i}
-                grand={grand === i}
-                over={over === i}
-                hinted={hint?.slotIndex === i}
-                next={nextSlot === i && !done}
-                done={celebrated}
-                celebrated={celebrated}
-                armed={selected !== null}
-                onActivate={tapSlot}
-              />
-            ))}
+            {target.map((letter, i) => {
+              const placed = slots[i] ? (tiles.find((t) => t.id === slots[i]) ?? null) : null;
+              const wrongHere = placed !== null && placed.value !== letter && landed.has(i);
+              return (
+                <OutlineSlot
+                  key={i}
+                  index={i}
+                  letter={letter}
+                  color={colorOf(letter)}
+                  placed={placed}
+                  landed={landed.has(i)}
+                  fresh={fresh === i}
+                  grand={grand === i}
+                  over={over === i}
+                  hinted={hint?.slotIndex === i}
+                  next={nextSlot === i && !done}
+                  done={celebrated}
+                  celebrated={celebrated}
+                  armed={selected !== null}
+                  onActivate={tapSlot}
+                >
+                  {/* a letter in the wrong spot is the letter itself: it can be dragged to another spot, or tapped and moved */}
+                  {wrongHere && placed ? (
+                    <LooseLetter
+                      key={placed.id}
+                      tile={placed}
+                      color={colorOf(placed.value)}
+                      index={i}
+                      fill
+                      selected={selected === placed.id}
+                      hinted={hint?.tileId === placed.id}
+                      disabled={done}
+                      wobbleKey={wobble[placed.id] ?? 0}
+                      onTap={tapTile}
+                      onHover={setOver}
+                      onDrop={dropTile}
+                      onHoldStart={holdTile}
+                      onHoldEnd={releaseTile}
+                    />
+                  ) : null}
+                </OutlineSlot>
+              );
+            })}
           </div>
 
           {/* phones: the tiles in even rows of at most four (the tray's padding holds each row to its width), so the tray and the outlines fit on one screen */}
@@ -506,13 +603,13 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
                 <FeedbackMessage key="ok" tone="success" title={`${pickLine(PRAISE, round.index)} Hooray!`}>
                   You spelled <strong>{word.text}</strong>! On to the next one…
                 </FeedbackMessage>
-              ) : missed ? (
-                <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
-                  That letter goes in a different spot. Try another!
+              ) : missed && !done ? (
+                <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)}>
+                  {misplaced.length > 0 ? 'That letter isn’t in the right spot yet. Drag it to another spot, or tap it and then tap a spot.' : 'That letter doesn’t go there. Try another!'}
                 </FeedbackMessage>
               ) : voiceNote ? (
                 voiceNote.counted ? (
-                  <FeedbackMessage key="voice-retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>
+                  <FeedbackMessage key="voice-retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)}>
                     {voiceNote.text}
                   </FeedbackMessage>
                 ) : (
@@ -526,7 +623,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
                 </FeedbackMessage>
               ) : selected ? (
                 <FeedbackMessage key="picked" tone="info" mood="think" nudge={picks} title="Nice pick!">
-                  Now tap its glowing spot, or drag it there.
+                  {selectedOnBoard ? 'Now tap another spot to move it there, or tap it again to put it down.' : 'Now tap its glowing spot, or drag it there.'}
                 </FeedbackMessage>
               ) : (
                 <FeedbackMessage key="idle" tone="info" mood={mood} nudge={landed.size} title="Spell the word!">

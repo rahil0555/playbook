@@ -184,7 +184,7 @@ describe('Magic Letters feel: typing and finishing the word', () => {
     const { user } = await openRound();
     await user.click(realTile('g'));
     await user.click(slot(0)); // G does not go on the empty P spot: the retry message appears
-    await user.click(await screen.findByRole('button', { name: 'Start this word again' }));
+    await user.click(await screen.findByRole('button', { name: 'Shuffle letters' }));
     const stops = timeline.filter((e) => e.kind === 'stop');
     const restart = stops[stops.length - 1]!; // the restart stops whatever the first attempt still had going
     await pause(400);

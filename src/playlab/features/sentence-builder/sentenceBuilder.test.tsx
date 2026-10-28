@@ -124,15 +124,67 @@ describe('Sentence builder', () => {
     expect(screen.getByRole('button', { name: 'Clear' })).toBeEnabled();
   });
 
-  it('a placed word goes back to the tray when it is tapped, and its slot is empty again for the next word', async () => {
+  it('a placed word is picked up by a tap; a tap on another spot moves it there, and a tap on the same word puts it down', async () => {
     const { user } = renderPlayLab({ initialActivity: 'sentences' });
     await screen.findByText(ARRANGE);
-    await user.click(word('The'));
-    await vi.waitFor(() => expect(placed()).toBe(1), { timeout: 2000 });
-    await user.click(screen.getByRole('button', { name: /^word The, in slot 1\./ }));
-    await vi.waitFor(() => expect(placed()).toBe(0), { timeout: 2000 });
+    await arrange(user, ['cat']); // the first tray word goes to the next spot: "cat" lands in spot 1 (wrong: "The" belongs there)
+    const cat = () => screen.getByRole('button', { name: /^word cat, in slot 1\./ });
+    await user.click(cat());
+    expect(cat()).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^word cat, in slot 1\. Picked up/ })).toBeInTheDocument();
+    await user.click(document.querySelector<HTMLElement>('[data-slot="2"]')!); // the spot for "is": cat moves there
+    await vi.waitFor(() => expect(document.querySelector('[data-slot="2"] [data-tile]')?.getAttribute('data-value')).toBe('cat'), { timeout: 2000 });
     expect(document.querySelector('[data-slot="0"]')?.getAttribute('data-state')).toBe('empty');
-    expect(document.querySelectorAll('ul[aria-label="Available words"] [data-tile]')).toHaveLength(4);
-    expect(screen.getByRole('button', { name: 'Clear' })).toBeDisabled();
+    expect(placed()).toBe(1);
+    expect(document.querySelectorAll('ul[aria-label="Available words"] [data-tile]')).toHaveLength(3);
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 3\./ }));
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 3\./ })); // a second tap on the same word puts it down
+    expect(screen.getByRole('button', { name: /^word cat, in slot 3\./ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('a placed word is swapped with the placed word it is tapped onto, and nothing is lost', async () => {
+    const { user } = renderPlayLab({ initialActivity: 'sentences' });
+    await screen.findByText(ARRANGE);
+    await arrange(user, ['cat', 'The']); // "cat" in spot 1, "The" in spot 2: both wrong
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 1\./ }));
+    await user.click(screen.getByRole('button', { name: /^word The, in slot 2\./ })); // tapping the other word is tapping its spot
+    await vi.waitFor(() => expect(document.querySelector('[data-slot="0"] [data-tile]')?.getAttribute('data-value')).toBe('The'), { timeout: 2000 });
+    expect(document.querySelector('[data-slot="1"] [data-tile]')?.getAttribute('data-value')).toBe('cat');
+    expect(placed()).toBe(2);
+    expect(document.querySelectorAll('ul[aria-label="Available words"] [data-tile]')).toHaveLength(2);
+  });
+
+  it('a sentence that is full but in the wrong order is fixed by swaps alone, and then it is celebrated (every change is judged again)', async () => {
+    const onAnswerSubmit = vi.fn();
+    const { user } = renderPlayLab({ initialActivity: 'sentences', onAnswerSubmit });
+    await screen.findByText(ARRANGE);
+    await arrange(user, ['cat', 'The', 'sleeping', 'is']); // the whole sentence, wrong
+    expect(await screen.findByText(/Green words are in the right place/)).toBeInTheDocument();
+    expect(onAnswerSubmit).toHaveBeenCalledTimes(1);
+
+    // swap "sleeping" and "is": the two spots are then right
+    await user.click(screen.getByRole('button', { name: /^word sleeping, in slot 3\./ }));
+    await user.click(screen.getByRole('button', { name: /^word is, in slot 4\./ }));
+    await vi.waitFor(() => expect(document.querySelector('[data-slot="2"]')?.getAttribute('data-state')).toBe('correct'), { timeout: 2000 });
+    // swap "cat" and "The": the sentence is now right, and it is judged as soon as the last swap lands
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 1\./ }));
+    await user.click(screen.getByRole('button', { name: /^word The, in slot 2\./ }));
+    expect(await screen.findByText(/You made a whole sentence/, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(onAnswerSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ correct: true }));
+    expect(screen.getByLabelText('The cat is sleeping.')).toBeInTheDocument();
+  });
+
+  it('a word that is right is locked: it cannot be picked up, and a word cannot be dropped over it', async () => {
+    const { user } = renderPlayLab({ initialActivity: 'sentences' });
+    await screen.findByText(ARRANGE);
+    await arrange(user, ['The']); // right in spot 1
+    const the = screen.getByRole('button', { name: /^word The, in slot 1\. In the right place/ });
+    expect(the).toBeDisabled();
+    await user.click(word('sleeping')); // spot 2 wants "cat": wrong, so it lands and stays
+    await vi.waitFor(() => expect(placed()).toBe(2), { timeout: 2000 });
+    await user.click(screen.getByRole('button', { name: /^word sleeping, in slot 2\./ }));
+    await user.click(document.querySelector<HTMLElement>('[data-slot="0"]')!); // a tap on the right word's spot: refused
+    expect(document.querySelector('[data-slot="0"] [data-tile]')?.getAttribute('data-value')).toBe('The');
+    expect(screen.getByRole('button', { name: /^word sleeping, in slot 2\./ })).toHaveAttribute('aria-pressed', 'true');
   });
 });

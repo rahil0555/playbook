@@ -69,30 +69,31 @@ describe('Magic Letters never reveals the answer (PIG)', () => {
     for (const d of tiles().filter((t) => t.dataset.decoy === 'true')) expect('pig').not.toContain(d.dataset.value!);
   });
 
-  it('stays empty after a wrong try, and after the hint appears (two misses)', async () => {
+  it('after two wrong letters the answer is still not shown: each wrong letter is the child’s own, and the hint is a star on a letter', async () => {
     const { user } = await openPig();
-    for (let i = 0; i < 2; i++) {
-      await user.click(realTile('i'));
-      await user.click(slot(0)); // PIG starts with P, so I does not fit here
-    }
-    expect(slot(0)).toHaveAttribute('data-state', 'hint'); // the glowing hint spot...
-    for (const s of slots()) expect(s.textContent).toBe(''); // ...is still an empty outline
-    // after "Start this word again" the hint text shows and the glowing spot is STILL an empty outline
-    await user.click(await screen.findByRole('button', { name: 'Start this word again' }, { timeout: 4000 }));
-    expect(await screen.findByText('Need a hint?', {}, { timeout: 4000 })).toBeInTheDocument();
-    expect(slot(0)).toHaveAttribute('data-state', 'hint');
-    for (const s of slots()) expect(s.textContent).toBe('');
+    await user.click(realTile('i'));
+    await user.click(slot(0)); // PIG starts with P, so I does not fit here: it stays in this spot, to be moved
+    await user.click(realTile('g'));
+    await user.click(slot(1)); // and G does not fit the I's spot
+    expect(slot(0)).toHaveAttribute('data-state', 'wrong');
+    expect(slot(0).textContent).toBe('I'); // the child's own letter...
+    expect(slot(1).textContent).toBe('G');
+    expect(slot(2).textContent).toBe(''); // ...and the empty spot keeps its secret
+    expect(slot(0).textContent).not.toMatch(/P/);
+    expect(realTile('p').querySelector('.border-sky-300')).not.toBeNull(); // the hint after two misses: a star on the P that belongs first
   });
 
   it('placing the right letters still works: only a landed letter shows, and only in its own slot', async () => {
     const { user } = await openPig();
     await user.click(realTile('i'));
-    await user.click(slot(0)); // wrong slot
-    expect(slot(0).textContent).toBe('');
-    expect(slot(0)).toHaveAttribute('data-state', 'empty');
+    await user.click(slot(0)); // wrong slot: it shows the child's own I, in that spot only
+    expect(slot(0).textContent).toBe('I');
+    expect(slot(0)).toHaveAttribute('data-state', 'wrong');
+    expect(slot(1).textContent).toBe('');
+    expect(slot(2).textContent).toBe('');
 
     await user.click(realTile('p'));
-    await user.click(slot(0));
+    await user.click(slot(0)); // the P goes to its own spot, and replaces the I, which goes back to the tray
     expect(slot(0)).toHaveAttribute('aria-label', 'Slot 1: P, done');
     expect(slot(0).textContent?.toUpperCase()).toBe('P'); // (CSS upper-cases it on screen)
     expect(slot(1).textContent).toBe(''); // the other slots keep their secret

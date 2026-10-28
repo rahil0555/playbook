@@ -15,7 +15,7 @@ import { elementUnder } from '../../lib/dom';
 import { PRAISE, pickLine, TRY_AGAIN } from '../../lib/messages';
 import { shuffle } from '../../lib/random';
 import {
-  clearSlots, emptySlots, filledCount, isComplete, isCorrect, makeTiles, placeTile, removeTile,
+  clearSlots, emptySlots, filledCount, isComplete, isCorrect, makeTiles, moveTile, removeTile,
   scramble, slotStates, slotValues, type SlotState, type Slots, type Tile,
 } from '../../lib/tiles';
 import { correctVariants, incorrectVariants, springs, wave } from '../../motion/variants';
@@ -141,11 +141,10 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
     if (status === 'wrong') setStatus('building');
     setStates(undefined);
   };
+  /** a word goes to a spot: an empty one, or swapped with the word there. A right word is never moved, so a drop over one is refused. */
   const place = (id: string, i?: number) => {
     if (solved) return;
-    // the slot was chosen when the tile was picked up: if another word has taken it since, use the first free slot
-    // instead of overwriting that word (the sound and the glide are the tile board's)
-    setSlots((s) => placeTile(s, id, i !== undefined && (s[i] === null || s[i] === id) ? i : undefined));
+    setSlots((s) => moveTile(s, tiles, target, id, i) ?? s);
     touched();
   };
   const remove = (id: string) => {
@@ -166,11 +165,13 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
       onWrong();
     }
   };
-  // runs once per completion: it fires when the slots go from incomplete to complete, not on every render (judge reads
-  // the slots of the render in which the sentence became complete)
+  // every change to the words of a full sentence is judged again: a swap that fixes the order is celebrated at once, and a wrong
+  // one is shown at once. It runs on each change of the words, not on every render (judge reads the words of the render in
+  // which they changed).
   useEffect(() => {
     if (complete) judge();
-  }, [complete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots]);
   const retry = () => {
     setSlots((s) => s.map((id, i) => (states?.[i] === 'correct' ? id : null)));
     setStatus('building');
@@ -215,7 +216,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
           </FeedbackMessage>
         ) : (
           <FeedbackMessage key="idle" tone="info" nudge={filledCount(slots)} title="Let’s build it!">
-            Put the words in the right order. Tap a word, then tap its spot, or drag it there.
+            Put the words in the right order. Drag a word onto a spot to move it, or onto another word to swap them. Or tap a word, then tap the spot you want.
           </FeedbackMessage>
         )}
       </AnimatePresence>
