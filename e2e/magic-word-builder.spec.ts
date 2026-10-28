@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { englishWords } from '../src/playlab/data/en/words';
-import { expect, test } from './helpers';
+import { expect, test, waitForNextItem } from './helpers';
 
 // Focused tests for the "Magic Letters" mode of Word Builder. Existing specs are not modified.
 
@@ -37,7 +37,7 @@ async function finishRound(page: Page) {
     const w = await currentWord(page);
     for (const ch of w.text) await page.keyboard.press(ch);
     await expect(page.getByText(/You spelled/)).toBeVisible();
-    await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+    await waitForNextItem(page);
   }
 }
 
@@ -162,6 +162,7 @@ test.describe('rounds, progress, success and retry', () => {
   });
 
   test('every word in the content set can be finished in Magic mode', async ({ page }) => {
+    test.setTimeout(150_000); // each word waits for its celebration before the next one comes
     await openMagic(page);
     const done = new Set<string>();
     for (let round = 0; round < 4 && done.size < englishWords.length; round++) {
@@ -170,7 +171,7 @@ test.describe('rounds, progress, success and retry', () => {
         done.add(w.id);
         for (const ch of w.text) await page.keyboard.press(ch);
         await expect(page.getByText(/You spelled/)).toBeVisible();
-        await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+        await waitForNextItem(page);
       }
       if (done.size < englishWords.length) await page.getByRole('button', { name: 'Play again' }).click();
     }
@@ -192,12 +193,12 @@ test.describe('rounds, progress, success and retry', () => {
     await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'hint');
   });
 
-  test('a finished word hops its letters, reads aloud and offers Next word', async ({ page }) => {
+  test('a finished word hops its letters, reads aloud, and the next word comes by itself', async ({ page }) => {
     await openMagic(page);
     const w = await currentWord(page);
     for (const ch of w.text) await page.keyboard.press(ch);
     await expect(page.getByText('Great job!').or(page.getByText(/Awesome|You got it|Super|Brilliant|Well done/)).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
     await expect(page.locator('[data-magic-tile]')).toHaveCount(0); // tray cleared
   });
 });
@@ -251,7 +252,7 @@ test.describe('learning integrity: the answer is never shown before it is placed
         if (w.text.length > 1) await expectAnswerHidden(page, w.text, [...w.text].flatMap((c, i) => (c === w.text[0] ? [i] : [])).slice(0, 1));
         for (const ch of w.text.slice(1)) await page.keyboard.press(ch);
         await expect(page.getByText(/You spelled/)).toBeVisible();
-        await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+        await waitForNextItem(page);
       }
       if (seen.size < englishWords.length) await page.getByRole('button', { name: 'Play again' }).click();
     }

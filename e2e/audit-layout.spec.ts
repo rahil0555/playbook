@@ -52,6 +52,8 @@ const AUDIT = (): Finding => {
   // content that sticks out of the box that clips it (a card, a board, a scroller)
   const clipped = [...document.querySelectorAll<HTMLElement>('p, span, h1, h2, h3, button, label, [data-tile], [data-magic-tile], [data-option]')]
     .filter((el) => vis(el) && !el.closest('.sr-only'))
+    // the storybook card is a transient cutscene that turns over on its own: its page-turn is not the layout at rest
+    .filter((el) => !el.closest('.pl-storybook-overlay'))
     .filter((el) => {
       const r = el.getBoundingClientRect();
       let anc = el.parentElement;
@@ -94,7 +96,8 @@ async function visitStates(page: Page, w: number) {
   const target = englishWords.find((x) => x.clue === clue1)!;
   for (const ch of target.text) await page.keyboard.press(ch);
   await page.getByText(/You spelled/).waitFor();
-  await page.waitForTimeout(1500);
+  // the finished word is measured once its landing burst has cleared, and before it moves on by itself (about 1.7 s after the last letter)
+  await page.waitForTimeout(1200);
   report['magic-complete'] = await page.evaluate(AUDIT);
   // Magic Letters: a wrong letter, then a second miss
   await page.reload();

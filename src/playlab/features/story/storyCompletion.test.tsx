@@ -30,15 +30,12 @@ describe('finishing the story', () => {
     expect(screen.getByRole('button', { name: 'Hear “are”' })).toHaveAttribute('data-state', 'target');
 
     await spell(user, 'are');
-    await user.click(await screen.findByRole('button', { name: 'Next word' }));
-
-    expect(await screen.findByRole('button', { name: 'Hear “One”' })).toHaveAttribute('data-state', 'target');
+    // no Next button: the next sentence comes by itself once the celebration is over
+    expect(await screen.findByRole('button', { name: 'Hear “One”' }, { timeout: 6000 })).toHaveAttribute('data-state', 'target');
     expect(screen.getByText('Sentence 2 of 2, word 1 of 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hear “are”' })).toBeNull();
 
     await spell(user, 'one');
-    await user.click(await screen.findByRole('button', { name: 'Finish' }));
-
-    expect(await screen.findByText('You spelled every word in all 2 sentences!')).toBeInTheDocument();
-  });
+    expect(await screen.findByText('You spelled every word in all 2 sentences!', {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 20000);
 });

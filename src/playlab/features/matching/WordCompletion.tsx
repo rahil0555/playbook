@@ -40,7 +40,8 @@ function Question({ round, q }: { round: Round<BlankQuestion>; q: BlankQuestion 
     setLanded(true);
     fire('burst', { x: 50, y: 30 });
     setCelebration((n) => n + 1);
-    moments.celebrateThenSay(word); // the fanfare, then the word read aloud once it has finished
+    // the fanfare, then the word read aloud once it has finished; the next word waits for that reading (useRound's celebration)
+    round.celebrate(moments.celebrateThenSay(word).done);
   };
 
   /** from the chosen letter's button to the blank, measured in the question's own box */
@@ -155,13 +156,8 @@ function Question({ round, q }: { round: Round<BlankQuestion>; q: BlankQuestion 
       <div className="min-h-[6rem]">
         <AnimatePresence mode="wait">
           {landed ? (
-            <FeedbackMessage
-              key="ok"
-              tone="success"
-              title={`${pickLine(PRAISE, round.index)} Hooray!`}
-              action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-            >
-              <strong>{word}</strong> needs the letter <strong>{q.answer.toUpperCase()}</strong>.
+            <FeedbackMessage key="ok" tone="success" title={`${pickLine(PRAISE, round.index)} Hooray!`}>
+              <strong>{word}</strong> needs the letter <strong>{q.answer.toUpperCase()}</strong>. On to the next one…
             </FeedbackMessage>
           ) : showRetry ? (
             <FeedbackMessage key="retry" tone="retry" nudge={wrong.length} title={pickLine(TRY_AGAIN, wrong.length)} action={{ label: 'Try again', onClick: () => { setWrong([]); setShowRetry(false); }, icon: 'refresh' }}>

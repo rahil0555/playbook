@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { englishSentences } from '../src/playlab/data/en/sentences';
 import { englishWords } from '../src/playlab/data/en/words';
-import { expect, installFakeSpeech, test } from './helpers';
+import { expect, installFakeSpeech, test, waitForNextItem } from './helpers';
 
 // Reliability on real devices: speech that must stop when the child leaves, the page is hidden or a round restarts;
 // controls that must stay tappable under the sound message; layout at a 320 px phone; touch targets.
@@ -68,7 +68,7 @@ test.describe('nothing is spoken on its own', () => {
       const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
       const fill = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string))!;
       await page.locator(`[data-option="${fill.words[fill.blankIndex!]}"]`).click();
-      await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click();
+      await waitForNextItem(page);
       await page.waitForTimeout(500);
     }
     await page.locator('[data-tile][data-placed="false"]').first().waitFor();
@@ -135,7 +135,7 @@ test.describe('speech stops when the child leaves', () => {
       const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
       const fill = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string))!;
       await page.locator(`[data-option="${fill.words[fill.blankIndex!]}"]`).click();
-      await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click();
+      await waitForNextItem(page);
       await page.waitForTimeout(500);
     }
     await page.locator('[data-tile][data-placed="false"]').first().waitFor();
@@ -199,11 +199,11 @@ test.describe('the sound message never blocks the controls', () => {
     // no speech on this device: the message appears after the first attempt
     await page.getByRole('button', { name: 'Hear the clue' }).click();
     await expect(page.getByRole('status').filter({ hasText: /no spoken voice|Spoken words/ })).toBeVisible();
-    const next = page.getByRole('button', { name: /^(Next word|Finish)$/ });
-    // on a short phone the button can be below the fold: scroll to it the way a child would, then compare the boxes
+    const next = page.getByText(/On to the next one/);
+    // on a short phone the success message can be below the fold: scroll to it the way a child would, then compare the boxes
     await next.scrollIntoViewIfNeeded();
     const boxes = await page.evaluate(() => {
-      const n = [...document.querySelectorAll('button')].find((b) => /^(Next word|Finish)$/.test(b.textContent?.trim() ?? ''))!;
+      const n = [...document.querySelectorAll('p,div')].filter((el) => /On to the next one/.test(el.textContent ?? '')).pop()!;
       const s = [...document.querySelectorAll('[role="status"]')].find((el) => /no spoken voice|Spoken words|Sound can’t play/.test(el.textContent ?? ''));
       const a = n.getBoundingClientRect();
       const b = s!.getBoundingClientRect();
@@ -212,8 +212,8 @@ test.describe('the sound message never blocks the controls', () => {
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return { overlap, hit: !!top && (top === n || n.contains(top)) };
     });
-    expect(boxes.overlap, 'the sound message does not sit over the Next button').toBe(false);
-    expect(boxes.hit, 'a tap on Next reaches Next').toBe(true);
+    expect(boxes.overlap, 'the sound message does not sit over the success message').toBe(false);
+    expect(boxes.hit, 'the success message is not covered').toBe(true);
   });
 
   test('the message says there is no spoken voice here (the sound effects still play)', async ({ page }) => {
@@ -247,7 +247,7 @@ test.describe('the next step is in reach on a short phone', () => {
       const word = await openMagic(page);
       for (const ch of word.text) await page.keyboard.press(ch);
       await expect(page.getByText(/You spelled/)).toBeVisible();
-      await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeInViewport({ timeout: 3000 });
+      await expect(page.getByText(/On to the next one/)).toBeInViewport({ timeout: 3000 });
     });
   }
 
@@ -265,7 +265,7 @@ test.describe('the next step is in reach on a short phone', () => {
       const s = englishSentences.find((x) => x.mode === 'arrange' && [...x.words].sort().join('|') === [...tiles].sort().join('|'))!;
       for (const w of s.words) await page.locator(`[data-tile][data-value="${w}"][data-placed="false"]`).first().click();
     }
-    await expect(page.getByRole('button', { name: /^(Next sentence|Finish)$/ })).toBeInViewport({ timeout: 3000 });
+    await expect(page.getByText(/On to the next one/)).toBeInViewport({ timeout: 3000 });
   });
 });
 

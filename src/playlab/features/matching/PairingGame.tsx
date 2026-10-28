@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { usePlayLab } from '../../app/PlayLabContext';
 import { CelebrationEffect, useBurst } from '../../components/CelebrationEffect';
@@ -8,6 +8,7 @@ import { PairingBoard, type PairItem } from '../../components/PairingBoard';
 import { ProgressIndicator } from '../../components/ProgressIndicator';
 import { RoundSummary } from '../../components/RoundSummary';
 import { useSpeech } from '../../hooks/useAudio';
+import { useProgression } from '../../hooks/useProgression';
 import { SPEECH_AFTER_SOUND_MS, useMoments } from '../../moments/useMoments';
 import { Illustration } from '../../illustrations/Illustration';
 import { letterColor } from '../../lib/accents';
@@ -58,6 +59,11 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   const startedAt = useRef(Date.now());
   const started = useRef(false);
   const wrongTimer = useRef<ReturnType<typeof setTimeout>>();
+  const progression = useProgression();
+  /** the pairs matched so far, read the moment a pair is matched: a double tap on one pair is one match, never two */
+  const matchedRef = useRef<ReadonlySet<string>>(new Set());
+  /** the round's completion, recorded at its last pair; its summary follows the celebration */
+  const completion = useRef<ActivityCompletion | null>(null);
 
   useEffect(() => {
     if (started.current) return;
@@ -107,24 +113,25 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
     return { left: shuffle(leftItems), right: shuffle(rightItems) };
   }, [letters, variant, sayLetterSound, sayWord, moments]);
 
-  const finish = useCallback(() => {
+  /** the round is finished at its last pair: it is recorded at once, and its summary follows the celebration (useProgression) */
+  const finishRound = () => {
+    if (completion.current) return;
     const score = firstTry.current;
-    setSummary(
-      recordCompletion({
-        activityId: 'matching',
-        score,
-        total,
-        stars: starsForScore(score, total),
-        durationMs: Date.now() - startedAt.current,
-        variant,
-      }),
-    );
-  }, [recordCompletion, total, variant]);
+    completion.current = recordCompletion({
+      activityId: 'matching',
+      score,
+      total,
+      stars: starsForScore(score, total),
+      durationMs: Date.now() - startedAt.current,
+      variant,
+    });
+    progression.arm('finish', () => setSummary(completion.current), null);
+  };
 
   const attempt = (leftId: string, rightId: string) => {
     const l = left.find((i) => i.id === leftId);
     const r = right.find((i) => i.id === rightId);
-    if (!l || !r || matched.has(l.pairId)) return;
+    if (!l || !r || matchedRef.current.has(l.pairId)) return;
     const n = (attempts.current[l.pairId] = (attempts.current[l.pairId] ?? 0) + 1);
     const ok = l.pairId === r.pairId;
     recordAnswer({ activityId: 'matching', questionId: `${variant}:${l.pairId}`, correct: ok, attempt: n, response: r.pairId, expected: l.pairId });
@@ -133,9 +140,10 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
       moments.chime();
       fire('burst', { x: 50, y: 40 });
       setMessage('none');
-      const next = new Set(matched).add(l.pairId);
+      const next = new Set(matchedRef.current).add(l.pairId);
+      matchedRef.current = next;
       setMatched(next);
-      if (next.size === total) setTimeout(finish, 900);
+      if (next.size === total) finishRound();
     } else {
       sfx('oops');
       setWrong({ left: leftId, right: rightId });
@@ -146,11 +154,14 @@ export function PairingGame({ variant, onPickGame }: { variant: Variant; onPickG
   };
 
   const restart = () => {
+    progression.cancel(); // a summary still counting down belongs to the round that is being left
     setLetters(pickLetters(content.letters, total));
+    matchedRef.current = new Set();
     setMatched(new Set());
     setWrong(null);
     setMessage('none');
     setSummary(null);
+    completion.current = null;
     attempts.current = {};
     firstTry.current = 0;
     startedAt.current = Date.now();

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { englishStories } from '../src/playlab/data/en/story';
-import { expect, installFakeSpeech, installScriptedSpeech, setHearing, spoken, test } from './helpers';
+import { expect, installFakeSpeech, installScriptedSpeech, setHearing, spoken, test, waitForNextItem } from './helpers';
 
 // The read-along stories: the child spells each sentence's words in order, each with the tennis reward, and the next sentence loads
 // once the last word of the one before is spelled. Speech is a mock, so these tests show how the app behaves, not what a real
@@ -42,7 +42,7 @@ test.describe('the story: the reference sentence, built word by word', () => {
       await expect(page.getByText(`Sentence 1 of ${englishStories.length}, word ${i + 1} of ${first.targets.length}`)).toBeVisible();
       await spellCurrent(page);
       await expect(page.locator('[data-story-tennis]')).toBeVisible();
-      await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+      await waitForNextItem(page);
     }
     await expect(page.locator('[data-story-sentence] p')).toHaveText(second.sentence);
     await expect(page.getByText(`Sentence 2 of ${englishStories.length}, word 1 of ${second.targets.length}`)).toBeVisible();
@@ -101,7 +101,7 @@ test.describe('the story: reduced motion and no spoken voice', () => {
     await openStory(page);
     await expect(page.getByText(/This device has no spoken voice/)).toBeVisible({ timeout: 5000 });
     await spellCurrent(page);
-    await expect(page.getByRole('button', { name: 'Next word' })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
   });
 });
 

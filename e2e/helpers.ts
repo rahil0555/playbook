@@ -124,8 +124,15 @@ export const setHearing = (page: Page, script: { transcript?: string; error?: st
 
 export const speechStarts = (page: Page) => page.evaluate(() => (window as unknown as { __speech: { starts: number } }).__speech.starts);
 
-export async function nextOrFinish(page: Page) {
-  await page.getByRole('button', { name: /^(Next word|Next sentence|Next|Finish)$/ }).click();
+/**
+ * A right answer moves the round on by itself: the success message shows, the celebration runs, then the next item (or the round's
+ * summary) comes. This waits for that, so a test never clicks a Next button that no longer exists.
+ */
+export async function waitForNextItem(page: Page) {
+  const message = page.getByText(/On to the next one/);
+  // the last item ends in the round's summary, which has no message: the wait then only checks that the message has gone
+  await message.first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => undefined);
+  await expect(message).toHaveCount(0, { timeout: 10000 });
 }
 
 /** Solve the current word-builder (Magic Letters) question by typing its letters. Returns the word. */
@@ -144,7 +151,7 @@ export async function solveWord(page: Page) {
 export async function solveSentence(page: Page) {
   // wait for the question to render (tiles for "arrange", options for "fill") before deciding which kind it is
   await page.locator('[data-tile], [data-option]').first().waitFor();
-  if (await page.getByText('Finish the sentence').isVisible()) {
+  if (await page.getByRole('heading', { level: 2, name: 'Finish the sentence', exact: true }).isVisible()) {
     const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
     const s = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string) && (x.distractors ?? []).every((d) => options.includes(d)))!;
     await page.locator(`[data-option="${s.words[s.blankIndex!]}"]`).click();

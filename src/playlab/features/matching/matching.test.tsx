@@ -116,9 +116,10 @@ describe('Word completion', () => {
           expect(await screen.findByText(/Say the word out loud/, {}, { timeout: 4000 })).toBeInTheDocument();
         }
         await user.click(document.querySelector<HTMLElement>(`[data-choice="${answer}"]`)!);
-        await user.click(await screen.findByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }, { timeout: 4000 })); // appears after the idle bubble's short exit
+        // no Next or Finish button: the next question comes by itself once this one's celebration is over (the loop waits for it)
+        expect(screen.queryByRole('button', { name: /^(Next word|Finish)$/ })).toBeNull();
       }
-      expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 4000 })).toBeInTheDocument();
+      expect(await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 8000 })).toBeInTheDocument();
       expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ variant: 'word-completion', total: 5 }));
     } finally {
       fixedRound.words = [];

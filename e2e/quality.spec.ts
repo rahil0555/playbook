@@ -4,7 +4,7 @@ import { englishSentences } from '../src/playlab/data/en/sentences';
 import { englishWords } from '../src/playlab/data/en/words';
 import { flightDuration } from '../src/playlab/moments/flightPath';
 import { CREATURE_HOP_MS, SPEECH_AFTER_SOUND_MS } from '../src/playlab/moments/timing';
-import { expect, installFakeSpeech, test } from './helpers';
+import { expect, installFakeSpeech, test, waitForNextItem } from './helpers';
 
 /** One frame at 60 Hz: the unit of scheduling allowance in the timing checks below. */
 const FRAME_MS = 1000 / 60;
@@ -146,7 +146,7 @@ async function openArrangeSentence(page: Page) {
     const options = await page.locator('[data-option]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.option as string));
     const fill = englishSentences.find((x) => x.mode === 'fill' && options.includes(x.words[x.blankIndex ?? 0] as string))!;
     await page.locator(`[data-option="${fill.words[fill.blankIndex!]}"]`).click();
-    await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click();
+    await waitForNextItem(page);
   }
   await page.locator('[data-tile][data-placed="false"]').first().waitFor();
   await page.waitForTimeout(400);
@@ -254,10 +254,11 @@ for (const [device, viewport] of [
         return {
           aboveLetters: creature.bottom <= firstSlot.top + 1,
           slots: [...document.querySelectorAll('[data-magic-slot]')].filter(hit).length,
-          buttons: [...document.querySelectorAll('button')].filter((b) => /Next word|Finish/.test(b.textContent ?? '') && hit(b)).length,
+          // the innermost element that holds the message, not the boxes around it
+          messages: [...document.querySelectorAll('p,div')].filter((el) => /On to the next one/.test(el.textContent ?? '') && ![...el.querySelectorAll('p,div')].some((c) => /On to the next one/.test(c.textContent ?? '')) && hit(el)).length,
         };
       });
-      expect(geometry, 'Pip sits above the word and covers no letter slot and no control').toEqual({ aboveLetters: true, slots: 0, buttons: 0 });
+      expect(geometry, 'Pip sits above the word and covers no letter slot and no message').toEqual({ aboveLetters: true, slots: 0, messages: 0 });
       // the fanfare is not on the drop: it starts with Pip's landing, after the last letter has landed
       const timing = await read<LastLetterTiming>(page, '__last');
       const fanfare = (await tones(page)).find((x) => x.f === 523 && x.t >= timing.landedAt);
@@ -289,8 +290,8 @@ for (const [device, viewport] of [
         'key press to cheer: the longest flight, then Pip\'s hop and the spoken delay, plus two frames of scheduling',
       ).toBeLessThanOrEqual(LONGEST_FLIGHT_MS + CREATURE_HOP_MS + SPEECH_AFTER_SOUND_MS + 2 * FRAME_MS);
       expect((await speech(page)).filter((x) => x.text.startsWith('Hooray')).length).toBe(1);
-      // the child can carry on at once
-      await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click({ timeout: 1000 });
+      // the child carries on: the next word comes by itself once the celebration is over
+      await waitForNextItem(page);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });
 
@@ -438,7 +439,7 @@ for (const [device, viewport] of [
       await expect.poll(async () => (await speech(page)).some((x) => x.text === sentence), { timeout: 2000 }).toBe(true);
       const line = (await speech(page)).find((x) => x.text === sentence);
       expect(line!.t - fanfare!.t, 'the sentence waits for the fanfare to finish').toBeGreaterThanOrEqual(600);
-      await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click({ timeout: 1000 });
+      await waitForNextItem(page);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });
 
@@ -448,7 +449,7 @@ for (const [device, viewport] of [
       await instrument(page);
       await openArrangeSentence(page);
       const s = await arrangeFast(page);
-      await expect(page.getByRole('button', { name: /^(Next sentence|Finish)$/ })).toBeVisible({ timeout: 3000 });
+      await expect(page.getByText(/On to the next one/)).toBeVisible({ timeout: 3000 });
       expect(s.words.length).toBeGreaterThan(0);
       expect(await tones(page)).toEqual([]);
       expect(await speech(page)).toEqual([]);

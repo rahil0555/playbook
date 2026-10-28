@@ -74,8 +74,9 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
     fire('burst', { x: 50, y: 40 });
     setReward((r) => ({ id: (r?.id ?? 0) + 1, word: keyWordOf(sentence), color: REWARD_COLOURS[sentence.words.length % REWARD_COLOURS.length] as string }));
     void controls.start('correct');
-    moments.celebrateThenSay(text); // the fanfare first, then the sentence read aloud once it has finished
-  }, [controls, fire, moments, sentence, text]);
+    // the fanfare first, then the sentence read aloud; the next sentence waits for that reading (useRound's celebration)
+    round.celebrate(moments.celebrateThenSay(text).done);
+  }, [controls, fire, moments, round, sentence, text]);
 
   const fail = useCallback(() => {
     sfx('oops');
@@ -105,13 +106,8 @@ export function SentenceQuestion({ round, sentence }: { round: Round<SentenceEnt
           <div>
             <AnimatePresence mode="wait">
               {solved ? (
-                <FeedbackMessage
-                  key="ok"
-                  tone="success"
-                  title={`${pickLine(PRAISE, round.index)} Hooray!`}
-                  action={{ label: round.index + 1 < round.total ? 'Next sentence' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-                >
-                  You made a whole sentence!
+                <FeedbackMessage key="ok" tone="success" title={`${pickLine(PRAISE, round.index)} Hooray!`}>
+                  You made a whole sentence! On to the next one…
                 </FeedbackMessage>
               ) : null}
             </AnimatePresence>
@@ -183,16 +179,21 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
 
   if (solved) return <SolvedSentence sentence={sentence} />;
 
+  // each placed word is checked as soon as it lands (right or wrong), before the whole sentence is judged; the next empty slot glows
+  const live = slotStates(slots, tiles, target);
+  const nextSlot = slots.findIndex((id) => id === null);
+
   return (
     <>
-      <h2 className="pl-wood mx-auto w-fit rounded-full px-6 py-1 text-center font-display text-xl font-bold sm:text-2xl">Make the sentence</h2>
+      <h2 className="pl-wood mx-auto w-fit rounded-full px-6 py-1 text-center font-display text-xl font-bold sm:text-2xl">Put the words in order</h2>
       <motion.div variants={{ ...incorrectVariants, ...correctVariants }} animate={controls} initial="idle">
         <TileBoard
           tiles={tiles}
           slots={slots}
           onPlace={place}
           onRemove={remove}
-          slotStates={states}
+          slotStates={states ?? live}
+          nextSlot={nextSlot >= 0 ? nextSlot : undefined}
           kind="word"
           noun="word"
           trailing={<span role="img" aria-label={sentence.punctuation === '.' ? 'full stop' : sentence.punctuation} className="px-1 font-display text-4xl font-bold text-ink-soft">{sentence.punctuation}</span>}
@@ -214,7 +215,7 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
           </FeedbackMessage>
         ) : (
           <FeedbackMessage key="idle" tone="info" nudge={filledCount(slots)} title="Let’s build it!">
-            Tap the words in order, or drag them into the glowing spots.
+            Put the words in the right order. Tap a word, then tap its spot, or drag it there.
           </FeedbackMessage>
         )}
       </AnimatePresence>

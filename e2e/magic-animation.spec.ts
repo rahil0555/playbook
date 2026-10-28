@@ -191,7 +191,7 @@ test.describe('tap: the same bubble flies from the tray to the slot', () => {
     await expect(page.getByText(/You spelled/)).toHaveCount(0); // still flying
     await expect(page.locator('[data-magic-flight]')).toHaveCount(1);
     await expect(page.getByText(/You spelled/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
   });
 
   test('no layout shift: the other tray letters and the slots do not move while a letter flies', async ({ page }) => {

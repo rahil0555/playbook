@@ -109,8 +109,8 @@ describe('the story screen', () => {
     }
     expect(await screen.findByText(/You spelled/, {}, { timeout: 5000 })).toBeInTheDocument();
     expect(document.querySelector('[data-story-tennis]')).not.toBeNull();
-    await user.click(await screen.findByRole('button', { name: 'Next word' }));
-    expect(await screen.findByRole('button', { name: 'Hear “two”' })).toHaveAttribute('data-state', 'target');
+    // no Next button: the next word comes by itself once the celebration is over ("two" is waiting until then)
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Hear “two”' })).toHaveAttribute('data-state', 'target'), { timeout: 6000 });
     expect(screen.getByRole('button', { name: 'Hear “are”' })).toHaveAttribute('data-state', 'done');
     expect(screen.getByText(`Sentence 1 of ${englishStories.length}, word 2 of 3`)).toBeInTheDocument();
   });

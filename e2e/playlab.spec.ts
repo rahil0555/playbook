@@ -1,5 +1,5 @@
 import { englishWords } from '../src/playlab/data/en/words';
-import { expect, installFakeSpeech, installScriptedSpeech, nextOrFinish, solveSentence, solveWord, spoken, test } from './helpers';
+import { expect, installFakeSpeech, installScriptedSpeech, waitForNextItem, solveSentence, solveWord, spoken, test } from './helpers';
 
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 const VIEWS = ['home', 'progress', 'alphabet', 'phonics', 'word-builder', 'sentences', 'matching'];
@@ -8,7 +8,7 @@ test.describe('navigation and refresh', () => {
   test('every activity opens from home, has a way back, and the URL hash survives a refresh', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: /Hello, explorer/ })).toBeVisible();
-    for (const [card, hash, title] of [['Letter Playground', 'alphabet', 'Letter Playground'], ['Sound Discovery', 'phonics', 'Sound Discovery'], ['Word Builder', 'word-builder', 'Magic Letters'], ['Sentence Fun', 'sentences', 'Sentence Fun'], ['Match & Play', 'matching', 'Match & Play']]) {
+    for (const [card, hash, title] of [['Letter Playground', 'alphabet', 'Letter Playground'], ['Sound Discovery', 'phonics', 'Sound Discovery'], ['Word Builder', 'word-builder', 'Magic Letters'], ['Sentence Fun', 'sentences', /Build the Sentence|Finish the Sentence/], ['Match & Play', 'matching', 'Match & Play']]) {
       await page.locator('button', { hasText: card }).first().click();
       await expect(page).toHaveURL(new RegExp(`#/${hash}$`));
       await expect(page.getByRole('heading', { level: 1 })).toContainText(title);
@@ -150,7 +150,7 @@ test.describe('phonics', () => {
       }
       await page.locator(`[data-choice="${right.id}"]`).click();
       await expect(page.getByText(new RegExp(`${right.upper} says`))).toBeVisible();
-      await nextOrFinish(page);
+      await waitForNextItem(page);
     }
     await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();
     await page.getByRole('button', { name: 'Play again' }).click();
@@ -159,14 +159,15 @@ test.describe('phonics', () => {
 });
 
 test.describe('word builder', () => {
-  test('every word in the content set can be completed (4 rounds, "play again" and "next")', async ({ page }) => {
+  test('every word in the content set can be completed (4 rounds, "play again", and each next word comes by itself)', async ({ page }) => {
+    test.setTimeout(150_000); // each word waits for its celebration before the next one comes
     await page.goto('/#/word-builder');
     const done = new Set<string>();
     for (let round = 0; round < 4 && done.size < englishWords.length; round++) {
       for (let q = 0; q < 5; q++) {
         const w = await solveWord(page);
         done.add(w.id);
-        await nextOrFinish(page);
+        await waitForNextItem(page);
       }
       await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();
       if (done.size < englishWords.length) await page.getByRole('button', { name: 'Play again' }).click();
@@ -178,19 +179,20 @@ test.describe('word builder', () => {
 
 test.describe('sentences', () => {
   test('a full round (arrange and fill-in) can be completed, then replayed', async ({ page }) => {
+    test.setTimeout(90_000); // every sentence waits for its celebration before the next one comes
     await installFakeSpeech(page);
     await page.goto('/#/sentences');
     for (let q = 0; q < 5; q++) {
       const id = await solveSentence(page);
       expect(id).toMatch(/^s\d+$/);
       await expect(page.getByText('You made a whole sentence!')).toBeVisible();
-      await nextOrFinish(page);
+      await waitForNextItem(page);
     }
     await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();
     // read aloud after each success, once its fanfare has finished (the last line follows the fanfare by ~0.7 s)
     await expect.poll(async () => (await spoken(page)).filter((t) => /\.$/.test(t)).length, { timeout: 3000 }).toBe(5);
     await page.getByRole('button', { name: 'Play again' }).click();
-    await expect(page.getByText(/Make the sentence|Finish the sentence/)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: /Put the words in order|Finish the sentence/ })).toBeVisible();
   });
 });
 
@@ -228,11 +230,11 @@ test.describe('matching', () => {
         const choice = page.locator(`[data-choice="${letter}"]:not([disabled])`);
         if ((await choice.count()) === 0) continue;
         await choice.click();
-        const accepted = await page.getByRole('button', { name: /^(Next word|Finish)$/ }).waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false);
+        const accepted = await page.getByText(/On to the next one/).waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false);
         if (accepted) break;
         await page.getByRole('button', { name: 'Try again' }).click();
       }
-      await nextOrFinish(page);
+      await waitForNextItem(page);
     }
     await expect(page.getByRole('region', { name: /Amazing|Great work|You did it/ })).toBeVisible();
   });
@@ -259,7 +261,7 @@ test.describe('progress and persistence', () => {
     await page.goto('/#/word-builder');
     for (let q = 0; q < 5; q++) {
       await solveWord(page);
-      await nextOrFinish(page);
+      await waitForNextItem(page);
     }
     await page.getByRole('button', { name: 'My Stars', exact: true }).click();
     await expect(page.getByTestId('session-rounds-finished')).toHaveText('1');

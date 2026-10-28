@@ -80,6 +80,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   const [creature, setCreature] = useState<{ n: number; from: { x: number; y: number } }>({ n: 0, from: { x: 0, y: -90 } });
   /** the completed word's gold finish, switched on when Pip lands (in turn, left to right) */
   const [celebrated, setCelebrated] = useState(false);
+  /** the spoken cheer for the finished word: the celebration waits for it (see the effect on `celebrated`) */
+  const cheered = useRef<PromiseLike<unknown> | null>(null);
   /** a gold splash under the word, from the moment the last letter lands */
   const [splash, setSplash] = useState(0);
   /** the storybook cutscene for the finished word: it turns over a moment after Pip lands, and clears itself after a few seconds */
@@ -100,7 +102,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
 
   useEffect(() => {
     if (!celebrated) return;
-    const start = reducedMotion ? 0 : 1100;
+    const start = reducedMotion ? 0 : 400;
     const open = setTimeout(() => setStory(true), start);
     const close = setTimeout(() => setStory(false), start + 4200);
     return () => {
@@ -108,6 +110,13 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
       clearTimeout(close);
     };
   }, [celebrated, reducedMotion]);
+
+  // The word's celebration starts when Pip has landed on it, and the next word comes once the cheer has been said (useRound).
+  useEffect(() => {
+    if (celebrated) round.celebrate(cheered.current);
+    // runs once per landing: `round` is stable for this question
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrated]);
 
   const done = isMagicDone(slots);
   /** every letter is in place AND has finished landing: now the word is "complete" */
@@ -152,11 +161,9 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
     fire('burst', { x: 50, y: 30 });
     moments.celebrate();
     // the cheer waits for the last letter's sound to finish (or is said at once when there is none still playing)
-    const round = generation.current;
+    const gen = generation.current;
     const lastDone: Promise<unknown> = lastSound.current?.done ?? Promise.resolve();
-    void lastDone.then(() => {
-      if (round === generation.current) moments.say(`Hooray! You spelled ${word.text}!`);
-    });
+    cheered.current = lastDone.then(() => (gen === generation.current ? moments.say(`Hooray! You spelled ${word.text}!`).done : undefined));
   }, [fire, moments, stripRing, word.text]);
 
   /** A letter has arrived visually: show it in its slot, and on the last one start the completion (Pip's hop, then the landing). */
@@ -496,13 +503,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
             <div className="min-h-[6rem] min-w-0 flex-1">
               {/* one message at a time: each is replaced at once (a new one never waits for the old one to leave) */}
               {complete ? (
-                <FeedbackMessage
-                  key="ok"
-                  tone="success"
-                  title={`${pickLine(PRAISE, round.index)} Hooray!`}
-                  action={{ label: round.index + 1 < round.total ? 'Next word' : 'Finish', onClick: round.next, icon: 'arrow-right' }}
-                >
-                  You spelled <strong>{word.text}</strong>!
+                <FeedbackMessage key="ok" tone="success" title={`${pickLine(PRAISE, round.index)} Hooray!`}>
+                  You spelled <strong>{word.text}</strong>! On to the next one…
                 </FeedbackMessage>
               ) : missed ? (
                 <FeedbackMessage key="retry" tone="retry" nudge={round.attempts} title={pickLine(TRY_AGAIN, round.attempts)} action={{ label: 'Start this word again', onClick: startAgain, icon: 'refresh' }}>

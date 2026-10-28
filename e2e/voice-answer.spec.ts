@@ -40,7 +40,7 @@ test.describe('Magic Letters: speaking the answer', () => {
     await setHearing(page, { transcript: `${word.text}.` });
     await speakButton(page).click();
     await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
     // the word is finished: the microphone is not offered again
     await expect(speakButton(page)).toHaveCount(0);
   });

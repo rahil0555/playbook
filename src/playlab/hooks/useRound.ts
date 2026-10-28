@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
 import { starsForScore } from '../services/progressService';
 import type { ActivityCompletion, ActivityId, AnswerResult } from '../types/learning';
+import { useProgression } from './useProgression';
 
 interface QuestionResult {
   attempts: number;
@@ -24,16 +25,21 @@ export interface Round<T> {
   summary: ActivityCompletion | null;
   /** Report an answer. Records progress, fires host callbacks, returns the result. */
   submit: (response: string, expected: string, correct: boolean) => AnswerResult;
-  /** Move to the next question, or finish the round after the last one. */
-  next: () => void;
-  /** Start a fresh round with newly built items. */
+  /**
+   * The current question has been answered right and its success is on screen. After a short celebration, and once `hold` (the
+   * praise being spoken) has finished, the next question comes by itself, or after the last one the round's summary. Only the first
+   * call for a question counts, so the child is never moved on twice.
+   */
+  celebrate: (hold?: PromiseLike<unknown> | null) => void;
+  /** Start a fresh round with newly built items. Any celebration still counting down is dropped. */
   restart: () => void;
 }
 
 /**
  * Shared state machine for question-based activities.
- *  - never penalises: wrong answers just add an attempt
- *  - a round is finished after the last question is solved and `next()` is called
+ *  - never penalises: wrong answers just add an attempt, and never move the child on
+ *  - a question is moved past by `celebrate` (see useProgression), never by a button
+ *  - the round is recorded as finished the moment its last question is answered right; its summary follows the celebration
  *  - stars are always >= 1
  */
 export function useRound<T extends { id: string }>(
@@ -50,6 +56,7 @@ export function useRound<T extends { id: string }>(
   const startedOnce = useRef(false);
   const buildRef = useRef(buildItems);
   buildRef.current = buildItems;
+  const progression = useProgression();
 
   // Count the start once per mount (StrictMode re-runs effects but keeps refs).
   useEffect(() => {
@@ -60,12 +67,30 @@ export function useRound<T extends { id: string }>(
 
   const current = items[index];
   const currentResult = current ? results[current.id] : undefined;
-  // Synchronous mirrors of the state above. A second tap in the same frame reads these, not the stale render's values,
-  // so a double tap on Check or Finish is counted once and cannot skip a question.
+  // Synchronous mirrors of the state above. A second tap in the same frame, or a countdown that fires after a render, reads these
+  // rather than a stale render's values, so each question is judged, counted and left exactly once.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const indexRef = useRef(index);
+  indexRef.current = index;
   const resultsRef = useRef(results);
   resultsRef.current = results;
-  const finishedRef = useRef(false);
-  const movingRef = useRef(-1);
+  /** the round's completion, once it has been recorded (it is recorded when the last question is answered right) */
+  const completion = useRef<ActivityCompletion | null>(null);
+
+  const finishRound = useCallback(() => {
+    if (completion.current) return;
+    const total = itemsRef.current.length;
+    const score = Object.values(resultsRef.current).filter((r) => r.firstTry).length;
+    completion.current = recordCompletion({
+      activityId,
+      score,
+      total,
+      stars: starsForScore(score, total),
+      durationMs: Date.now() - startedAt.current,
+      variant,
+    });
+  }, [activityId, recordCompletion, variant]);
 
   const submit = useCallback<Round<T>['submit']>(
     (response, expected, correct) => {
@@ -79,49 +104,51 @@ export function useRound<T extends { id: string }>(
       const next = { ...resultsRef.current, [current.id]: { attempts: attempt, solved: correct, firstTry: correct && attempt === 1 } };
       resultsRef.current = next;
       setResults(next);
-      return recordAnswer({ activityId, questionId: current.id, correct, attempt, response, expected });
+      const result = recordAnswer({ activityId, questionId: current.id, correct, attempt, response, expected });
+      if (correct && itemsRef.current.every((item) => next[item.id]?.solved)) finishRound();
+      return result;
     },
-    [activityId, current, recordAnswer],
+    [activityId, current, finishRound, recordAnswer],
   );
 
   const solvedCount = useMemo(() => Object.values(results).filter((r) => r.solved).length, [results]);
 
-  const next = useCallback(() => {
-    if (index + 1 < items.length) {
-      // a double tap on "Next" moves once: the first call already asked for index + 1
-      if (movingRef.current === index) return;
-      movingRef.current = index;
-      setIndex(index + 1);
+  /** the countdown is over: the next question, or after the last one the summary of the round */
+  const advance = useCallback(() => {
+    const i = indexRef.current;
+    if (i + 1 < itemsRef.current.length) {
+      indexRef.current = i + 1;
+      setIndex(i + 1);
       return;
     }
-    // a double tap on "Finish" records the completion once (host callbacks fire once too)
-    if (finishedRef.current) return;
-    finishedRef.current = true;
-    const score = Object.values(resultsRef.current).filter((r) => r.firstTry).length;
-    const total = items.length;
-    const completion = recordCompletion({
-      activityId,
-      score,
-      total,
-      stars: starsForScore(score, total),
-      durationMs: Date.now() - startedAt.current,
-      variant,
-    });
-    setSummary(completion);
-  }, [activityId, index, items.length, recordCompletion, variant]);
+    finishRound();
+    setSummary(completion.current);
+  }, [finishRound]);
+
+  const celebrate = useCallback(
+    (hold?: PromiseLike<unknown> | null) => {
+      const item = itemsRef.current[indexRef.current];
+      if (!item || !resultsRef.current[item.id]?.solved) return;
+      progression.arm(item.id, advance, hold);
+    },
+    [advance, progression],
+  );
 
   const restart = useCallback(() => {
+    progression.cancel(); // nothing from the last round may move this one on
     audio.stop(); // a new round starts in silence: nothing from the last one may still be waiting to be said
-    setItems(buildRef.current());
+    const fresh = buildRef.current();
+    itemsRef.current = fresh;
+    setItems(fresh);
+    indexRef.current = 0;
     setIndex(0);
-    setResults({});
     resultsRef.current = {};
+    setResults({});
+    completion.current = null;
     setSummary(null);
-    finishedRef.current = false;
-    movingRef.current = -1;
     startedAt.current = Date.now();
     recordStart(activityId);
-  }, [activityId, audio, recordStart]);
+  }, [activityId, audio, progression, recordStart]);
 
   return {
     items,
@@ -134,7 +161,7 @@ export function useRound<T extends { id: string }>(
     finished: summary !== null,
     summary,
     submit,
-    next,
+    celebrate,
     restart,
   };
 }

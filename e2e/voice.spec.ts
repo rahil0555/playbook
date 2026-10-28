@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, solveWord, test } from './helpers';
+import { expect, solveWord, test, waitForNextItem } from './helpers';
 
 // Speaking an answer in Magic Letters. The browser's speech recogniser is replaced by a scripted one, so the test decides
 // what the browser "hears" and how it fails; everything else (the states, the transcript, the feedback) is the real app.
@@ -54,7 +54,7 @@ test.describe('Magic Letters: say the word after spelling it', () => {
     await expect(page.getByRole('status').filter({ hasText: /Listening/ })).toBeVisible();
     await expect(page.getByText('Correct!')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText(/^You said:/)).toContainText(word.text);
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
   });
 
   test('a refused microphone says why, and the typed answer is still judged', async ({ page }) => {
@@ -85,20 +85,20 @@ test.describe('Magic Letters: say the word after spelling it', () => {
     await scriptSpeech(page);
     await page.goto('/#/word-builder');
     const word = await solveWord(page);
-    await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+    await waitForNextItem(page);
     const next = await solveWord(page);
     expect(next.id).not.toBe(word.id);
     await expect(page.getByText('Correct!')).toHaveCount(0);
   });
 
-  test('after speaking, Next word starts the next word with a clean speaking area', async ({ page }) => {
+  test('after speaking, the next word starts by itself with a clean speaking area', async ({ page }) => {
     await scriptSpeech(page);
     await page.goto('/#/word-builder');
     const word = await solveWord(page);
     await page.evaluate((text) => ((window as unknown as { __speechScript: { transcript: string } }).__speechScript.transcript = text), word.text);
     await page.getByRole('button', { name: 'Speak your answer' }).click();
     await expect(page.getByText('Correct!')).toBeVisible({ timeout: 5000 });
-    await page.getByRole('button', { name: /^(Next word|Finish)$/ }).click();
+    await waitForNextItem(page);
     const next = await solveWord(page);
     expect(next.id).not.toBe(word.id);
     await expect(page.getByText(/^You said:/)).toHaveCount(0);

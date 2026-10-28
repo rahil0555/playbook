@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, nextOrFinish, solveSentence, solveWord, test } from './helpers';
+import { expect, waitForNextItem, solveSentence, solveWord, test } from './helpers';
 
 // Rewards: stickers for finished rounds. (The "Things you love" feature was removed for children.)
 
@@ -16,7 +16,7 @@ test.describe('stickers', () => {
     await page.goto('/#/word-builder');
     for (let q = 0; q < 5; q++) {
       await solveWord(page);
-      await nextOrFinish(page);
+      await waitForNextItem(page);
     }
     const reveal = page.getByTestId('sticker-reveal');
     await expect(reveal).toBeVisible();

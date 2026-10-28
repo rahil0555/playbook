@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { englishWords } from '../src/playlab/data/en/words';
-import { expect, installFakeSpeech, nextOrFinish, solveSentence, spoken, test } from './helpers';
+import { expect, installFakeSpeech, waitForNextItem, solveSentence, spoken, test } from './helpers';
 
 // Magic Moments: the touch feel of Sentence Fun, Letter–Picture matching, Missing Letter and the Magic Letters reveal.
 // Every check watches what the page actually does: sound-effect oscillators, spoken lines and the DOM over time.
@@ -41,7 +41,7 @@ async function openArrangeSentence(page: Page) {
     await page.locator('[data-tile], [data-option]').first().waitFor();
     if ((await page.locator('[data-tile][data-placed="false"]').count()) > 0) break;
     await solveSentence(page);
-    await nextOrFinish(page);
+    await waitForNextItem(page);
   }
   await page.locator('[data-tile][data-placed="false"]').first().waitFor();
   await page.waitForTimeout(500);
@@ -74,7 +74,7 @@ test.describe('Sentence Fun: words react to touch', () => {
     await expect(reward).toBeVisible();
     await expect(reward).toHaveText(/\S/);
     // the reward never blocks the next step
-    await page.getByRole('button', { name: /^(Next sentence|Finish)$/ }).click({ timeout: 1500 }); // the button settles after its entrance; under load that can take a moment
+    await waitForNextItem(page); // the round moves on by itself once the celebration is over
   });
 
   test('rapid taps: a double tap places the word once, and two different words placed together both land', async ({ page }) => {
@@ -174,7 +174,7 @@ test.describe('Missing Letter: the letter travels into the gap', () => {
         const blank = document.querySelector('[data-blank]')?.textContent ?? '';
         const flying = document.querySelectorAll('[data-magic-flight]').length;
         const feedback = [...document.querySelectorAll('h2, h3, p, strong')].map((e) => e.textContent ?? '').find((t) => /Hooray|Which letter|Try again|needs the letter/.test(t)) ?? '';
-        const next = [...document.querySelectorAll('button')].some((b) => /^(Next word|Finish)$/.test(b.textContent?.trim() ?? ''));
+        const next = /On to the next one/.test(document.body.textContent ?? '');
         const state = `gap="${blank}" flying=${flying} next=${next} feedback="${feedback.slice(0, 40)}"`;
         if (state !== last) {
           last = state;
@@ -187,7 +187,7 @@ test.describe('Missing Letter: the letter travels into the gap', () => {
   /** The Next/Finish button must appear; on a failure the recorded timeline is attached to the report first. */
   async function expectNextVisible(page: Page) {
     try {
-      await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+      await expect(page.getByText(/On to the next one/)).toBeVisible();
     } catch (error) {
       const timeline = await page.evaluate(() => (window as unknown as { __feedback?: string[] }).__feedback ?? []);
       await test.info().attach('missing-letter-timeline.txt', { body: timeline.join('\n') || '(nothing recorded)', contentType: 'text/plain' });
@@ -235,7 +235,7 @@ test.describe('Letter–Picture matching: pops and a chime', () => {
 });
 
 test.describe('Magic Letters: the word reacts when it is finished', () => {
-  test('finishing a word splashes gold under it, Pip lands on it with stars, and Next word works at once', async ({ page }) => {
+  test('finishing a word splashes gold under it, Pip lands on it with stars, and the next word follows by itself', async ({ page }) => {
     await recordMoments(page);
     await page.goto('/#/word-builder');
     await page.locator('[data-magic-clue]').waitFor();
@@ -269,9 +269,8 @@ test.describe('Magic Letters: the word reacts when it is finished', () => {
       .poll(() => page.evaluate(() => ((window as unknown as { __hop?: string[] }).__hop ?? []).some((t) => t !== 'none')), { timeout: 2500 })
       .toBe(true);
     // the child is not held up: the next word is there at once
-    const next = page.getByRole('button', { name: /^(Next word|Finish)$/ });
-    await expect(next).toBeVisible({ timeout: 800 });
-    await next.click();
+    await expect(page.getByText(/On to the next one/)).toBeVisible({ timeout: 800 });
+    await waitForNextItem(page);
   });
 });
 

@@ -27,6 +27,8 @@ interface TileBoardProps {
   noun: string;
   /** rendered after the last slot, e.g. the sentence's full stop */
   trailing?: ReactNode;
+  /** the empty slot the next word belongs in: it glows, the others stay plain (words are read left to right) */
+  nextSlot?: number;
 }
 
 /** a tapped tile lifts for this long (the selection) before it travels to its slot */
@@ -34,10 +36,16 @@ const PICK_UP_MS = 150;
 /** if a placed word never reports that its glide has finished, it still lands after this long (a safety net only) */
 const LANDING_FALLBACK_MS = 1100;
 
-/** A letter tile is the BOOK-style square; a word tile is a wider tile of the same design (its text sized in LetterTile). */
+/**
+ * A letter tile is the BOOK-style square. A word tile is the same glossy design, as wide as its word needs (never narrower than a
+ * square), and a word slot is a little larger than the tile it holds, so a word sits in its slot without being squeezed.
+ */
 const SIZE = {
-  letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]' },
-  word: { box: 'h-[3.75rem] sm:h-[4.5rem]' },
+  letter: { box: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]', slot: 'h-[4.4rem] w-[4.4rem] sm:h-[5.4rem] sm:w-[5.4rem]' },
+  word: {
+    box: 'h-[3.75rem] min-w-[4.5rem] px-3 sm:h-[4.5rem] sm:min-w-[5.2rem]',
+    slot: 'h-[4.1rem] min-w-[5rem] px-1.5 sm:h-[4.9rem] sm:min-w-[6rem]',
+  },
 } as const;
 
 function slotAt(info: PanInfo): number | null {
@@ -52,7 +60,7 @@ function slotAt(info: PanInfo): number | null {
  * - drag a tile onto any slot (touch or mouse); dropping a placed tile elsewhere returns it
  * - tiles keep a stable "bay" in the tray, so nothing reflows while playing
  */
-export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, hintTileId, locked = false, kind, format = (v) => v, noun, trailing }: TileBoardProps) {
+export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, hintTileId, locked = false, kind, format = (v) => v, noun, trailing, nextSlot }: TileBoardProps) {
   const { reducedMotion } = usePlayLab();
   const moments = useMoments();
   const [over, setOver] = useState<number | null>(null);
@@ -113,10 +121,12 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
     }, PICK_UP_MS);
   };
 
+  /** a letter has its own tile colour (the same on every screen); a word takes the palette in turn */
+  const colorFor = (tile: Tile) => (kind === 'letter' ? letterTileColor(tile.value) : (LETTER_TILE_PALETTE[Math.max(0, tiles.indexOf(tile)) % LETTER_TILE_PALETTE.length] as string));
+
   const renderTile = (tile: Tile, placedIn: number | null) => {
     const isLifted = lifting.has(tile.id);
-    // a letter has its own tile colour (the same on every screen); a word takes the palette in turn
-    const color = kind === 'letter' ? letterTileColor(tile.value) : (LETTER_TILE_PALETTE[Math.max(0, tiles.indexOf(tile)) % LETTER_TILE_PALETTE.length] as string);
+    const color = colorFor(tile);
     const isHint = hintTileId === tile.id;
     return (
       <motion.button
@@ -187,6 +197,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
           const state = slotStates?.[i];
           // the spot a lifted word is flying to glows, the same way a word dragged over it does
           const aimed = over === i || (landingSlots.has(i) && !tile);
+          // the next empty slot glows; the other empty slots are plain, so the reading order is clear
+          const isNext = i === nextSlot;
           return (
             <div
               key={i}
@@ -194,8 +206,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
               role="group"
               data-state={state ?? (tile ? 'filled' : 'empty')}
               aria-label={tile ? `Slot ${i + 1}: ${format(tile.value)}` : `Slot ${i + 1}: empty`}
-              style={tile || state ? undefined : { boxShadow: aimed ? undefined : 'inset 0 0 16px rgba(255,200,80,0.5), 0 0 0 4px rgba(255,255,255,0.55)' }}
-              className={`relative flex items-center justify-center rounded-[1.5rem] border-[3px] border-dashed transition-[transform,background-color,border-color] ${size.box} ${
+              style={tile || state === 'correct' || state === 'wrong' || !isNext || aimed ? undefined : { boxShadow: 'inset 0 0 16px rgba(255,200,80,0.5), 0 0 0 4px rgba(255,255,255,0.55)' }}
+              className={`relative flex items-center justify-center rounded-[1.5rem] border-[3px] border-dashed transition-[transform,background-color,border-color] ${size.slot} ${
                 state === 'correct'
                   ? 'border-brand-500 bg-brand-100 shadow-[0_0_0_4px_rgba(22,162,134,0.25)]'
                   : state === 'wrong'
@@ -204,10 +216,12 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
                       ? 'scale-105 border-sky-500 bg-sky-100'
                       : tile
                         ? 'border-transparent bg-black/[0.05]'
-                        : 'border-amber-400/80 bg-white/75'
+                        : isNext
+                          ? 'border-amber-400/80 bg-white/75'
+                          : 'border-black/15 bg-white/55'
               }`}
             >
-              {tile ? renderTile(tile, i) : guide?.[i] ? <span aria-hidden="true" className={`font-display font-bold text-black/15 ${kind === 'letter' ? 'text-[2.6rem] sm:text-[3.2rem]' : 'text-[1.7rem] sm:text-[2.1rem]'}`}>{format(guide[i] as string)}</span> : null}
+              {tile ? renderTile(tile, i) : guide?.[i] ? <span aria-hidden="true" className={`font-display font-bold text-black/15 ${kind === 'letter' ? 'text-[2.6rem] sm:text-[3.2rem]' : 'text-[1.7rem] sm:text-[2.1rem]'}`}>{format(guide[i] as string)}</span> : kind === 'word' ? <span aria-hidden="true" className="font-display text-lg font-bold text-black/25">{i + 1}</span> : null}
               {landings[i] ? <StarBurst key={landings[i]} seed={landings[i]! + i} count={6} spread={46} /> : null}
             </div>
           );
@@ -219,7 +233,18 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
       <ul aria-label={`Available ${noun}s`} className="pl-wood mt-5 flex flex-wrap items-center justify-center gap-3 rounded-[1.9rem] px-3 py-4 sm:gap-4 sm:px-5">
         {tiles.map((tile) => (
           <li key={tile.id}>
-            {isPlaced(slots, tile.id) ? <span aria-hidden="true" className={`block rounded-[1.5rem] bg-black/20 shadow-[inset_0_4px_8px_rgba(60,25,5,0.45)] ${size.box}`} /> : renderTile(tile, null)}
+            {isPlaced(slots, tile.id) ? (
+              // a word already in a slot stays in the tray, faded, so the tray keeps its shape and the child sees what is left
+              kind === 'word' ? (
+                <span aria-hidden="true" className={`pointer-events-none block rounded-[1.6rem] opacity-30 saturate-50 ${size.box}`}>
+                  <LetterTileFace text={format(tile.value)} color={colorFor(tile)} word className="h-full" />
+                </span>
+              ) : (
+                <span aria-hidden="true" className={`block rounded-[1.5rem] bg-black/20 shadow-[inset_0_4px_8px_rgba(60,25,5,0.45)] ${size.box}`} />
+              )
+            ) : (
+              renderTile(tile, null)
+            )}
           </li>
         ))}
       </ul>

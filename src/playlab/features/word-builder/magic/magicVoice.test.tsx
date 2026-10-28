@@ -65,7 +65,8 @@ describe('Magic Letters: a spoken answer', () => {
     expect(onAnswerSubmit).toHaveBeenCalledTimes(1);
     expect(onAnswerSubmit.mock.calls[0]![0]).toMatchObject({ activityId: 'word-builder', correct: true, attempt: 1, response: 'cat', expected: 'cat' });
 
-    await user.click(await screen.findByRole('button', { name: 'Finish' }));
+    // the round's only word is the last one: its summary comes by itself after the celebration
+    expect(await screen.findByRole('region', { name: 'Amazing!' }, { timeout: 5000 })).toBeInTheDocument();
     expect(onActivityComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -86,7 +87,8 @@ describe('Magic Letters: a spoken answer', () => {
     expect(await screen.findByText(/You spelled/, {}, { timeout: 5000 })).toBeInTheDocument();
     expect(onAnswerSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ correct: true, attempt: 2, response: 'cat' }));
 
-    await user.click(await screen.findByRole('button', { name: 'Finish' }));
+    // one word, not spelled first time: the summary is the round's own, and it is recorded once
+    expect(await screen.findByRole('region', { name: 'You did it!' }, { timeout: 5000 })).toBeInTheDocument();
     expect(onActivityComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -151,7 +153,7 @@ describe('Magic Letters: a spoken answer', () => {
     expect(onAnswerSubmit.mock.calls[0]![0]).toMatchObject({ correct: true, attempt: 1 });
     // once the word is spelled the microphone is not offered, so a second answer cannot start
     expect(screen.queryByRole('button', { name: 'Speak answer' })).toBeNull();
-    await user.click(await screen.findByRole('button', { name: 'Finish' }));
+    expect(await screen.findByRole('region', { name: 'Amazing!' }, { timeout: 5000 })).toBeInTheDocument();
     expect(onActivityComplete).toHaveBeenCalledTimes(1);
   });
 });

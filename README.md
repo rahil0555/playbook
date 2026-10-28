@@ -181,7 +181,7 @@ Deviation from the suggested layout: everything lives under `src/playlab/` (inst
 | Asset | State | Replace by |
 | --- | --- | --- |
 | Illustrations (32) | Original simple SVGs, `src/playlab/illustrations/art.tsx` | Edit/replace the entry for an id (view all at `/?gallery`) |
-| Logo mark | Supplied Edurance graduation-cap artwork, `src/playlab/assets/edurance-graduation-cap.png`; favicon `public/favicon.png` | Replace the PNG files (the favicon is a square, padded 32 px copy) |
+| Logo mark | Supplied Edurance graduation-cap artwork, `src/playlab/assets/edurance-graduation-cap.png`; favicon `public/favicon.png` | Replace the PNG files. Both are transparent PNGs showing the cap only (the teal background is removed); the favicon is a 32 px copy |
 | Mascot "Pip" | Stand-in drawn for this project (`components/Mascot.tsx`) | Official Edurance character |
 | Voice recordings | None | `audio` URLs in the content pack |
 | Fonts | Andika + Fredoka (SIL OFL), Latin only, vendored in `styles/fonts/` | Add a Devanagari font when adding Hindi |

@@ -38,14 +38,17 @@ describe('Magic Letters feedback: a quick pick and drop', () => {
     await waitFor(() => expect(screen.queryByText('Nice pick!')).not.toBeInTheDocument());
   });
 
-  it('the last letter placed at once completes the word: the success message and its Next button show, and the picked-up message is gone', async () => {
+  it('the last letter placed at once completes the word: the success message shows, the picked-up message is gone, and the next word comes by itself', async () => {
     const { user } = await openRound();
     for (const [i, letter] of ['p', 'i', 'g'].entries()) {
       await user.click(realTile(letter));
       await user.click(slot(i));
     }
     expect(await screen.findByText(/You spelled/, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /^(Next word|Finish)$/ }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^(Next word|Finish)$/ })).toBeNull();
     await waitFor(() => expect(screen.queryByText('Nice pick!')).not.toBeInTheDocument());
-  });
+    // the celebration is over and the round has moved on: the next word's outlines are empty again
+    expect((await screen.findAllByLabelText(/^Slot \d, empty/, {}, { timeout: 8000 })).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/You spelled/)).toBeNull();
+  }, 20000);
 });

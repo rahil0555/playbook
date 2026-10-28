@@ -188,14 +188,15 @@ describe('Magic Letters: a whole round', () => {
   it('finishes 5 words, counts toward Word Builder progress, and offers next steps', async () => {
     const onActivityComplete = vi.fn();
     const onAnswerSubmit = vi.fn();
-    const { user, adapter } = await openMagic({ onActivityComplete, onAnswerSubmit });
-    for (const [i, w] of ['apple', 'cat', 'sun', 'fish', 'book'].entries()) {
-      await screen.findByLabelText('Word slots. Drop each letter on its outline');
-      expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(w.length);
+    const { adapter } = await openMagic({ onActivityComplete, onAnswerSubmit });
+    for (const w of ['apple', 'cat', 'sun', 'fish', 'book']) {
+      await vi.waitFor(() => expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(w.length), { timeout: 8000 });
       typeWord(w);
       expect(await screen.findByText(/You spelled/, {}, { timeout: 4000 })).toBeInTheDocument();
       await vi.waitFor(() => expect(audioLog.at(-1)?.text ?? '').toContain(w), { timeout: 2000 }); // read aloud after the celebration sound
-      await user.click(screen.getByRole('button', { name: i === 4 ? 'Finish' : 'Next word' }));
+      // no button: the round moves on by itself once the celebration is over (the summary after the last word)
+      expect(screen.queryByRole('button', { name: /^(Next word|Finish)$/ })).toBeNull();
+      await vi.waitFor(() => expect(screen.queryByText(/You spelled/)).toBeNull(), { timeout: 8000 });
     }
     expect(await screen.findByRole('region', { name: 'Amazing!' })).toBeInTheDocument();
     expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ activityId: 'word-builder', score: 5, total: 5, stars: 3 }));
@@ -212,13 +213,14 @@ describe('Magic Letters: a whole round', () => {
     await user.click(realTile('a'));
     await user.click(slot(4)); // miss on word 1
     typeWord('apple');
-    await user.click(await screen.findByRole('button', { name: 'Next word' }));
+    await vi.waitFor(() => expect(screen.queryByText(/You spelled/)).toBeNull(), { timeout: 8000 }); // the next word comes by itself
     for (const w of ['cat', 'sun', 'fish', 'book']) {
-      await screen.findByLabelText('Word slots. Drop each letter on its outline');
+      await vi.waitFor(() => expect(document.querySelectorAll('[data-magic-slot]')).toHaveLength(w.length), { timeout: 8000 });
       typeWord(w);
-      await user.click(await screen.findByRole('button', { name: /^(Next word|Finish)$/ }));
+      await screen.findByText(/You spelled/, {}, { timeout: 4000 });
+      await vi.waitFor(() => expect(screen.queryByText(/You spelled/)).toBeNull(), { timeout: 8000 });
     }
-    await screen.findByRole('region', { name: /Amazing|Great work|You did it/ });
+    await screen.findByRole('region', { name: /Amazing|Great work|You did it/ }, { timeout: 8000 });
     expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 4, total: 5 }));
     expect(within(document.body).queryByText(/wrong/i)).toBeNull(); // never says "wrong"
   }, 30_000);

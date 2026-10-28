@@ -56,8 +56,8 @@ Work through these on each device. Tick what works; write down anything that doe
 **Layout**
 - [ ] The whole screen fits. Nothing is cut off at the right edge, and the page does not scroll sideways.
 - [ ] Every button can be tapped. No button is hidden under another control or under the sound message.
-- [ ] After you finish a Magic Letters word, the **Next word** button is on screen, or it comes into view when the
-      message appears.
+- [ ] After you finish a Magic Letters word, the success message shows and the next word comes by itself after a moment.
+      There is no button to press; the child can carry on at once if the next word is already there.
 - [ ] Turn the phone sideways and back. The page still fits and nothing is hidden under the notch or the bar.
 
 **Sound and speech**
@@ -95,7 +95,7 @@ letter on its glowing outline. Do each step on each device.
 6. **Typing:** on a laptop, type the word on the keyboard, quickly. Each letter should go to the first free outline
    that matches it.
 7. **Completion:** finish a word. Check: the picture hops, Pip (the green helper) jumps up beside the picture with a
-   little burst of stars, a fanfare plays, and **after** the fanfare the word is said aloud. Then tap **Next word**.
+   little burst of stars, a fanfare plays, and **after** the fanfare the word is said aloud. Then the next word comes by itself (no button).
 8. **Repeated letters:** find a word with the same letter twice (for example *apple*). Both should go in.
 9. **Five words:** finish a whole round. Note whether the summary screen makes sense to you.
 
@@ -112,7 +112,7 @@ advance.) This is a release-blocking problem if it happens.
 3. Put the words in the wrong order, then tap **Check my sentence**. The message should explain which words are right,
    and **Try again** should be there.
 4. Put the words in the right order. Check the celebration: the key word appears big for a moment, the fanfare plays,
-   and then the whole sentence is read aloud. Tap **Next sentence** as soon as you can. It must work straight away.
+   and then the whole sentence is read aloud. The next sentence comes by itself once the celebration is over; there is no button to press.
 5. Fill-in sentences: tap the word that fits the gap. A wrong word should be kind and easy to try again.
 
 ---
@@ -194,7 +194,7 @@ Score each line from **1 (very poor) to 5 (very good)**. Write one sentence of e
 | Area | What it means | Score | Evidence (what you saw or heard) |
 | --- | --- | --- | --- |
 | **Engagement** | The child keeps going, comes back to the game, asks to play again | | |
-| **Clarity** | The child understands what to do without help (instructions, clues, the Next button) | | |
+| **Clarity** | The child understands what to do without help (instructions, clues, the success message and what happens next) | | |
 | **Independence** | The child completes steps alone; how often they asked an adult | | |
 | **Frustration** | 5 = calm even after a wrong answer; 1 = gives up or gets upset (score this as *calm*, not as the opposite) | | |
 | **Technical reliability** | Nothing blank, stuck, covered or silent that should not be; sound and speech behaved as expected | | |

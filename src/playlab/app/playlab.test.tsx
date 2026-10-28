@@ -15,7 +15,7 @@ describe('Navigation', () => {
       ['Letter Playground', /Letter Playground/],
       ['Sound Discovery', /Sound Discovery/],
       ['Word Builder', /Magic Letters/],
-      ['Sentence Fun', /Sentence Fun/],
+      ['Sentence Fun', /Build the Sentence|Finish the Sentence/],
       ['Match & Play', /Match & Play/],
     ];
     for (const [title, heading] of cases) {

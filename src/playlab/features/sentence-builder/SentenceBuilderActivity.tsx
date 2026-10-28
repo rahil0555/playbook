@@ -23,6 +23,8 @@ export default function SentenceBuilderActivity() {
     <div>
       <ActivityHeader
         activityId="sentences"
+        title={round.summary || !round.current ? undefined : mode === 'fill' ? 'Finish the Sentence' : 'Build the Sentence'}
+        compact
         instruction={
           round.summary
             ? 'Great reading! Play again or try the next activity.'

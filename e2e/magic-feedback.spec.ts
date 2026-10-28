@@ -33,15 +33,17 @@ test.describe('Magic Letters feedback', () => {
     await expect(page.getByText('Nice pick!')).toHaveCount(0);
   });
 
-  test('the last letter placed at once completes the word: the success message and its Next button show, and the picked-up message is gone', async ({ page }) => {
+  test('the last letter placed at once completes the word: the success message shows, the picked-up message is gone, and the next word comes by itself', async ({ page }) => {
     const word = await openRound(page);
     for (const [i, letter] of [...word].entries()) {
       await tap(page, letter);
       await drop(page, i);
     }
-    await page.clock.runFor(4000); // the last letter flies in and the word is finished
+    await page.clock.runFor(2000); // the last letter flies in and the word is finished: its card shows
     await expect(page.getByText(/You spelled/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^(Next word|Finish)$/ })).toBeVisible();
+    await expect(page.getByText(/On to the next one/)).toBeVisible();
     await expect(page.getByText('Nice pick!')).toHaveCount(0);
+    await page.clock.runFor(4000); // then the celebration is over and the next word comes by itself
+    await expect(page.getByText(/You spelled/)).toHaveCount(0);
   });
 });

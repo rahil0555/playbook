@@ -78,10 +78,10 @@ export function useMoments() {
       chime: () => sfx('chime'),
       /** the bigger fanfare: a whole word or sentence is finished */
       celebrate: () => sfx('celebrate'),
-      /** the fanfare now, and the line read aloud once the fanfare has finished (never over it) */
-      celebrateThenSay: (text: string) => {
+      /** the fanfare now, and the line read aloud once the fanfare has finished (never over it). Returns the line: `done` settles when it has been said */
+      celebrateThenSay: (text: string): Scheduled => {
         sfx('celebrate');
-        queueLine(text, CELEBRATION_SPEECH_MS);
+        return queueLine(text, CELEBRATION_SPEECH_MS);
       },
       /** run something a moment later (e.g. the spoken letter sound after its pop) */
       after,
