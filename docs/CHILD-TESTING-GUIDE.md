@@ -113,7 +113,7 @@ advance.) This is a release-blocking problem if it happens.
 2. Tap quickly, several words in a row. Every word should end up in its own spot, none should disappear or swap.
 3. Put the words in the wrong order. Each word is checked as it lands (green when it is right, sun-coloured when it is
    not). Drag a wrong word onto another word: the two should swap. Tap a wrong word, then tap the spot you want: it should
-   move there. A right word stays put. Check that a sentence fixed by swaps alone is celebrated.
+   move there. A right word can be moved or swapped too: being right only changes the feedback. Check that a sentence fixed by swaps alone is celebrated.
 4. Put the words in the right order. Check the celebration: the key word appears big for a moment, the fanfare plays,
    and then the whole sentence is read aloud. The next sentence comes by itself once the celebration is over; there is no button to press.
 5. Fill-in sentences: tap the word that fits the gap. A wrong word should be kind and easy to try again.

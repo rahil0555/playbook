@@ -59,27 +59,6 @@ export function placeTile(slots: Slots, tileId: string, slotIndex?: number): Slo
   return next;
 }
 
-/**
- * A slot whose word is right for that slot is locked: the word is not picked up, and nothing is dropped over it. A right word is
- * final, so locking it never costs the child anything.
- */
-export function isLockedSlot(slots: Slots, tiles: readonly Tile[], target: readonly string[], slotIndex: number): boolean {
-  const id = slots[slotIndex];
-  if (!id) return false;
-  return tiles.find((t) => t.id === id)?.value === target[slotIndex];
-}
-
-/**
- * placeTile, with locked words respected: a right word is never moved, and a drop over one is refused (null). Dropping a word on
- * its own spot changes nothing. Any other word can be moved to an empty spot, or swapped with a wrong one.
- */
-export function moveTile(slots: Slots, tiles: readonly Tile[], target: readonly string[], tileId: string, slotIndex?: number): Slots | null {
-  const from = slots.indexOf(tileId);
-  if (from >= 0 && isLockedSlot(slots, tiles, target, from)) return null;
-  if (slotIndex !== undefined && isLockedSlot(slots, tiles, target, slotIndex)) return null;
-  return placeTile(slots, tileId, slotIndex);
-}
-
 export function removeTile(slots: Slots, tileId: string): Slots {
   return slots.includes(tileId) ? slots.map((s) => (s === tileId ? null : s)) : slots;
 }

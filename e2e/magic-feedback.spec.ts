@@ -19,7 +19,7 @@ async function openRound(page: Page) {
 }
 
 const tap = (page: Page, value: string) =>
-  page.evaluate((v) => (document.querySelector(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`) as HTMLElement).click(), value);
+  page.evaluate((v) => (document.querySelector(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`) as HTMLElement).click(), value);
 const drop = (page: Page, slot: number) => page.evaluate((i) => (document.querySelector(`[data-magic-slot="${i}"]`) as HTMLElement).click(), slot);
 
 test.describe('Magic Letters feedback', () => {

@@ -51,4 +51,27 @@ describe('Magic Letters: a repeated letter (BOOK) is two separate letters', () =
     await user.click(slot(3));
     expect(await screen.findByText(/You spelled/, {}, { timeout: 5000 })).toBeInTheDocument();
   }, 20000);
+
+  it('both O letters can be moved on their own once they are right: moving one leaves the other in its spot', async () => {
+    const { user } = renderPlayLab({ initialActivity: 'word-builder' });
+    await screen.findByRole('heading', { level: 1, name: 'Magic Letters' }, { timeout: 5000 });
+    await screen.findAllByLabelText(/^Slot \d, empty/);
+    await user.click(trayTile('o'));
+    await user.click(slot(1)); // right: the first O is in its spot
+    await user.click(trayTile('o'));
+    await user.click(slot(2)); // right: the second O is in its spot
+    expect(slot(1)).toHaveAttribute('aria-label', 'Slot 2: O, done');
+    expect(slot(2)).toHaveAttribute('aria-label', 'Slot 3: O, done');
+    // the O in spot 2 is picked up and moved to spot 1 (wrong there, the B belongs first); the O in spot 3 stays where it is
+    await user.click(onBoard(1));
+    await user.click(slot(0));
+    expect(slot(0)).toHaveAttribute('data-state', 'wrong');
+    expect(slot(2)).toHaveAttribute('aria-label', 'Slot 3: O, done');
+    expect(oLetters()).toBe(2); // still two O letters: none lost, none duplicated
+    // and the O moves back to its own spot, which is empty now
+    await user.click(onBoard(0));
+    await user.click(slot(1));
+    expect(slot(1)).toHaveAttribute('aria-label', 'Slot 2: O, done');
+    expect(oLetters()).toBe(2);
+  });
 });

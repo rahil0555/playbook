@@ -17,7 +17,7 @@ beforeEach(() => {
   round.order = PIG_ROUND;
 });
 
-const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
+const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 
 async function openRound() {

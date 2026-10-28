@@ -42,7 +42,7 @@ async function openRound() {
 }
 
 const speakButton = () => screen.getByRole('button', { name: 'Speak answer' });
-const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
+const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 
 /** the browser hears one phrase and finishes: the final transcript, then the end of the session */

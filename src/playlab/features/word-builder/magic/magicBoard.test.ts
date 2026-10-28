@@ -134,11 +134,17 @@ describe('moveTile: a letter is placed, moved or swapped, and nothing is lost or
     invariant(replaced.slots);
   });
 
-  it('a right letter is locked: it is never moved, and nothing is dropped over it', () => {
+  it('a right letter can be picked up and moved, and a letter can be dropped on it: correctness is feedback, not a restriction', () => {
     const right = moveTile(target, emptyMagicSlots(5), tiles, a.id, 0);
     if (right.kind !== 'moved') throw new Error('expected moved');
-    expect(moveTile(target, right.slots, tiles, a.id, 4)).toEqual({ kind: 'locked' }); // picked up
-    expect(moveTile(target, right.slots, tiles, l.id, 0)).toEqual({ kind: 'locked' }); // dropped on
+    const moved = moveTile(target, right.slots, tiles, a.id, 4); // the right A moves to an empty spot
+    expect(moved).toMatchObject({ kind: 'moved', from: 0, to: 4 });
+    if (moved.kind !== 'moved') throw new Error('expected moved');
+    expect(moved.slots).toEqual([null, null, null, null, a.id]);
+    const replaced = moveTile(target, right.slots, tiles, l.id, 0); // a tray L dropped on the right A: the A goes back to the tray
+    expect(replaced).toMatchObject({ kind: 'moved', from: null, to: 0 });
+    if (replaced.kind !== 'moved') throw new Error('expected moved');
+    expect(replaced.slots).toEqual([l.id, null, null, null, null]); // nothing lost: the A is in the tray
   });
 
   it('dropping a letter on the spot it is already on changes nothing', () => {
@@ -154,7 +160,8 @@ describe('moveTile: a letter is placed, moved or swapped, and nothing is lost or
     expect(second).toMatchObject({ kind: 'moved', to: 2 });
     if (second.kind !== 'moved') throw new Error('expected moved');
     expect(second.slots.slice(1, 3)).toEqual([p2.id, p1.id]);
-    expect(moveTile(target, second.slots, tiles, a.id, 2)).toEqual({ kind: 'locked' });
+    // two right P's swap places, and both stay right: either P is right in either P spot
+    expect(moveTile(target, second.slots, tiles, p1.id, 1)).toEqual({ kind: 'moved', slots: [null, p1.id, p2.id, null, null], from: 2, to: 1 });
   });
 
   it('a decoy is always wrong, and can be moved like any other wrong letter', () => {

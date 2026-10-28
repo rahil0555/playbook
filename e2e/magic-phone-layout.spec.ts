@@ -287,7 +287,7 @@ test.describe('Magic Letters on a phone', () => {
     }
 
     // one drag: the first letter of the word, from the tray to its outline, with both on screen together
-    const first = page.locator(`[data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first();
+    const first = page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first();
     const outline = outlines.nth(0);
     await first.scrollIntoViewIfNeeded();
     const firstId = await first.getAttribute('data-magic-tile');
@@ -319,7 +319,7 @@ test.describe('Magic Letters on a phone', () => {
     const w = await currentWord(page);
     for (let i = 0; i < w.text.length; i++) {
       const ch = w.text[i]!;
-      const tile = page.locator(`[data-magic-tile][data-value="${ch}"][data-decoy="false"]`).first();
+      const tile = page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${ch}"][data-decoy="false"]`).first();
       const slot = page.locator(`[data-magic-slot="${i}"]`);
       if (i % 2 === 0) {
         // drag: press on the letter, move onto the outline, let go
@@ -346,7 +346,7 @@ test.describe('Magic Letters on a phone', () => {
     const w = await currentWord(page);
     for (let i = 0; i < w.text.length; i++) {
       const ch = w.text[i]!;
-      await page.locator(`[data-magic-tile][data-value="${ch}"][data-decoy="false"]`).first().click();
+      await page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${ch}"][data-decoy="false"]`).first().click();
       await page.locator(`[data-magic-slot="${i}"]`).click();
       await expect(page.locator(`[data-magic-slot="${i}"]`), `outline ${i + 1} (${ch}) did not fill`).toHaveAttribute('data-state', 'filled', { timeout: 4000 });
     }

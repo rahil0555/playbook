@@ -6,7 +6,7 @@ import { StarBurst } from '../../../moments/StarBurst';
 import { tapSoundGate } from './magicFeel';
 import { springs } from '../../../motion/variants';
 import { clamp, measurePose, type Pose } from '../../../moments/flightPath';
-import { nearestOpenSlot } from '../../../lib/dom';
+import { nearestSlot } from '../../../lib/dom';
 import { LetterTileFace } from '../../../components/LetterTile';
 import type { MagicTile } from './magicBoard';
 
@@ -58,9 +58,9 @@ function releasePose(el: Element | null, info: PanInfo, grab: { dx: number; dy: 
   return { ...m, cx: info.point.x - window.scrollX + grab.dx, cy: info.point.y - window.scrollY + grab.dy };
 }
 
-/** The empty spot this tile is over or close to. The glow and the drop both use it, so what the child sees is where it lands. */
-function nearestSlot(el: HTMLElement | null): number | null {
-  const slot = nearestOpenSlot(el, '[data-magic-slot]');
+/** The spot this tile is over or close to (empty, or holding a letter a swap would take). The glow and the drop both use it, so what the child sees is where it lands. */
+function nearestSpot(el: HTMLElement | null): number | null {
+  const slot = nearestSlot(el, '[data-magic-slot]');
   return slot ? Number(slot.dataset.magicSlot) : null;
 }
 
@@ -155,10 +155,10 @@ export function LooseLetter({ tile, color, index, selected, hinted, disabled, wo
           stretchX.set(1 + stretch * 0.6);
           stretchY.set(1 - stretch * 0.5);
         }
-        onHover(nearestSlot(ref.current));
+        onHover(nearestSpot(ref.current));
       }}
       onDragEnd={(_, info) => {
-        const slot = nearestSlot(ref.current);
+        const slot = nearestSpot(ref.current);
         onHoldEnd(); // the sound stops before the drop can say the letter's own sound
         onHover(null);
         onDrop(tile.id, slot, releasePose(ref.current, info, grab.current));

@@ -246,10 +246,6 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
       return;
     }
     const result = moveTile(target, slotsRef.current, tiles, tileId, slotIndex);
-    if (result.kind === 'locked') {
-      setAnnounce(`Slot ${slotIndex + 1} already has its letter.`);
-      return;
-    }
     if (result.kind !== 'moved') return;
     const right = tile.value === target[slotIndex];
     const next = result.slots;
@@ -296,10 +292,6 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
         tapSlot(at);
         return;
       }
-      if (isRightAt(target, slotsRef.current, tiles, at)) {
-        setAnnounce('That letter is already in the right spot.');
-        return;
-      }
       const picking = selected !== tileId;
       setSelected(picking ? tileId : null);
       setVoiceNote(null);
@@ -338,8 +330,7 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
   };
   /** a spot is tapped: the letter picked up goes there (a move, a swap, or a replacement) */
   const tapSlot = (slotIndex: number) => {
-    if (isRightAt(target, slotsRef.current, tiles, slotIndex)) setAnnounce(`Slot ${slotIndex + 1} already has its letter.`);
-    else if (selected) attempt(selected, slotIndex);
+    if (selected) attempt(selected, slotIndex);
     else setAnnounce('Pick up a letter first, then choose a spot.');
   };
   const dropTile = (tileId: string, slotIndex: number | null, pose: Pose | null) => {
@@ -521,7 +512,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
             <motion.span aria-hidden="true" initial={{ opacity: 0 }} animate={stripRing} className="pointer-events-none absolute inset-0 rounded-[2rem] border-4 border-brand-500" />
             {target.map((letter, i) => {
               const placed = slots[i] ? (tiles.find((t) => t.id === slots[i]) ?? null) : null;
-              const wrongHere = placed !== null && placed.value !== letter && landed.has(i);
+              // the letter in a landed spot is always the draggable tile: right or wrong, it can be moved or swapped
+              const placedHere = placed !== null && landed.has(i);
               return (
                 <OutlineSlot
                   key={i}
@@ -540,8 +532,8 @@ export function MagicQuestion({ round, word, storyStage }: { round: Round<WordEn
                   armed={selected !== null}
                   onActivate={tapSlot}
                 >
-                  {/* a letter in the wrong spot is the letter itself: it can be dragged to another spot, or tapped and moved */}
-                  {wrongHere && placed ? (
+                  {/* the letter in the spot is the draggable tile itself: a right letter moves or swaps just like a wrong one */}
+                  {placedHere && placed ? (
                     <LooseLetter
                       key={placed.id}
                       tile={placed}

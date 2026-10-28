@@ -20,7 +20,7 @@ async function currentWord(page: Page) {
 }
 
 const center = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
-const realTile = (page: Page, v: string) => page.locator(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`).first();
+const realTile = (page: Page, v: string) => page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`).first();
 
 async function dragTo(page: Page, tile: ReturnType<typeof realTile>, slotIndex: number) {
   const from = center((await tile.boundingBox())!);
@@ -205,7 +205,7 @@ test.describe('rounds, progress, success and retry', () => {
     for (const ch of w.text) await page.keyboard.press(ch);
     await expect(page.getByText('Great job!').or(page.getByText(/Awesome|You got it|Super|Brilliant|Well done/)).first()).toBeVisible();
     await expect(page.getByText(/On to the next one/)).toBeVisible();
-    await expect(page.locator('[data-magic-tile]')).toHaveCount(0); // tray cleared
+    await expect(page.locator('ul[aria-label="Loose letters"] [data-magic-tile]')).toHaveCount(0); // tray cleared (a letter in its spot is a tile too)
   });
 });
 

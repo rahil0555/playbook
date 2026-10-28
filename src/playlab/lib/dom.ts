@@ -20,18 +20,17 @@ export function elementUnder(info: PanInfo, selector: string, dragged?: Element 
 }
 
 /**
- * The open element matching `selector` (one not marked `data-state="filled"`) whose centre is nearest to the centre of `el`,
- * if that centre is within 80% of the element's own width. Boxes are measured as they are now, so it works for any size of
- * word or screen, and while `el` is being dragged.
+ * The element matching `selector` whose centre is nearest to the centre of `el`, if that centre is within 80% of the element's own
+ * width. Every matching element is a target, filled or not: dropping a letter on a letter swaps them. Boxes are measured as they are
+ * now, so it works for any size of word or screen, and while `el` is being dragged.
  */
-export function nearestOpenSlot(el: HTMLElement | null, selector: string): HTMLElement | null {
+export function nearestSlot(el: HTMLElement | null, selector: string): HTMLElement | null {
   if (!el || typeof document === 'undefined') return null;
   const b = el.getBoundingClientRect();
   const cx = b.left + b.width / 2;
   const cy = b.top + b.height / 2;
   let best: { slot: HTMLElement; distance: number } | null = null;
   for (const slot of document.querySelectorAll<HTMLElement>(selector)) {
-    if (slot.dataset.state === 'filled') continue;
     const r = slot.getBoundingClientRect();
     const distance = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
     if (distance <= r.width * 0.8 && (!best || distance < best.distance)) best = { slot, distance };

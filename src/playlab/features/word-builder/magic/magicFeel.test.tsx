@@ -29,7 +29,7 @@ beforeEach(() => {
 
 type User = ReturnType<typeof renderPlayLab>['user'];
 
-const tilesOf = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)];
+const tilesOf = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)];
 const realTile = (value: string) => tilesOf(value).find((t) => t.dataset.decoy === 'false')!;
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));

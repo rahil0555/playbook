@@ -182,3 +182,184 @@ test.describe('Reading a Story: a wrong letter is moved by a real drag', () => {
     await expect(page.locator(`[data-magic-slot="${dest}"]`)).toHaveAttribute('data-state', 'wrong', { timeout: 3000 });
   });
 });
+
+// ---- correct items move too: correctness is feedback, not a restriction ----
+
+test.describe('Sentence Fun: a right word is moved, swapped and replaced by dragging it', () => {
+  test('a right word dropped on another right word swaps with it, and no word is lost', async ({ page }) => {
+    const words = (await openArrangeSentence(page)).words;
+    test.skip(words[0] === words[1], 'the first two words are the same');
+    await tapWord(page, words[0]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(1);
+    await tapWord(page, words[1]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(2);
+    await page.waitForTimeout(700); // both words glide into their spots first
+    await drag(page, page.locator('[data-slot="0"] [data-tile]'), page.locator('[data-slot="1"]'));
+    await expect(page.locator('[data-slot="0"] [data-tile]')).toHaveAttribute('data-value', words[1]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot="1"] [data-tile]')).toHaveAttribute('data-value', words[0]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(2); // both still on the board
+    await expect(page.locator('ul[aria-label="Available words"] [data-tile]')).toHaveCount(words.length - 2);
+  });
+
+  test('a tray word dropped on a right word replaces it, and the right word goes back to the tray', async ({ page }) => {
+    const words = (await openArrangeSentence(page)).words;
+    test.skip(words[0] === words[1], 'the first two words are the same');
+    await tapWord(page, words[0]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(1);
+    await page.waitForTimeout(700);
+    await drag(page, page.locator(`ul[aria-label="Available words"] [data-tile][data-value="${words[1]}"][data-placed="false"]`).first(), page.locator('[data-slot="0"]'));
+    await expect(page.locator('[data-slot="0"] [data-tile]')).toHaveAttribute('data-value', words[1]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(1);
+    await expect(page.locator(`ul[aria-label="Available words"] [data-tile][data-value="${words[0]}"][data-placed="false"]`)).toHaveCount(1); // back in the tray
+    await expect(page.locator('ul[aria-label="Available words"] [data-tile]')).toHaveCount(words.length - 1);
+  });
+
+  test('a right word dragged into an empty spot moves there, and its old spot is empty again', async ({ page }) => {
+    const words = (await openArrangeSentence(page)).words;
+    test.skip(words.length < 3, 'the sentence is too short');
+    await tapWord(page, words[0]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(1);
+    await page.waitForTimeout(700);
+    await drag(page, page.locator('[data-slot="0"] [data-tile]'), page.locator('[data-slot="2"]'));
+    await expect(page.locator('[data-slot="0"]')).toHaveAttribute('data-state', 'empty', { timeout: 3000 });
+    await expect(page.locator('[data-slot="2"] [data-tile]')).toHaveAttribute('data-value', words[0]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(1);
+  });
+
+  test('by taps: a right word is picked up and swapped with another right word', async ({ page }) => {
+    const words = (await openArrangeSentence(page)).words;
+    test.skip(words[0] === words[1], 'the first two words are the same');
+    await tapWord(page, words[0]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(1);
+    await tapWord(page, words[1]!);
+    await expect.poll(() => page.locator('[data-slot] [data-tile]').count(), { timeout: 3000 }).toBe(2);
+    await page.waitForTimeout(700);
+    await page.locator('[data-slot="0"] [data-tile]').click(); // the right word in spot 1 is picked up...
+    await page.locator('[data-slot="1"] [data-tile]').click(); // ...and tapping the other word swaps them
+    await expect(page.locator('[data-slot="0"] [data-tile]')).toHaveAttribute('data-value', words[1]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot="1"] [data-tile]')).toHaveAttribute('data-value', words[0]!, { timeout: 3000 });
+    await expect(page.locator('[data-slot] [data-tile]')).toHaveCount(2);
+  });
+});
+
+/** Word Builder on the round's first word: returns the word (its letters are read from the clue) */
+async function openWordBuilder(page: Page) {
+  await installFakeSpeech(page);
+  await page.goto('/#/word-builder');
+  await expect(page.getByRole('heading', { level: 1, name: 'Magic Letters' })).toBeVisible();
+  await page.locator('[data-magic-slot="0"]').waitFor();
+  await page.waitForTimeout(700);
+  const clue = await page.locator('[data-magic-clue]').first().innerText();
+  return englishWords.find((w) => w.clue === clue)!.text;
+}
+const letterInTray = (page: Page, v: string) => page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`).first();
+const letterInSpot = (page: Page, i: number) => page.locator(`[data-magic-slot="${i}"] [data-magic-tile]`);
+
+test.describe('Word Builder: a correct letter moves and swaps like any other letter', () => {
+  test('a correct letter is dragged onto an empty spot: it moves there, and its spot is empty again', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    const last = word.length - 1;
+    test.skip(last < 2, 'the word is too short');
+    await letterInTray(page, word[0]!).click();
+    await page.locator('[data-magic-slot="0"]').click(); // right: spot 1 is done
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', `Slot 1: ${word[0]!.toUpperCase()}, done`, { timeout: 3000 });
+    await drag(page, letterInSpot(page, 0), page.locator(`[data-magic-slot="${last}"]`));
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', 'Slot 1, empty', { timeout: 3000 });
+    await expect(letterInSpot(page, last)).toHaveAttribute('data-value', word[0]!, { timeout: 3000 });
+  });
+
+  test('two correct letters are swapped by dragging one onto the other, and no letter is lost', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    const [a, b] = [word[0]!, word[1]!];
+    test.skip(a === b, 'the first two letters are the same');
+    await letterInTray(page, a).click();
+    await page.locator('[data-magic-slot="0"]').click();
+    await letterInTray(page, b).click();
+    await page.locator('[data-magic-slot="1"]').click();
+    await expect(page.locator('[data-magic-slot="1"]')).toHaveAttribute('aria-label', `Slot 2: ${b.toUpperCase()}, done`, { timeout: 3000 });
+    await drag(page, letterInSpot(page, 0), page.locator('[data-magic-slot="1"]'));
+    await expect(letterInSpot(page, 0)).toHaveAttribute('data-value', b, { timeout: 3000 });
+    await expect(letterInSpot(page, 1)).toHaveAttribute('data-value', a, { timeout: 3000 });
+    // each letter now sits in the other's spot: both are wrong there, and both are still on the board
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'wrong');
+    await expect(page.locator('[data-magic-slot="1"]')).toHaveAttribute('data-state', 'wrong');
+  });
+
+  test('a correct letter is swapped with an incorrect letter in another spot', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    test.skip(word.length < 3, 'the word is too short');
+    const a = word[0]!;
+    // a tray letter that does not belong in the third spot
+    const wrongForThird = await page.locator('ul[aria-label="Loose letters"] [data-magic-tile][data-decoy="false"]').evaluateAll(
+      (els, third) => (els as HTMLElement[]).map((e) => e.dataset.value as string).find((v) => v !== third),
+      word[2]!,
+    );
+    test.skip(!wrongForThird || wrongForThird === a, 'no other letter to try');
+    await letterInTray(page, a).click();
+    await page.locator('[data-magic-slot="0"]').click(); // right
+    await letterInTray(page, wrongForThird!).click();
+    await page.locator('[data-magic-slot="2"]').click(); // wrong: it stays in the third spot
+    await expect(page.locator('[data-magic-slot="2"]')).toHaveAttribute('data-state', 'wrong');
+    await drag(page, letterInSpot(page, 0), page.locator('[data-magic-slot="2"]'));
+    await expect(letterInSpot(page, 2)).toHaveAttribute('data-value', a, { timeout: 3000 });
+    await expect(letterInSpot(page, 0)).toHaveAttribute('data-value', wrongForThird!, { timeout: 3000 });
+  });
+
+  test('a tray letter dropped on a correct letter replaces it, and the correct letter goes back to the tray', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    const a = word[0]!;
+    await letterInTray(page, a).click();
+    await page.locator('[data-magic-slot="0"]').click(); // right
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', `Slot 1: ${a.toUpperCase()}, done`, { timeout: 3000 });
+    const other = await page.locator('ul[aria-label="Loose letters"] [data-magic-tile][data-decoy="false"]').evaluateAll(
+      (els, first) => (els as HTMLElement[]).map((e) => e.dataset.value as string).find((v) => v !== first),
+      a,
+    );
+    test.skip(!other, 'no other letter in the tray');
+    await page.waitForTimeout(700);
+    await drag(page, letterInTray(page, other!), page.locator('[data-magic-slot="0"]'));
+    await expect(letterInSpot(page, 0)).toHaveAttribute('data-value', other!, { timeout: 3000 });
+    await expect(letterInTray(page, a)).toHaveCount(1, { timeout: 3000 }); // the correct letter is back in the tray, not lost
+  });
+
+  test('a correct letter picked up by a tap and moved to an empty spot by a tap', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    const last = word.length - 1;
+    test.skip(last < 2, 'the word is too short');
+    await letterInTray(page, word[0]!).click();
+    await page.locator('[data-magic-slot="0"]').click();
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', `Slot 1: ${word[0]!.toUpperCase()}, done`, { timeout: 3000 });
+    await letterInSpot(page, 0).click(); // picked up, though it is right
+    await page.locator(`[data-magic-slot="${last}"]`).click();
+    await expect(letterInSpot(page, last)).toHaveAttribute('data-value', word[0]!, { timeout: 3000 });
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', 'Slot 1, empty', { timeout: 3000 });
+  });
+
+  test('once the word is spelled it is accepted: its letters can no longer be moved', async ({ page }) => {
+    const word = await openWordBuilder(page);
+    for (const ch of word) await page.keyboard.press(ch);
+    await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 5000 });
+    await expect(letterInSpot(page, 0)).toBeDisabled({ timeout: 1000 });
+  });
+});
+
+test.describe('Reading a Story: a correct letter moves, and the word is still completed', () => {
+  test('a correct letter is dragged to another spot, the sentence stays, and the word is still spelled by typing', async ({ page }) => {
+    await installFakeSpeech(page);
+    await page.goto('/#/story');
+    await expect(page.locator('[data-magic-slot="0"]')).toBeVisible();
+    const target = (await page.locator('[data-story-word][data-state="target"]').first().getAttribute('data-story-word'))!;
+    test.skip(target.length < 3 || new Set(target).size < 2, 'the word has no two different letters to move between');
+    const first = target[0]!;
+    const dest = target.length - 1;
+    await letterInTray(page, first).click();
+    await page.locator('[data-magic-slot="0"]').click(); // right
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', `Slot 1: ${first.toUpperCase()}, done`, { timeout: 3000 });
+    await drag(page, letterInSpot(page, 0), page.locator(`[data-magic-slot="${dest}"]`));
+    await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('aria-label', 'Slot 1, empty', { timeout: 3000 });
+    await expect(letterInSpot(page, dest)).toHaveAttribute('data-value', first, { timeout: 3000 });
+    await expect(page.locator('[data-story-sentence]')).toBeVisible(); // the sentence (the narration's text) is still there
+    for (const ch of target) await page.keyboard.press(ch); // typing still puts each letter in the spot that needs it
+    await expect(page.getByText(/You spelled/)).toBeVisible({ timeout: 6000 });
+  });
+});

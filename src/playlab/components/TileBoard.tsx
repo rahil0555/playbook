@@ -11,10 +11,10 @@ import { dragProps, springs } from '../motion/variants';
 interface TileBoardProps {
   tiles: Tile[];
   slots: Slots;
-  /** Put a tile in a slot (slotIndex undefined = first free slot). The parent decides: a right word is never moved. */
+  /** Put a tile in a slot (slotIndex undefined = first free slot). A word on a spot is swapped with the dropped one, or replaced by a tray word. */
   onPlace: (tileId: string, slotIndex?: number) => void;
   onRemove: (tileId: string) => void;
-  /** Per-slot result. A slot marked 'correct' is locked: its word is right, so it is not picked up and nothing is dropped over it. */
+  /** Per-slot result, shown as feedback only: a right word is marked green but can still be picked up, moved or swapped. */
   slotStates?: SlotState[];
   /** Faint guide letters shown in empty slots (Starter level, like the reference reel) */
   guide?: string[];
@@ -60,7 +60,7 @@ function slotAt(info: PanInfo, dragged: HTMLElement | undefined): number | null 
  * - tap a placed tile, then tap a slot: the tile moves there, or swaps with the tile in it (tap the other tile to do the same)
  * - drag a tile onto a slot: a placed tile moves, or swaps with the one already there; a tray tile replaces the one there
  * - drop a placed tile outside the row: it goes back to the tray
- * - a word that is already right is locked in its slot
+ * - a right word is marked green, but it can still be moved or swapped (correctness is feedback, not a restriction)
  * - tiles keep a stable "bay" in the tray, so nothing reflows while playing
  */
 export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, hintTileId, locked = false, kind, format = (v) => v, noun, trailing, nextSlot }: TileBoardProps) {
@@ -85,9 +85,6 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
   const size = SIZE[kind];
   const byId = new Map(tiles.map((t) => [t.id, t]));
   const landingSlots = new Set(lifting.values());
-
-  /** a right word is locked: it is not picked up, and nothing is dropped over it */
-  const isLocked = (slotIndex: number) => slotStates?.[slotIndex] === 'correct';
 
   /** the word has arrived: its chime and its landing burst, together */
   const landed = (slotIndex: number) => {
@@ -135,9 +132,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
     }, PICK_UP_MS);
   };
 
-  /** Tap a placed tile: a right one stays put; otherwise it is picked up, or, with another tile picked up, that tile moves to its spot. */
+  /** Tap a placed tile: it is picked up, or, with another tile picked up, that tile moves to its spot (or swaps with it). */
   const tapPlaced = (tileId: string, slotIndex: number) => {
-    if (isLocked(slotIndex)) return;
     if (picked !== null && picked !== tileId) {
       onPlace(picked, slotIndex);
       setPicked(null);
@@ -149,7 +145,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
 
   /** Tap a slot while a placed tile is picked up: the tile goes there (a move, or a swap). The same spot puts it down. */
   const tapSlot = (slotIndex: number) => {
-    if (picked === null || isLocked(slotIndex)) return;
+    if (picked === null) return;
     onPlace(picked, slotIndex);
     setPicked(null);
   };
@@ -166,16 +162,13 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
     const isLifted = lifting.has(tile.id) || picked === tile.id;
     const color = colorFor(tile);
     const isHint = hintTileId === tile.id;
-    // a right word, once placed, is final: it is shown, but it cannot be picked up or dragged
-    const inert = locked || (placedIn !== null && isLocked(placedIn));
+    const inert = locked;
     const label =
       placedIn === null
         ? `${noun} ${format(tile.value)}. Tap to place it`
-        : isLocked(placedIn)
-          ? `${noun} ${format(tile.value)}, in slot ${placedIn + 1}. In the right place`
-          : picked === tile.id
-            ? `${noun} ${format(tile.value)}, in slot ${placedIn + 1}. Picked up. Now tap a slot`
-            : `${noun} ${format(tile.value)}, in slot ${placedIn + 1}. Tap to pick it up, then tap a slot`;
+        : picked === tile.id
+          ? `${noun} ${format(tile.value)}, in slot ${placedIn + 1}. Picked up. Now tap a slot`
+          : `${noun} ${format(tile.value)}, in slot ${placedIn + 1}${slotStates?.[placedIn] === 'correct' ? ', in the right place' : ''}. Tap to pick it up, then tap a slot`;
     return (
       <motion.button
         key={tile.id}
@@ -222,7 +215,7 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
         onDragEnd={(_, info) => {
           const target = slotAt(info, tileEls.current.get(tile.id));
           setOver(null);
-          if (target !== null && target !== placedIn && !isLocked(target)) {
+          if (target !== null && target !== placedIn) {
             onPlace(tile.id, target);
             placedInto(tile.id, target);
           } else if (target === null && placedIn !== null) onRemove(tile.id);
@@ -253,8 +246,8 @@ export function TileBoard({ tiles, slots, onPlace, onRemove, slotStates, guide, 
           const tile = tileId ? byId.get(tileId) : undefined;
           const state = slotStates?.[i];
           // the spot a dragged or a picked-up word is over or can go to: it glows, the same way
-          const canTake = picked !== null && !isLocked(i) && tileId !== picked;
-          const aimed = (over === i && !isLocked(i)) || (landingSlots.has(i) && !tile);
+          const canTake = picked !== null && tileId !== picked;
+          const aimed = over === i || (landingSlots.has(i) && !tile);
           // the next empty slot glows; the other empty slots are plain, so the reading order is clear
           const isNext = i === nextSlot;
           const keyboardSpot = canTake && !tile;

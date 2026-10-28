@@ -3,9 +3,9 @@ import { shuffle, type Rng } from '../../../lib/random';
 
 /**
  * Pure placement logic for the "Magic Letters" mode of Word Builder (and the story's words).
- * Every letter the child puts down is judged at once: a letter in its own spot is right and is locked there. A letter in another spot
- * is wrong, but it stays where it was put, and the child can move it to an empty spot or swap it with the letter there. A wrong
- * letter is never sent back to the tray and never needs a restart.
+ * Every letter the child puts down is judged at once, and the judgement is feedback only: a right letter and a wrong one can both be
+ * picked up, moved to an empty spot, or swapped with the letter in a spot. A letter is never sent back to the tray by being wrong,
+ * and nothing needs a restart. Only a finished (spelled) word is accepted, which is decided by the caller, not by this file.
  */
 export interface MagicTile {
   id: string;
@@ -21,8 +21,6 @@ export type MagicSlots = (string | null)[];
 export type MoveResult =
   /** the letter is in its new spot; `from` is the spot it came from (null: the tray), and `to` the spot it went to */
   | { kind: 'moved'; slots: MagicSlots; from: number | null; to: number }
-  /** a right letter is never moved, and nothing is dropped over one */
-  | { kind: 'locked' }
   /** the letter is already on that spot */
   | { kind: 'same' }
   /** unknown tile or spot */
@@ -74,16 +72,14 @@ export const misplacedSlots = (target: readonly string[], slots: MagicSlots, til
   slots.flatMap((id, i) => (id !== null && !isRightAt(target, slots, tiles, i) ? [i] : []));
 
 /**
- * Put a letter on a spot: from the tray, or from another spot. An empty spot takes it; a wrong letter on that spot is swapped with
- * it (a letter from the tray sends that one back to the tray). A right letter, either the one moved or the one on the spot, is never
- * moved. Never mutates. Repeated letters: any matching letter is right for any matching spot.
+ * Put a letter on a spot: from the tray, or from another spot. An empty spot takes it; a letter already on that spot is swapped with
+ * it (a letter from the tray sends that one back to the tray). Right and wrong letters are treated the same here: correctness is
+ * feedback, not a restriction. Never mutates. Repeated letters: any matching letter is right for any matching spot.
  */
 export function moveTile(target: readonly string[], slots: MagicSlots, tiles: readonly MagicTile[], tileId: string, slotIndex: number): MoveResult {
   if (!tiles.some((t) => t.id === tileId) || slotIndex < 0 || slotIndex >= target.length) return { kind: 'ignored' };
   const from = slots.indexOf(tileId);
   if (from === slotIndex) return { kind: 'same' };
-  if (from >= 0 && isRightAt(target, slots, tiles, from)) return { kind: 'locked' };
-  if (isRightAt(target, slots, tiles, slotIndex)) return { kind: 'locked' };
   const next = [...slots];
   const occupant = next[slotIndex] ?? null;
   if (from >= 0) next[from] = occupant;

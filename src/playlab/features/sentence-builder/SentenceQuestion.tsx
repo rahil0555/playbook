@@ -15,7 +15,7 @@ import { elementUnder } from '../../lib/dom';
 import { PRAISE, pickLine, TRY_AGAIN } from '../../lib/messages';
 import { shuffle } from '../../lib/random';
 import {
-  clearSlots, emptySlots, filledCount, isComplete, isCorrect, makeTiles, moveTile, removeTile,
+  clearSlots, emptySlots, filledCount, isComplete, isCorrect, makeTiles, placeTile, removeTile,
   scramble, slotStates, slotValues, type SlotState, type Slots, type Tile,
 } from '../../lib/tiles';
 import { correctVariants, incorrectVariants, springs, wave } from '../../motion/variants';
@@ -141,10 +141,10 @@ function ArrangeQuestion({ sentence, round, solved, status, setStatus, onSolved,
     if (status === 'wrong') setStatus('building');
     setStates(undefined);
   };
-  /** a word goes to a spot: an empty one, or swapped with the word there. A right word is never moved, so a drop over one is refused. */
+  /** a word goes to a spot: an empty one, or swapped with the word there (a tray word replaces it). Any word can move, right or wrong. */
   const place = (id: string, i?: number) => {
     if (solved) return;
-    setSlots((s) => moveTile(s, tiles, target, id, i) ?? s);
+    setSlots((s) => placeTile(s, id, i));
     touched();
   };
   const remove = (id: string) => {

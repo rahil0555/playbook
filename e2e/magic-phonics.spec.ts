@@ -35,7 +35,7 @@ test.describe('Magic Letters: letter sounds for the word on screen', () => {
     await recordSpeech(page);
     const word = await openWord(page);
     const first = word.text[0]!;
-    await page.locator(`[data-magic-tile][data-value="${first}"][data-decoy="false"]`).click();
+    await page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${first}"][data-decoy="false"]`).click();
     await page.waitForTimeout(800); // the sound would follow the pop after ~170 ms
     expect(await spoken(page), 'nothing is spoken for the letter while no recording exists').toEqual([]);
   });

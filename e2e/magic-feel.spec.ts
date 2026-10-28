@@ -46,7 +46,7 @@ async function firstRealTile(page: Page) {
   const word = englishWords.find((w) => w.clue === clue)!;
   return {
     value: word.text[0]!,
-    tile: page.locator(`[data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first(),
+    tile: page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${word.text[0]}"][data-decoy="false"]`).first(),
   };
 }
 
@@ -63,7 +63,7 @@ test.describe('Magic Letters feel', () => {
     const measured = await page.evaluate(
       (v) =>
         new Promise<{ moves: number; firstMoveMs: number | null; sparkles: number; popAt: number | null; clickAt: number }>((resolve) => {
-          const tileEl = document.querySelector<HTMLElement>(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
+          const tileEl = document.querySelector<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
           // the wiggle lives on the letter's own inner span (not the button, which carries the drag/hover transform)
           const el = [...tileEl.children].find((c) => c.classList.contains('block') && c.getAttribute('aria-hidden') === 'true') as HTMLElement;
           const clickAt = performance.now();
@@ -118,7 +118,7 @@ test.describe('Magic Letters feel', () => {
     const { value } = await firstRealTile(page);
     // six taps in one burst (dispatched back to back, far faster than the 1.4 s gap)
     await page.evaluate((v) => {
-      const el = document.querySelector<HTMLElement>(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
+      const el = document.querySelector<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
       for (let i = 0; i < 6; i++) el.click();
     }, value);
     await page.waitForTimeout(1500);
@@ -219,7 +219,7 @@ test.describe('dragging a five-letter word', () => {
       for (const [k, letter] of [...'apple'].entries()) {
         // on a phone the tray sits below the fold: bring the spots to the top, so the spots and the tray are both on screen
         await page.evaluate(() => document.querySelector('[data-magic-slot="0"]')!.scrollIntoView({ block: 'start' }));
-        const tile = page.locator(`[data-magic-tile][data-value="${letter}"][data-decoy="false"]`).first();
+        const tile = page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${letter}"][data-decoy="false"]`).first();
         const tb = (await tile.boundingBox())!;
         const sb = (await page.locator(`[data-magic-slot="${k}"]`).boundingBox())!;
         const start = { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 };
@@ -236,7 +236,7 @@ test.describe('dragging a five-letter word', () => {
           await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
           const seen = await page.evaluate(
             ([v, slot]) => {
-              const b = document.querySelector(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!.getBoundingClientRect();
+              const b = document.querySelector(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`)!.getBoundingClientRect();
               return {
                 cx: b.left + b.width / 2,
                 cy: b.top + b.height / 2,
@@ -266,7 +266,7 @@ test.describe('dragging a five-letter word', () => {
     const moves = await page.evaluate(
       (v) =>
         new Promise<number>((resolve) => {
-          const el = document.querySelector<HTMLElement>(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
+          const el = document.querySelector<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`)!;
           const inner = [...el.children].find((c) => c.classList.contains('block') && c.getAttribute('aria-hidden') === 'true') as HTMLElement;
           let last = getComputedStyle(inner).transform;
           let count = 0;

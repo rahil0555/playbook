@@ -359,7 +359,7 @@ test.describe('responsive layout', () => {
     await page.goto('/#/word-builder');
     const clue = await page.locator('[data-magic-clue]').innerText();
     const first = englishWords.find((w) => w.clue === clue)!.text[0]!;
-    const tile = page.locator(`[data-magic-tile][data-value="${first}"][data-decoy="false"]`).first();
+    const tile = page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${first}"][data-decoy="false"]`).first();
     await drag(center((await tile.boundingBox())!), center((await page.locator('[data-magic-slot="0"]').boundingBox())!));
     await expect(page.locator('[data-magic-slot="0"]')).toHaveAttribute('data-state', 'filled');
     expect(await page.evaluate(() => window.scrollY)).toBe(0); // dragging did not scroll the page

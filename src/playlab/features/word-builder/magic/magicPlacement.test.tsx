@@ -72,15 +72,22 @@ describe('Magic Letters: a wrong letter stays where it was put, and can be moved
     expect(trayTile('l')).toBeDefined(); // the L is back in the tray, not lost
   });
 
-  it('a right letter is locked: nothing is picked up from its spot, and nothing is dropped over it', async () => {
+  it('a right letter can be picked up and moved, and a tray letter dropped on it replaces it: correctness is feedback, not a restriction', async () => {
     const { user } = await openApple();
     await place(user, 'a', 0); // right
-    await place(user, 'l', 0); // a tray letter onto the right spot: refused
+    await user.click(onBoard(0)); // the right A is picked up like any other letter
+    expect(onBoard(0)).toHaveAttribute('aria-pressed', 'true');
+    await user.click(slot(4)); // and moved to the empty spot
+    expect(slot(0)).toHaveAttribute('aria-label', 'Slot 1, empty');
+    expect(onBoard(4).dataset.value).toBe('a');
+    expect(slot(4)).toHaveAttribute('data-state', 'wrong');
+    await user.click(onBoard(4)); // back onto its own spot: right again
+    await user.click(slot(0));
     expect(slot(0)).toHaveAttribute('aria-label', 'Slot 1: A, done');
-    expect(document.querySelector('[role="status"].sr-only')).toHaveTextContent('Slot 1 already has its letter.');
-    expect(trayTile('l')).toBeDefined(); // the L is still in the tray
+    await place(user, 'l', 0); // a tray L dropped on the right A replaces it, and the A goes back to the tray
+    expect(slot(0)).toHaveAttribute('data-state', 'wrong');
+    expect(trayTile('a')).toBeDefined(); // nothing lost
   });
-
   it('a full wrong word is fixed by moves alone, and each move is judged: the word is then spelled and celebrated', async () => {
     const onAnswerSubmit = vi.fn();
     const { user } = renderPlayLab({ initialActivity: 'word-builder', onAnswerSubmit });

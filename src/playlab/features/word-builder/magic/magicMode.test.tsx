@@ -14,7 +14,7 @@ vi.mock('../../../lib/random', async (importOriginal) => {
 });
 
 type User = ReturnType<typeof renderPlayLab>['user'];
-const tilesOf = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)];
+const tilesOf = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)];
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 const realTile = (value: string) => tilesOf(value).find((t) => t.dataset.decoy === 'false')!;
 
@@ -53,9 +53,10 @@ describe('Magic Letters: tap-to-select fallback', () => {
     expect(await screen.findByText(/isn’t in the right spot yet/)).toBeInTheDocument();
     expect(onAnswerSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ correct: false, expected: 'apple', response: 'a@4' }));
     expect(sfxLog).toContain('oops');
-    expect(realTile('a')).toHaveAttribute('aria-pressed', 'false'); // put down after a miss, and still on the board
+    expect(slot(3).querySelector('[data-magic-tile]')).toHaveAttribute('aria-pressed', 'false'); // put down after a miss, and still on the board
 
-    await place(user, 'a', 0); // picked up from its wrong spot, and moved to the right one
+    await user.click(slot(3).querySelector('[data-magic-tile]')!); // picked up from its wrong spot...
+    await user.click(slot(0)); // ...and moved to the right one
     expect(slot(0)).toHaveAttribute('aria-label', 'Slot 1: A, done');
     expect(slot(3)).toHaveAttribute('data-state', 'empty');
     await vi.waitFor(() => expect(screen.queryByText(/isn’t in the right spot yet/)).toBeNull(), { timeout: 5000 }); // message clears once nothing is in a wrong spot
@@ -118,7 +119,7 @@ describe('Magic Letters: hints, retry and typed letters', () => {
     await place(user, 'a', 4); // a wrong spot: the letter stays there
     await place(user, 'p', 3); // another wrong spot
     expect(slot(0)).toHaveAttribute('data-state', 'hint'); // the first spot that is not right yet
-    expect(realTile('a').querySelector('.border-sky-300')).not.toBeNull(); // the sky-blue hint ring is on the A that belongs there
+    expect(slot(4).querySelector('[data-magic-tile]')!.querySelector('.border-sky-300')).not.toBeNull(); // the sky-blue hint ring is on the A that belongs there
   });
 
   it('Shuffle letters clears every placed letter and reshuffles, and nothing forces it', async () => {

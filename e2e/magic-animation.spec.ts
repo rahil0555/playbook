@@ -28,7 +28,7 @@ async function pageCenter(page: Page, loc: ReturnType<Page['locator']>) {
   const s = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   return { x: c.x + s.x, y: c.y + s.y };
 }
-const realTile = (page: Page, v: string) => page.locator(`[data-magic-tile][data-value="${v}"][data-decoy="false"]`).first();
+const realTile = (page: Page, v: string) => page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]`).first();
 const slot = (page: Page, i: number) => page.locator(`[data-magic-slot="${i}"]`);
 
 interface Sample {
@@ -167,7 +167,7 @@ test.describe('tap: the same bubble flies from the tray to the slot', () => {
       const v = letters[i]!;
       const nth = used.get(v) ?? 0;
       used.set(v, nth + 1);
-      await page.locator(`[data-magic-tile][data-value="${v}"][data-decoy="false"]:not([aria-hidden])`).nth(0).click({ trial: false });
+      await page.locator(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${v}"][data-decoy="false"]:not([aria-hidden])`).nth(0).click({ trial: false });
       await slot(page, i).click();
     }
     for (let i = 0; i < letters.length; i++) await expect(slot(page, i)).toHaveAttribute('data-state', 'filled');

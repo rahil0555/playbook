@@ -14,7 +14,7 @@ vi.mock('../../../lib/random', async (importOriginal) => {
 
 const slots = () => [...document.querySelectorAll<HTMLElement>('[data-magic-slot]')];
 const slot = (i: number) => slots()[i]!;
-const tiles = () => [...document.querySelectorAll<HTMLElement>('[data-magic-tile]')];
+const tiles = () => [...document.querySelectorAll<HTMLElement>('ul[aria-label="Loose letters"] [data-magic-tile]')];
 const realTile = (v: string) => tiles().find((t) => t.dataset.value === v && t.dataset.decoy === 'false')!;
 
 async function openPig(props: Parameters<typeof renderPlayLab>[0] = {}) {

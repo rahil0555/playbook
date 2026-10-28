@@ -174,17 +174,24 @@ describe('Sentence builder', () => {
     expect(screen.getByLabelText('The cat is sleeping.')).toBeInTheDocument();
   });
 
-  it('a word that is right is locked: it cannot be picked up, and a word cannot be dropped over it', async () => {
+  it('right words can be picked up, moved and swapped: correctness is feedback, not a restriction', async () => {
     const { user } = renderPlayLab({ initialActivity: 'sentences' });
     await screen.findByText(ARRANGE);
-    await arrange(user, ['The']); // right in spot 1
-    const the = screen.getByRole('button', { name: /^word The, in slot 1\. In the right place/ });
-    expect(the).toBeDisabled();
-    await user.click(word('sleeping')); // spot 2 wants "cat": wrong, so it lands and stays
-    await vi.waitFor(() => expect(placed()).toBe(2), { timeout: 2000 });
-    await user.click(screen.getByRole('button', { name: /^word sleeping, in slot 2\./ }));
-    await user.click(document.querySelector<HTMLElement>('[data-slot="0"]')!); // a tap on the right word's spot: refused
-    expect(document.querySelector('[data-slot="0"] [data-tile]')?.getAttribute('data-value')).toBe('The');
-    expect(screen.getByRole('button', { name: /^word sleeping, in slot 2\./ })).toHaveAttribute('aria-pressed', 'true');
+    await arrange(user, ['The', 'cat']); // both right, in spots 1 and 2 (this sentence is "The cat is sleeping.")
+    const slotWord = (i: number) => document.querySelector(`[data-slot="${i}"] [data-tile]`)?.getAttribute('data-value');
+    expect(document.querySelector('[data-slot="0"]')?.getAttribute('data-state')).toBe('correct');
+    // a right word moves into an empty spot, and its old spot is empty again
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 2\b/ }));
+    await user.click(document.querySelector<HTMLElement>('[data-slot="3"]')!);
+    await vi.waitFor(() => expect(slotWord(3)).toBe('cat'), { timeout: 2000 });
+    expect(slotWord(1)).toBeUndefined();
+    expect(placed()).toBe(2);
+    // two right words swap: "The" (spot 1) is picked up, and a tap on "cat" (spot 4) is a tap on its spot
+    await user.click(screen.getByRole('button', { name: /^word The, in slot 1\b/ }));
+    await user.click(screen.getByRole('button', { name: /^word cat, in slot 4\b/ }));
+    await vi.waitFor(() => expect(slotWord(3)).toBe('The'), { timeout: 2000 });
+    expect(slotWord(0)).toBe('cat');
+    expect(placed()).toBe(2); // nothing lost or duplicated
+    expect(document.querySelectorAll('ul[aria-label="Available words"] [data-tile]')).toHaveLength(2);
   });
 });

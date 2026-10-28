@@ -12,7 +12,7 @@ vi.mock('../../data/en/story', () => {
   return { englishStories, englishStory: englishStories[0] };
 });
 
-const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
+const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 
 async function spell(user: UserEvent, word: string) {

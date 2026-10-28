@@ -6,7 +6,7 @@ import { sentenceGroups, sentenceParts } from './StorySentence';
 import { LETTER_TILE_COLOR, STORY_WORD_COLORS, storyOf, storyRounds } from './storyRounds';
 import { TennisScene } from './TennisScene';
 
-const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`[data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
+const realTile = (value: string) => [...document.querySelectorAll<HTMLElement>(`ul[aria-label="Loose letters"] [data-magic-tile][data-value="${value}"]`)].find((t) => t.dataset.decoy === 'false')!;
 const slot = (i: number) => document.querySelector<HTMLElement>(`[data-magic-slot="${i}"]`)!;
 
 /** The words of a sentence, lower-cased, in the order they are written. */
