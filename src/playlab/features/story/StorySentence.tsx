@@ -58,7 +58,7 @@ export function StorySentence({ sentence, targets, spelled, hint, target, comple
   const [hintShown, setHintShown] = useState(false);
   return (
     <section aria-label="The sentence" data-story-sentence className="w-full rounded-[1.8rem] bg-white/80 px-4 py-3 text-center shadow-soft">
-      <p className="font-display text-2xl font-bold leading-relaxed text-ink sm:text-3xl">
+      <p className="font-display text-2xl font-bold leading-[3rem] text-ink sm:text-3xl sm:leading-[3.5rem]">
         {sentenceGroups(sentence).map((group, g) => (
           <span key={g} className={group.length > 1 ? 'whitespace-nowrap' : undefined}>
             {group.map((part, i) => {
@@ -77,7 +77,7 @@ export function StorySentence({ sentence, targets, spelled, hint, target, comple
                   aria-current={state === 'target' ? 'step' : undefined}
                   onClick={() => speak(part.text)}
                   style={colour ? { color: colour } : undefined}
-                  className={`rounded-xl px-0.5 transition active:scale-95 ${state === 'target' ? 'underline decoration-4 underline-offset-[6px]' : ''} ${state === 'done' ? 'font-extrabold' : ''}`}
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl px-1 align-middle transition active:scale-95 ${state === 'target' ? 'underline decoration-4 underline-offset-[6px]' : ''} ${state === 'done' ? 'font-extrabold' : ''}`}
                 >
                   {part.text}
                 </button>

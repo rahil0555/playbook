@@ -2,6 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
 import { SPEECH_STYLE, type PlayRequest, type Scheduled, type SfxName, type SpeakOutcome } from '../services/audioService';
 import { phonicLoopRequest, phonicRequest } from '../services/phonics';
+import { SOUND_LEAD_IN } from '../lib/lessonLines';
 import type { AudioClipSet, LetterEntry, PhonemeId } from '../types/learning';
 
 /** Live audio status (speaking / unavailable / voice name). */
@@ -46,8 +47,8 @@ export function useSpeech() {
 
 const clip = (audio: AudioClipSet | undefined, key: keyof AudioClipSet) => audio?.[key];
 
-/** Said just before a letter's sound, so the child hears the sound inside its example word. */
-export const SOUND_LEAD_IN = 'Listen for the sound in';
+/** Said just before a letter's sound (defined with the other spoken lines, and re-exported here for callers). */
+export { SOUND_LEAD_IN } from '../lib/lessonLines';
 
 /**
  * The requests that play a letter's sound. A recording is used when there is one. Otherwise the sound is heard in its example

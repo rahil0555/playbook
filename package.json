@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "dev:https": "vite --config vite.https.config.ts"
+    "dev:https": "vite --config vite.https.config.ts",
+    "voice:generate": "vite-node scripts/generate-voice.ts",
+    "voice:plan": "vite-node scripts/generate-voice.ts -- --dry-run",
+    "check:secrets": "node scripts/check-bundle-secrets.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.0.0",

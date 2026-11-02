@@ -127,13 +127,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative isolate min-h-[var(--pl-min-height,100dvh)] w-full pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
     <Scene name={SCENES[view] ?? 'meadow'} />
-    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-3 pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:px-6">
-      <header className="relative z-40 my-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-[2rem] bg-white/85 px-3 py-1.5 shadow-soft backdrop-blur-sm sm:my-3 sm:px-4 sm:py-2">
+    <div className="mx-auto flex min-h-[var(--pl-min-height,100dvh)] w-full max-w-6xl flex-col px-3 pb-[calc(2.5rem+env(safe-area-inset-bottom))] short:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
+      <header className="relative z-40 my-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-[2rem] bg-white/85 px-3 py-1.5 shadow-soft backdrop-blur-sm short:my-1 short:py-1 sm:my-3 sm:px-4 sm:py-2 short:sm:my-1 short:sm:py-1">
         <button type="button" onClick={() => navigate('home')} aria-label="Edurance PlayLab, go to home" className="rounded-2xl p-1">
           <Logo compact />
         </button>
 
-        <nav aria-label="Main" className="order-3 flex w-full justify-center gap-2 md:order-none md:w-auto">
+        <nav aria-label="Main" className="order-3 flex w-full justify-center gap-2 min-[560px]:order-none min-[560px]:w-auto">
           <NavButton icon="home" label="Home" showLabel current={view === 'home'} onClick={() => navigate('home')} />
           <NavButton icon="star" label="My Stars" showLabel current={view === 'progress'} onClick={() => navigate('progress')} />
         </nav>
