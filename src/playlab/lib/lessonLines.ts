@@ -27,3 +27,9 @@ export function praiseFor(step: number): string {
 export function encourageFor(tries: number): string {
   return ENCOURAGE_LINES[((tries - 1) % ENCOURAGE_LINES.length + ENCOURAGE_LINES.length) % ENCOURAGE_LINES.length] as string;
 }
+
+/**
+ * Said just before a letter's sound, so the child hears the sound inside its example word. It lives here, with the
+ * other spoken lines, so the voice generator can read it without importing any React.
+ */
+export const SOUND_LEAD_IN = 'Listen for the sound in';

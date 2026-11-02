@@ -57,7 +57,7 @@ export function PronunciationControl({ label, onPlay, accent = 'sky', variant = 
   return (
     <span className={`inline-flex flex-col items-start gap-1 ${className}`}>
       <Button variant={variant} accent={accent} size={size} icon={soundEnabled ? icon : 'speaker-off'} onClick={handle} aria-label={label} disabled={disabled}>
-        <span className={collapse ? 'sr-only sm:not-sr-only' : undefined}>{label}</span>
+        <span className={collapse ? 'sr-only sm:not-sr-only short:sm:sr-only' : undefined}>{label}</span>
         {speaking ? (
           <span aria-hidden="true" className="ml-1 inline-flex h-4 items-end gap-0.5">
             {[0, 1, 2].map((i) => (

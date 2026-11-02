@@ -1,9 +1,10 @@
 /**
  * Audio for PlayLab.
  *
- *  - Voice: PlayLab ships NO recorded voice files. By default it asks the
- *    browser's built-in speech synthesis (Web Speech API) to say things, so
- *    pronunciation depends on the browser, the operating system and the
+ *  - Voice: a line is said in Pip's own voice (Edu's ElevenLabs voice) when a clip for it can be played - a
+ *    pre-generated file from /audio/edu, or the /api/voice server function. See services/eduVoice.ts. When there
+ *    is no clip, or it will not play, the line falls back to the browser's built-in speech synthesis (Web Speech
+ *    API), so pronunciation then depends on the browser, the operating system and the
  *    installed voices. Browser speech cannot say a sound on its own (such as
  *    "b"), so the app never asks it to: a sound is heard inside an example word.
  *    If a clip URL is supplied (`src`), that file is played instead and speech
@@ -13,6 +14,7 @@
  *    fire-and-forget safe and resolves with an outcome string.
  */
 
+import { createEduVoice, type EduVoice } from './eduVoice';
 import { listEnglishVoices, resolveVoice, type VoiceOption } from './voiceCatalog';
 
 /**
@@ -118,6 +120,10 @@ export interface AudioEnv {
   startTimeoutMs?: number;
   /** ms to wait for the browser to list its voices before speaking with whichever voice it has (0 = do not wait) */
   voiceWaitMs?: number;
+  /** Pip's own voice (pre-generated clips + the server function). null turns it off and leaves browser speech. */
+  voice?: EduVoice | null;
+  /** ms a line waits for the clip manifest before it is spoken without one */
+  voiceLoadTimeoutMs?: number;
 }
 
 function defaultEnv(): AudioEnv {
@@ -128,8 +134,19 @@ function defaultEnv(): AudioEnv {
     Utterance: typeof SpeechSynthesisUtterance !== 'undefined' ? SpeechSynthesisUtterance : undefined,
     AudioElement: typeof Audio !== 'undefined' ? Audio : undefined,
     AudioContextCtor: window.AudioContext ?? w.webkitAudioContext,
+    voice: createEduVoice({ base: import.meta.env.BASE_URL }),
   };
 }
+
+/** How long a line waits for the clip manifest before it is spoken with the browser's voice instead. */
+export const VOICE_LOAD_TIMEOUT_MS = 1500;
+
+/**
+ * A one-sample silent mp3. Played (and paused) on the first tap so the browser counts media playback as
+ * user-started: after this, a clip that the app starts by itself is allowed on phones.
+ */
+const SILENCE =
+  'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAABAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//sQxAADwAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
 
 const NOTES: Record<SfxName, { freq: number; at: number; dur: number; type?: OscillatorType; gain?: number }[]> = {
   tap: [{ freq: 520, at: 0, dur: 0.07, type: 'triangle' }],
@@ -168,6 +185,9 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     speechSupported: !!(env.synth && env.Utterance),
   };
   const listeners = new Set<() => void>();
+  // Start loading the clip manifest straight away, so the first line is not held up waiting for it. It is
+  // fire-and-forget: a manifest that never arrives only means the browser's own voice says the line.
+  void env.voice?.load().catch(() => undefined);
   let ctx: AudioContext | null = null;
   let currentClip: HTMLAudioElement | null = null;
   /** ends the clip that is playing now (replaced or stopped count as played); null when none is */
@@ -405,6 +425,23 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     });
   };
 
+  /**
+   * The clip that says `req.text` in Pip's voice, or undefined when the browser should say it. The very first line
+   * waits a moment for the clip manifest; after that the answer is immediate. A manifest that never arrives only
+   * costs that one wait: `load()` settles either way, and the timeout is the backstop if the request hangs.
+   */
+  const eduClipFor = async (voice: EduVoice, text: string): Promise<string | undefined> => {
+    try {
+      if (!voice.ready()) {
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, env.voiceLoadTimeoutMs ?? VOICE_LOAD_TIMEOUT_MS));
+        await Promise.race([voice.load(), timeout]);
+      }
+      return voice.clipFor(text);
+    } catch {
+      return undefined;
+    }
+  };
+
   const play: AudioService['play'] = async (req) => {
     if (snapshot.muted) return 'muted';
     try {
@@ -417,6 +454,18 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       }
       announceBeforePlay();
       if (req.src && (await playClip(req.src))) return 'played';
+      // Pip's own voice: a pre-generated clip, or the server function. The audio element reports a clip that will
+      // not play, and that line then falls through to browser speech, so a missing clip is never silence.
+      // With no voice configured this costs nothing at all: there is no extra await, so the timing of a plain
+      // spoken line is exactly what it was before Pip had a voice of his own.
+      const voice = env.voice;
+      if (!req.src && voice) {
+        const clip = voice.ready() ? voice.clipFor(req.text) : await eduClipFor(voice, req.text);
+        if (clip) {
+          if (await playClip(clip)) return 'played';
+          voice.markBroken(clip);
+        }
+      }
       // speech never starts on top of a recording that is still playing; with none playing, a line is spoken at once
       if (endClip) await clipIdle;
       return await speak(req);
@@ -451,10 +500,31 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   if (typeof document !== 'undefined' && env.AudioContextCtor) {
     const prime = () => {
       document.removeEventListener('pointerdown', prime, true);
-      if (!snapshot.muted) {
-        const c = getCtx();
-        if (c?.state === 'suspended') void c.resume().catch(() => undefined);
+      if (snapshot.muted) return; // sound off never creates a context and never plays anything
+      const c = getCtx();
+      if (c?.state === 'suspended') void c.resume().catch(() => undefined);
+      // Phones only allow audio the child started. Playing (and at once pausing) a silent clip inside this tap
+      // makes the browser treat the page as allowed, so a clip the app starts later is not blocked.
+      try {
+        if (env.AudioElement) {
+          const unlock = new env.AudioElement(SILENCE);
+          unlock.volume = 0;
+          const p = unlock.play();
+          const settle = () => {
+            try {
+              unlock.pause();
+            } catch {
+              /* ignore */
+            }
+          };
+          if (p && typeof p.then === 'function') p.then(settle, () => undefined);
+          else settle();
+        }
+      } catch {
+        /* the unlock is best effort: a blocked clip still falls back to browser speech */
       }
+      // the first line can then be answered from the manifest instead of waiting for it
+      void env.voice?.load().catch(() => undefined);
     };
     document.addEventListener('pointerdown', prime, true);
   }

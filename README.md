@@ -171,10 +171,45 @@ Deviation from the suggested layout: everything lives under `src/playlab/` (inst
 ### Audio: what is and isn't there
 
 * **Choosing a voice (free, browser-only).** Open **Settings → Voice**: a dropdown of the English voices on the device (American English first; accents and *online* voices are labelled), **Preview voice** to hear a sample in the highlighted voice *without saving it*, and **Use this voice** to save it. The choice is stored locally with the other settings (per learner id, if one is given) and applies everywhere: Magic Letters and every other activity. "Automatic (best American English)" is the default and prefers on-device `en-US` voices. If the saved voice is not on the device, PlayLab falls back to automatic silently; with no American voice the closest English voice is used (and Settings says so); with no English voice or no speech support Settings explains and the activities still work. No novelty-voice filtering is applied. Speech style is conservative and lives in one constants block (`SPEECH_STYLE` in `services/audioService.ts`: rate 0.9, pitch 1.05); no paid service, API key, or network call is involved. The Web Speech API offers no emotion control, so the "friendly teacher" feel comes from the voice you pick plus these small tweaks.
-* **No recorded voice files are bundled** and none are claimed. By default PlayLab uses the browser's built-in speech synthesis, so **pronunciation depends on the browser, the operating system and the installed voice**. Browser speech cannot say a sound on its own, so a letter's sound is heard inside its example word (`sound.speech` in `data/en/alphabet.ts`), and a recording can replace that when one is added (`audio/phonics/`).
+* **No recorded voice files are committed.** Run `npm run voice:generate` to create Pip's ElevenLabs clips (see *Pip's voice* below). Without them PlayLab uses the browser's built-in speech synthesis, so **pronunciation depends on the browser, the operating system and the installed voice**. Browser speech cannot say a sound on its own, so a letter's sound is heard inside its example word (`sound.speech` in `data/en/alphabet.ts`), and a recording can replace that when one is added (`audio/phonics/`).
 * To use real recordings, set `audio: { name, sound, word }` URLs on letter entries (via a content pack). A clip is tried first; speech is the fallback.
 * If speech is missing, blocked, silent (no voices) or throws, the UI keeps working, a kind notice appears, and buttons explain what happened. Audio never blocks an animation: every call is fire-and-forget.
 * Sound effects are tiny tones **synthesized with Web Audio** (no files). The speaker button in the header mutes everything.
+
+### Pip's voice (ElevenLabs)
+
+Pip, the mascot, speaks in the same ElevenLabs voice Edurance's **Edu** uses. A line is said in the first of these that plays:
+
+1. **a pre-generated clip** in `public/audio/edu/` — instant, costs nothing per play, works offline;
+2. **`/api/voice`**, a serverless function that asks ElevenLabs for the same voice and caches the answer;
+3. **the browser's own speech**, exactly as before.
+
+Anything failing falls quietly to the next step, so a missing clip, a server without keys or no network is never silence and never an error the child sees.
+
+#### The key never reaches the browser
+
+`ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are read **only** by `api/voice.ts` (on the server) and by `scripts/generate-voice.ts` (on your machine). Neither has a `VITE_` prefix, so Vite cannot inline them into the bundle; the browser only ever sees clip URLs. `npm run check:secrets` scans the built output for the key, its variable names, the `xi-api-key` header and `api.elevenlabs.io`, and fails the build if it finds any of them.
+
+#### Generating the clips
+
+Set the keys locally (copy `.env.example` to `.env.local`; both are git-ignored), then:
+
+```bash
+npm run voice:plan                       # what would be generated, and how much text. Spends nothing.
+ELEVENLABS_API_KEY=... ELEVENLABS_VOICE_ID=... npm run voice:generate
+```
+
+It writes one mp3 per fixed line into `public/audio/edu/` plus a `manifest.json`, then commit both. Re-running only generates what is new; `--force` regenerates everything (use it after changing voice), and `--limit N` generates only the first N. The fixed lines are listed in one place, `src/playlab/audio/voiceLines.ts` — about 385 lines, ~9,200 characters in total.
+
+Until the clips exist the manifest lists none and keeps `dynamic` off, so the app makes **no** request to the voice service at all and every line is spoken by the browser, as it was before.
+
+#### Dynamic lines
+
+For a line that was never pre-generated, `/api/voice?t=<text>` returns the mp3. It accepts GET only, caps text at 300 characters, allows only ordinary sentence characters, rate-limits each caller to 30 requests a minute, caches by text, and answers `503` (not an error) when the keys are not set. Set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in the Vercel project settings to turn it on.
+
+#### On phones
+
+The first tap unlocks audio (browsers only allow sound the child started): it resumes the Web Audio context, plays a silent clip so later clips are allowed, and starts loading the manifest. The header's speaker button still mutes everything, clips included.
 
 ### Assets that may need replacing
 
@@ -183,21 +218,22 @@ Deviation from the suggested layout: everything lives under `src/playlab/` (inst
 | Illustrations (32) | Original simple SVGs, `src/playlab/illustrations/art.tsx` | Edit/replace the entry for an id (view all at `/?gallery`) |
 | Logo mark | Supplied Edurance graduation-cap artwork, `src/playlab/assets/edurance-graduation-cap.png`; favicon `public/favicon.png` | Replace the PNG files. Both are transparent PNGs showing the cap only (the teal background is removed); the favicon is a 32 px copy |
 | Mascot "Pip" | Stand-in drawn for this project (`components/Mascot.tsx`) | Official Edurance character |
-| Voice recordings | None | `audio` URLs in the content pack |
+| Pip's voice clips | None committed; generated by `npm run voice:generate` into `public/audio/edu/` | Run the script with your ElevenLabs key (see *Pip's voice* above) |
+| Letter-sound recordings | None | `audio` URLs in the content pack |
 | Fonts | Andika + Fredoka (SIL OFL), Latin only, vendored in `styles/fonts/` | Add a Devanagari font when adding Hindi |
 
 ### Privacy
 
-Everything runs in the browser: no network calls, no analytics, no accounts. Only non-sensitive demo data is stored in `localStorage` (counts, stars, badges, last results, sound/level setting), under `edurance.playlab.*` keys, optionally namespaced by an opaque learner id.
+Everything the child does runs in the browser: no analytics, no accounts. The only network call PlayLab can make is for Pip's voice, and only when the clips have been generated (see *Pip's voice* above): a clip file from `/audio/edu`, or the line's text to `/api/voice` on your own deployment. Nothing else leaves the device. Only non-sensitive demo data is stored in `localStorage` (counts, stars, badges, last results, sound/level setting), under `edurance.playlab.*` keys, optionally namespaced by an opaque learner id.
 
 ---
 
 ## Known limitations and future improvements
 
 * **Browsers/devices:** automated tests ran in Chromium only (desktop, with phone/tablet viewports and *emulated* touch). **Not tested:** real iOS/Android devices, Safari, Firefox, real finger drags, assistive-technology users, low-end-device performance.
-* **Voices:** see Audio above. iOS/Safari additionally need a prior user gesture before speech.
+* **Voices:** see Audio above. iOS/Safari additionally need a prior user gesture before speech; the first tap primes it. Pip's ElevenLabs clips have not been generated in this repo (no key here), so what ships today still speaks with the browser voice.
 * **Languages:** only English content ships. Content (letters/words/sentences) is pluggable via `registerContentPack`; **UI strings are English-only**, and the letter model assumes a bicameral alphabet (upper/lower case), so Hindi will need a small model extension (see INTEGRATION.md → *Adding a language*).
-* **Magic Letters on small screens:** on a 375 × 740 phone the second row of loose letters can sit slightly below the fold (all slots and the first row stay visible; tap-to-select covers the rest). Rounds recorded before the Classic mode was removed still show as Word Builder in *Recently finished* (the progress service is unchanged).
+* **Landscape phones:** at 640 × 320 the header, title and instruction take about 250 px, so the play area starts near the fold and the page scrolls to it. Everything is reachable, nothing overlaps and nothing is cut off (see `e2e/responsive.spec.ts`), but a 320 px-tall screen cannot show the chrome and a whole game at once. Rounds recorded before the Classic mode was removed still show as Word Builder in *Recently finished* (the progress service is unchanged).
 * **Test suite status:** the unit suite is **not fully green**: a few older timing-sensitive tests fail on the unmodified baseline too. See [docs/TESTING.md](docs/TESTING.md) for exactly which.
 * **Content size:** 26 letters, 18 words, 11 sentences. Enough to demo and test; a real curriculum needs more and curriculum review of the phonics choices (e.g. x → *fox*, q → *quilt*, y → *yo-yo*).
 * **Progress model** is deliberately simple (stars, rounds, badges, last 8 rounds). There is no spaced repetition or adaptive difficulty yet; the `AnswerResult` stream is designed so the main app can build that.

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { englishSentences } from '../src/playlab/data/en/sentences';
 import { englishWords } from '../src/playlab/data/en/words';
+import { AUDIT, type Finding } from './layoutAudit';
 
 // Layout gate: what a phone, tablet or desktop screen shows on each main screen and in the states a child reaches
 // (a finished word, a wrong answer, a solved sentence, Settings). Every state is checked for: sideways scrolling,
@@ -15,68 +16,6 @@ const SCREENS: { name: string; go: (p: Page) => Promise<void> }[] = [
   { name: 'matching', go: async (p) => { await p.goto('/#/matching'); await p.waitForTimeout(600); } },
   { name: 'progress', go: async (p) => { await p.goto('/#/progress'); await p.waitForTimeout(600); } },
 ];
-
-type Finding = { horizontalOverflow: number; offscreen: string[]; smallTargets: number; smallSample: string[]; overlaps: string[]; clipped: string[] };
-
-const AUDIT = (): Finding => {
-  const vw = window.innerWidth;
-  const vis = (el: Element) => {
-    const s = getComputedStyle(el as HTMLElement);
-    const r = el.getBoundingClientRect();
-    return s.visibility !== 'hidden' && s.display !== 'none' && r.width > 0 && r.height > 0;
-  };
-  const label = (el: Element) => ((el.textContent ?? '') || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 30);
-  const interactive = [...document.querySelectorAll<HTMLElement>('button, a[href], [role="button"], [data-tile], [data-magic-tile], [data-option], [data-choice], [data-side], [data-game]')].filter(vis);
-  const offscreen = interactive
-    .filter((el) => {
-      const r = el.getBoundingClientRect();
-      return r.right > vw + 1 || r.left < -1;
-    })
-    .map(label);
-  const small = interactive.filter((el) => {
-    const r = el.getBoundingClientRect();
-    return r.width < 44 || r.height < 44;
-  });
-  const overlaps: string[] = [];
-  const buttons = interactive.filter((el) => el.tagName === 'BUTTON');
-  for (let i = 0; i < buttons.length; i++) {
-    for (let j = i + 1; j < buttons.length; j++) {
-      const a = buttons[i]!, b = buttons[j]!;
-      if (a.contains(b) || b.contains(a)) continue;
-      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-      const ix = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
-      const iy = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
-      if (ix > 4 && iy > 4) overlaps.push(`${label(a)} / ${label(b)}`);
-    }
-  }
-  // content that sticks out of the box that clips it (a card, a board, a scroller)
-  const clipped = [...document.querySelectorAll<HTMLElement>('p, span, h1, h2, h3, button, label, [data-tile], [data-magic-tile], [data-option]')]
-    .filter((el) => vis(el) && !el.closest('.sr-only'))
-    // the storybook card is a transient cutscene that turns over on its own: its page-turn is not the layout at rest
-    .filter((el) => !el.closest('.pl-storybook-overlay'))
-    .filter((el) => {
-      const r = el.getBoundingClientRect();
-      let anc = el.parentElement;
-      while (anc && anc !== document.body) {
-        const o = getComputedStyle(anc);
-        if (o.overflowX !== 'visible' || o.overflow !== 'visible') {
-          const a = anc.getBoundingClientRect();
-          return r.right > a.right + 2 || r.left < a.left - 2;
-        }
-        anc = anc.parentElement;
-      }
-      return false;
-    })
-    .map(label);
-  return {
-    horizontalOverflow: document.documentElement.scrollWidth > vw + 1 ? document.documentElement.scrollWidth : 0,
-    offscreen: [...new Set(offscreen)],
-    smallTargets: small.length,
-    smallSample: [...new Set(small.map((el) => `${label(el)} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`))].slice(0, 6),
-    overlaps: [...new Set(overlaps)].slice(0, 6),
-    clipped: [...new Set(clipped)].slice(0, 6),
-  };
-};
 
 /** Every state a child reaches on the way through a round, from a fresh load (so the Settings panel starts closed). */
 async function visitStates(page: Page, w: number) {

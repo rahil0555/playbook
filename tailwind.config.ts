@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 /**
  * Tailwind is scoped to PlayLab so it can live next to another Tailwind (or
@@ -41,5 +42,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `short:` = a landscape phone. Wide enough for a one-row header, but only ~320-412 px tall, so the chrome
+    // (header, title sign, instruction) has to shrink or the game area is pushed off the screen. It is a variant
+    // rather than a `screens` entry on purpose: a `raw` screen stops Tailwind sorting `min-[...]` width variants.
+    plugin(({ addVariant }) => {
+      addVariant('short', '@media (max-height: 480px)');
+    }),
+  ],
 } satisfies Config;
