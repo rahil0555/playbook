@@ -2,7 +2,7 @@ import type { SVGProps } from 'react';
 
 export type IconName =
   | 'home' | 'star' | 'speaker' | 'speaker-off' | 'replay' | 'check' | 'arrow-right' | 'arrow-left'
-  | 'settings' | 'refresh' | 'bulb' | 'close' | 'undo' | 'exit' | 'trophy' | 'sparkle' | 'play' | 'heart' | 'mic' | 'stop';
+  | 'settings' | 'refresh' | 'bulb' | 'close' | 'undo' | 'exit' | 'trophy' | 'sparkle' | 'play' | 'heart' | 'mic' | 'stop' | 'lock';
 
 const PATHS: Record<IconName, string> = {
   home: 'M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10M10 19.5v-5h4v5',
@@ -25,6 +25,7 @@ const PATHS: Record<IconName, string> = {
   mic: 'M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3ZM6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3.5',
   stop: 'M7 7h10v10H7Z',
   heart: 'M12 20.5C5.5 16.1 3 13.3 3 9.4 3 6.6 5.2 4.5 7.9 4.5c1.7 0 3.1.9 4.1 2.3 1-1.4 2.4-2.3 4.1-2.3 2.7 0 4.9 2.1 4.9 4.9 0 3.9-2.5 6.7-9 11.1Z',
+  lock: 'M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9h-13ZM12 14v2.5',
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

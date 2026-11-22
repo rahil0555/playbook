@@ -1,41 +1,22 @@
 /**
  * Audio for PlayLab.
  *
- *  - Voice: a line is said in Pip's own voice (Edu's ElevenLabs voice) when a clip for it can be played - a
- *    pre-generated file from /audio/edu, or the /api/voice server function. See services/eduVoice.ts. When there
- *    is no clip, or it will not play, the line falls back to the browser's built-in speech synthesis (Web Speech
- *    API), so pronunciation then depends on the browser, the operating system and the
- *    installed voices. Browser speech cannot say a sound on its own (such as
- *    "b"), so the app never asks it to: a sound is heard inside an example word.
- *    If a clip URL is supplied (`src`), that file is played instead and speech
- *    is only the fallback.
+ *  - Voice: ONE voice, Pip's own - the ElevenLabs voice behind the pre-generated files in /audio/edu and the
+ *    /api/voice server function (see services/eduVoice.ts). If a line's clip will not play, the line is SILENT.
+ *    The browser's built-in speech synthesis (Web Speech API) is deliberately NOT used: it sounds robotic, it
+ *    differs on every device, and it is not this product's voice. There is no fallback to it, anywhere.
  *  - Sound effects: tiny tones synthesized with the Web Audio API (no files).
  *  - Nothing here ever throws into the UI or blocks an animation: every call is
  *    fire-and-forget safe and resolves with an outcome string.
  */
 
 import { createEduVoice, type EduVoice } from './eduVoice';
-import { listEnglishVoices, resolveVoice, type VoiceOption } from './voiceCatalog';
 
 /**
- * Speech style, in ONE place for easy tuning. Browser voices differ a lot, so keep these conservative:
- * a little slower than normal for young listeners, with only a slight lift in pitch.
+ * What came of a request. 'silent' is the honest outcome for a spoken line whose recording could not be played:
+ * nothing was said, and nothing was said in its place.
  */
-export const SPEECH_STYLE = {
-  rate: 0.85,
-  pitch: 1.05,
-} as const;
-
-/**
- * How long speech may take to START before we give up on it. Online (network) voices can take a couple of seconds to
- * begin, so they get more time than the voices on the device.
- */
-export const START_TIMEOUT_MS = 2500;
-/** How long speech waits for the browser's voice list before it speaks with whichever voice the browser gives. */
-export const VOICE_WAIT_MS = 1200;
-export const ONLINE_START_TIMEOUT_MS = 6000;
-
-export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error' | 'cancelled';
+export type SpeakOutcome = 'played' | 'muted' | 'unsupported' | 'blocked' | 'error' | 'cancelled' | 'silent';
 /** Calling it cancels the line or sound; `done` settles once it has been played, or dropped. */
 export type Scheduled = (() => void) & { readonly done: Promise<SpeakOutcome> };
 /** 'boing' = a soft playful pop when a tile is picked up; 'chime' = a gentle landing; 'sparkle' = a tiny shimmer. */
@@ -54,30 +35,15 @@ export interface PlayRequest {
   clipOnly?: boolean;
   /** with `clipOnly`: repeat the recording until stop() (a sound that is held down) */
   loop?: boolean;
-  rate?: number;
-  pitch?: number;
   /** in a sequence only: a short breath before this line, between an instruction and the example word */
   pauseBeforeMs?: number;
-  /**
-   * Use this English voice id for this request only (used by the Settings preview, so previewing never saves).
-   * `undefined` = the saved preference; `null` = automatic.
-   */
-  voice?: string | null;
 }
 
 export interface AudioSnapshot {
   speaking: boolean;
-  /** true once speech was tried and nothing could be played (no voice, blocked, unsupported) */
+  /** true once a line was tried and its recording could not be played (that line is then silent, not robotic) */
   unavailable: boolean;
-  /** Name of the voice that will be used (saved choice or automatic). */
-  voiceName: string | null;
   muted: boolean;
-  /** English voices on this device (may be empty at first: browsers load them asynchronously). */
-  voices: VoiceOption[];
-  /** The saved voice id, or null for automatic. */
-  voiceId: string | null;
-  /** false when this browser has no speech synthesis at all */
-  speechSupported: boolean;
 }
 
 export interface AudioService {
@@ -102,27 +68,17 @@ export interface AudioService {
    */
   setListening(listening: boolean): void;
   setMuted(muted: boolean): void;
-  /** Choose the voice for future speech (null = automatic). Unknown/stale ids fall back to automatic. */
-  setVoice(voiceId: string | null): void;
-  /** Re-read the device's voice list (e.g. when Settings opens). */
-  refreshVoices(): void;
   getSnapshot(): AudioSnapshot;
   subscribe(listener: () => void): () => void;
 }
 
 /** Injectable browser pieces, so the service can be tested without a real browser. */
 export interface AudioEnv {
-  synth?: SpeechSynthesis | null;
-  Utterance?: typeof SpeechSynthesisUtterance;
   AudioElement?: typeof Audio;
   AudioContextCtor?: typeof AudioContext;
-  /** ms to wait for speech to actually start before declaring it unavailable */
-  startTimeoutMs?: number;
-  /** ms to wait for the browser to list its voices before speaking with whichever voice it has (0 = do not wait) */
-  voiceWaitMs?: number;
-  /** Pip's own voice (pre-generated clips + the server function). null turns it off and leaves browser speech. */
+  /** Pip's own voice (pre-generated clips + the server function). Without it, spoken lines stay silent. */
   voice?: EduVoice | null;
-  /** ms a line waits for the clip manifest before it is spoken without one */
+  /** ms a line waits for the clip manifest before it gives up on that line */
   voiceLoadTimeoutMs?: number;
 }
 
@@ -130,15 +86,13 @@ function defaultEnv(): AudioEnv {
   if (typeof window === 'undefined') return {};
   const w = window as unknown as { webkitAudioContext?: typeof AudioContext };
   return {
-    synth: 'speechSynthesis' in window ? window.speechSynthesis : null,
-    Utterance: typeof SpeechSynthesisUtterance !== 'undefined' ? SpeechSynthesisUtterance : undefined,
     AudioElement: typeof Audio !== 'undefined' ? Audio : undefined,
     AudioContextCtor: window.AudioContext ?? w.webkitAudioContext,
     voice: createEduVoice({ base: import.meta.env.BASE_URL }),
   };
 }
 
-/** How long a line waits for the clip manifest before it is spoken with the browser's voice instead. */
+/** How long a line waits for the clip manifest before it gives up on that line (nothing is spoken in its place). */
 export const VOICE_LOAD_TIMEOUT_MS = 1500;
 
 /**
@@ -178,15 +132,11 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   let snapshot: AudioSnapshot = {
     speaking: false,
     unavailable: false,
-    voiceName: null,
     muted: false,
-    voices: [],
-    voiceId: null,
-    speechSupported: !!(env.synth && env.Utterance),
   };
   const listeners = new Set<() => void>();
   // Start loading the clip manifest straight away, so the first line is not held up waiting for it. It is
-  // fire-and-forget: a manifest that never arrives only means the browser's own voice says the line.
+  // fire-and-forget: a manifest that never arrives only means those lines stay silent.
   void env.voice?.load().catch(() => undefined);
   let ctx: AudioContext | null = null;
   let currentClip: HTMLAudioElement | null = null;
@@ -197,11 +147,6 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   let token = 0; // bumped by stop() so queued sequence items are dropped
   /** lines waiting for their delay (see later()): calling one cancels it; stop() cancels them all */
   const waiting = new Set<() => void>();
-  /**
-   * Utterances the browser is still speaking. Kept referenced until they end: some browsers stop speaking, and never report
-   * the end, when the only reference to an utterance is garbage-collected mid-sentence.
-   */
-  const inFlight = new Set<SpeechSynthesisUtterance>();
   /** told just before a line or a recording starts (see onBeforePlay) */
   const beforePlay = new Set<() => void>();
   /** the microphone is listening: sound effects are off then (see setListening) */
@@ -223,149 +168,6 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     listeners.forEach((l) => l());
   };
 
-  const rawVoices = (): SpeechSynthesisVoice[] => {
-    try {
-      return env.synth?.getVoices() ?? [];
-    } catch {
-      return [];
-    }
-  };
-
-  /** The voice to use for `lang`. `override` (a request's own choice) beats the saved preference. */
-  const pickVoice = (lang: string, override?: string | null): SpeechSynthesisVoice | null =>
-    resolveVoice(rawVoices(), lang, override === undefined ? snapshot.voiceId : override);
-
-  const speakingLang = 'en-US';
-  const refreshName = () => {
-    const v = pickVoice(speakingLang);
-    if (v && v.name !== snapshot.voiceName) set({ voiceName: v.name });
-  };
-
-  /**
-   * Speech asked for before the browser has listed its voices waits for the list (see `speak`), so the teacher voice is chosen
-   * whenever the browser can offer it. Each waiting line resolves when the list arrives, or gives up after the wait.
-   */
-  let voiceWaiters: ((listed: boolean) => void)[] = [];
-  /** once a wait has run out on a device that never lists voices, later speech does not wait again */
-  let voiceWaitGivenUp = false;
-  const releaseVoiceWaiters = () => {
-    const waiting = voiceWaiters;
-    voiceWaiters = [];
-    waiting.forEach((release) => release(true));
-  };
-
-  /** Re-read the English voice list; the snapshot only changes when the list really changed (stable for React). */
-  const refreshVoices = () => {
-    const next = listEnglishVoices(rawVoices());
-    const same = next.length === snapshot.voices.length && next.every((o, i) => o.id === snapshot.voices[i]?.id && o.label === snapshot.voices[i]?.label);
-    if (!same) set({ voices: next });
-    refreshName();
-    if (rawVoices().length > 0) releaseVoiceWaiters();
-  };
-
-  // Browsers (notably Chrome) load voices asynchronously and announce it with `voiceschanged`.
-  try {
-    env.synth?.addEventListener?.('voiceschanged', refreshVoices);
-  } catch {
-    /* older browsers: the retries below still pick the list up */
-  }
-  refreshVoices();
-  if (env.synth && snapshot.voices.length === 0 && typeof setTimeout === 'function') {
-    [300, 1200, 3000].forEach((ms) => setTimeout(refreshVoices, ms));
-  }
-
-  const speakNow = (req: PlayRequest): Promise<SpeakOutcome> => {
-    const { synth, Utterance } = env;
-    if (!synth || !Utterance) {
-      set({ unavailable: true });
-      return Promise.resolve('unsupported');
-    }
-    return new Promise<SpeakOutcome>((resolve) => {
-      let started = false;
-      let settled = false;
-      const lang = req.lang ?? 'en-US';
-      let watchdog: ReturnType<typeof setTimeout> | undefined;
-      let utterance: SpeechSynthesisUtterance | null = null;
-      const finish = (outcome: SpeakOutcome) => {
-        if (settled) return;
-        settled = true;
-        if (watchdog) clearTimeout(watchdog);
-        if (utterance) inFlight.delete(utterance);
-        set({ speaking: false });
-        resolve(outcome);
-      };
-      try {
-        synth.cancel();
-        // a paused engine accepts speak() and then says nothing, so it is resumed first
-        if (synth.paused) synth.resume();
-        const u = new Utterance(req.text);
-        utterance = u;
-        inFlight.add(u);
-        u.lang = lang;
-        u.rate = req.rate ?? SPEECH_STYLE.rate;
-        u.pitch = req.pitch ?? SPEECH_STYLE.pitch;
-        const voice = pickVoice(lang, req.voice);
-        if (voice) {
-          u.voice = voice;
-          // "current voice" shows the saved/automatic voice; a one-off preview must not change it
-          if (req.voice === undefined) set({ voiceName: voice.name });
-        }
-        u.onstart = () => {
-          started = true;
-          set({ speaking: true, unavailable: false });
-        };
-        u.onend = () => finish('played');
-        u.onerror = (e) => {
-          const err = (e as SpeechSynthesisErrorEvent).error;
-          if (err === 'canceled' || err === 'interrupted') return finish('played'); // replaced by a newer request
-          if (err === 'not-allowed') return finish('blocked');
-          set({ unavailable: true });
-          finish('error');
-        };
-        // Some browsers/devices with no installed voice accept speak() but never start. Do not wait forever.
-        watchdog = setTimeout(() => {
-          if (!started) {
-            try {
-              synth.cancel();
-            } catch {
-              /* ignore */
-            }
-            set({ unavailable: true });
-            finish('unsupported');
-          }
-        }, env.startTimeoutMs ?? (voice?.localService === false ? ONLINE_START_TIMEOUT_MS : START_TIMEOUT_MS));
-        synth.speak(u);
-      } catch {
-        set({ unavailable: true });
-        finish('error');
-      }
-    });
-  };
-
-  /**
-   * Speaks `req` with the browser's teacher voice. A device whose voice list has not arrived yet waits a moment for it, so the first
-   * line is not spoken in the browser's default voice. A line stopped while it waits (`stop`) is not spoken at all.
-   */
-  const speak = (req: PlayRequest): Promise<SpeakOutcome> => {
-    const waitMs = env.voiceWaitMs ?? VOICE_WAIT_MS;
-    const mustWait = !voiceWaitGivenUp && env.synth !== undefined && env.synth !== null && waitMs > 0 && rawVoices().length === 0;
-    if (!mustWait) return speakNow(req);
-    const asked = token;
-    return new Promise<SpeakOutcome>((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const release = (listed: boolean) => {
-        clearTimeout(timer);
-        if (!listed) voiceWaitGivenUp = true;
-        resolve(token === asked ? speakNow(req) : 'cancelled');
-      };
-      voiceWaiters.push(release);
-      timer = setTimeout(() => {
-        voiceWaiters = voiceWaiters.filter((r) => r !== release);
-        release(false);
-      }, waitMs);
-    });
-  };
-
   /** Stop the clip that is playing, if any, and release whatever is waiting for it. */
   const stopClip = () => {
     const end = endClip;
@@ -377,15 +179,6 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     }
     currentClip = null;
     end?.();
-  };
-
-  /** Speech that must not be heard over a sound: cancel it (a letter sound replaces anything being said). */
-  const cancelSpeech = () => {
-    try {
-      env.synth?.cancel();
-    } catch {
-      /* ignore */
-    }
   };
 
   /** Play a recording. One clip at a time: a new clip replaces the one playing. Resolves when it has finished. */
@@ -426,9 +219,9 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
   };
 
   /**
-   * The clip that says `req.text` in Pip's voice, or undefined when the browser should say it. The very first line
-   * waits a moment for the clip manifest; after that the answer is immediate. A manifest that never arrives only
-   * costs that one wait: `load()` settles either way, and the timeout is the backstop if the request hangs.
+   * The URL of the clip that says `req.text` in Pip's voice, or undefined when there is no recording for it. The very
+   * first line waits a moment for the clip manifest; after that the answer is immediate. A manifest that never arrives
+   * only costs that one wait: `load()` settles either way, and the timeout is the backstop if the request hangs.
    */
   const eduClipFor = async (voice: EduVoice, text: string): Promise<string | undefined> => {
     try {
@@ -449,15 +242,12 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
         // a recording only: with no recording there is nothing to play, and nothing is spoken instead
         if (!req.src) return 'unsupported';
         announceBeforePlay();
-        cancelSpeech();
         return (await playClip(req.src, req.loop)) ? 'played' : 'error';
       }
       announceBeforePlay();
       if (req.src && (await playClip(req.src))) return 'played';
-      // Pip's own voice: a pre-generated clip, or the server function. The audio element reports a clip that will
-      // not play, and that line then falls through to browser speech, so a missing clip is never silence.
-      // With no voice configured this costs nothing at all: there is no extra await, so the timing of a plain
-      // spoken line is exactly what it was before Pip had a voice of his own.
+      // Pip's own voice, and the ONLY voice: a pre-generated clip, or the server function (/api/voice, which uses the
+      // same ElevenLabs key). A clip that will not play is remembered as broken, so it is not retried this session.
       const voice = env.voice;
       if (!req.src && voice) {
         const clip = voice.ready() ? voice.clipFor(req.text) : await eduClipFor(voice, req.text);
@@ -466,9 +256,11 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
           voice.markBroken(clip);
         }
       }
-      // speech never starts on top of a recording that is still playing; with none playing, a line is spoken at once
-      if (endClip) await clipIdle;
-      return await speak(req);
+      // Nothing could play this line, and nothing may be said in its place: never the browser's robotic voice.
+      // The shell tells the grown-up that spoken words did not play; the pictures and sound effects still work.
+      await clipIdle;
+      set({ unavailable: true });
+      return 'silent';
     } catch {
       return 'error';
     }
@@ -478,7 +270,6 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
     token += 1;
     [...waiting].forEach((cancel) => cancel());
     waiting.clear();
-    cancelSpeech();
     stopClip();
     set({ speaking: false });
   };
@@ -602,11 +393,6 @@ export function createAudioService(env: AudioEnv = defaultEnv()): AudioService {
       if (muted) stop();
       set({ muted });
     },
-    setVoice(id) {
-      set({ voiceId: id });
-      refreshName();
-    },
-    refreshVoices,
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);

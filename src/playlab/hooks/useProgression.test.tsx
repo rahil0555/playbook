@@ -1,13 +1,22 @@
 import { act, renderHook } from '@testing-library/react';
+import React, { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CELEBRATE_MAX_HOLD_MS, CELEBRATE_MS, useProgression } from './useProgression';
+import { PlayLabPausedContext } from '../app/PlayLabContext';
+import { createElement } from 'react';
+
+function renderProgression() {
+  return renderHook(() => useProgression(), {
+    wrapper: ({ children }) => createElement(PlayLabPausedContext.Provider, { value: false }, children),
+  });
+}
 
 describe('useProgression: one countdown per item, always cancellable', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
   it('runs the callback once the celebration has been on screen for CELEBRATE_MS', () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     act(() => result.current.arm('q1', done));
     act(() => void vi.advanceTimersByTime(CELEBRATE_MS - 1));
@@ -17,7 +26,7 @@ describe('useProgression: one countdown per item, always cancellable', () => {
   });
 
   it('an item is armed once: a repeated or late arm for the same key does nothing', () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     act(() => {
       result.current.arm('q1', done);
@@ -29,8 +38,27 @@ describe('useProgression: one countdown per item, always cancellable', () => {
     expect(done).toHaveBeenCalledTimes(1);
   });
 
+  it('pauses an already-armed transition while the demo wall is open, then resumes it', () => {
+    let setPaused!: (paused: boolean) => void;
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      const [paused, update] = useState(false);
+      setPaused = update;
+      return <PlayLabPausedContext.Provider value={paused}>{children}</PlayLabPausedContext.Provider>;
+    }
+    const { result, rerender } = renderHook(() => useProgression(), { wrapper: Wrapper });
+    const done = vi.fn();
+    act(() => result.current.arm('q1', done));
+    act(() => setPaused(true));
+    rerender();
+    act(() => void vi.advanceTimersByTime(CELEBRATE_MS));
+    expect(done).not.toHaveBeenCalled();
+    act(() => setPaused(false));
+    rerender();
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
   it('cancel drops the countdown: nothing armed before it runs afterwards', () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     act(() => result.current.arm('q1', done));
     act(() => result.current.cancel());
@@ -39,7 +67,7 @@ describe('useProgression: one countdown per item, always cancellable', () => {
   });
 
   it('after a cancel the same key can be armed again, as for a new round', () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     act(() => result.current.arm('q1', done));
     act(() => result.current.cancel());
@@ -49,7 +77,7 @@ describe('useProgression: one countdown per item, always cancellable', () => {
   });
 
   it('leaving the activity (unmounting) cancels whatever is pending', () => {
-    const { result, unmount } = renderHook(() => useProgression());
+    const { result, unmount } = renderProgression();
     const done = vi.fn();
     act(() => result.current.arm('q1', done));
     unmount();
@@ -58,7 +86,7 @@ describe('useProgression: one countdown per item, always cancellable', () => {
   });
 
   it('waits for the held praise to finish, and not longer than CELEBRATE_MAX_HOLD_MS', async () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     let finish!: () => void;
     act(() => result.current.arm('q1', done, new Promise<void>((resolve) => (finish = resolve))));
@@ -69,7 +97,7 @@ describe('useProgression: one countdown per item, always cancellable', () => {
   });
 
   it('a held praise that never reports its end still lets the child on, after the cap', () => {
-    const { result } = renderHook(() => useProgression());
+    const { result } = renderProgression();
     const done = vi.fn();
     act(() => result.current.arm('q1', done, new Promise(() => undefined)));
     act(() => void vi.advanceTimersByTime(CELEBRATE_MAX_HOLD_MS - 1));

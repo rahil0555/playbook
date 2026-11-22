@@ -132,8 +132,13 @@ describe('Magic Letters feel: tapping a tile', () => {
     await pause(800);
     const starts = timeline.filter((e) => e.kind === 'clip');
     for (const start of starts) {
-      const ended = timeline.find((e) => e.kind === 'clipEnd' && e.what === start.what && e.t > start.t);
-      const overlapping = starts.filter((s) => s !== start && s.t > start.t && s.t < (ended?.t ?? Infinity));
+      // A sound ends either by playing out, or by being cut short: picking another letter stops the sound that is playing
+      // (the test above asserts exactly that, and a stopped sound is never finished). So a stop also ends it - otherwise
+      // the replacement would be counted as playing alongside a sound that is already silent.
+      const finished = timeline.find((e) => e.kind === 'clipEnd' && e.what === start.what && e.t > start.t);
+      const stopped = timeline.find((e) => e.kind === 'stop' && e.t > start.t);
+      const ended = finished?.t ?? stopped?.t;
+      const overlapping = starts.filter((s) => s !== start && s.t > start.t && s.t < (ended ?? Infinity));
       expect(overlapping, `while ${start.what} plays, no other sound starts`).toHaveLength(0);
     }
   });

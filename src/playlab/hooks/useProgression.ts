@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
+import { PlayLabPausedContext } from '../app/PlayLabContext';
 
 /** How long a correct answer's celebration stays on screen before the next question (or the round's summary) comes. */
 export const CELEBRATE_MS = 1200;
@@ -24,19 +25,28 @@ export interface Progression {
  * the same everywhere and no screen keeps a timer of its own. Unmounting cancels whatever is pending.
  */
 export function useProgression(): Progression {
+  const paused = useContext(PlayLabPausedContext);
   const armed = useRef(new Set<string>());
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const pending = useRef(new Set<() => void>());
   /** bumped by every cancel: a countdown from before it finds a different number and does nothing */
   const generation = useRef(0);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   const cancel = useCallback(() => {
     generation.current += 1;
     armed.current = new Set();
     timers.current.forEach((t) => clearTimeout(t));
     timers.current.clear();
+    pending.current.clear();
   }, []);
 
   useEffect(() => cancel, [cancel]);
+
+  useEffect(() => {
+    if (!paused) pending.current.forEach((resume) => resume());
+  }, [paused]);
 
   const arm = useCallback((key: string, onDone: () => void, hold?: PromiseLike<unknown> | null) => {
     if (armed.current.has(key)) return;
@@ -46,8 +56,9 @@ export function useProgression(): Progression {
     let heard = !hold;
     let fired = false;
     const fire = () => {
-      if (fired || gen !== generation.current || !timeUp || !heard) return;
+      if (fired || gen !== generation.current || !timeUp || !heard || pausedRef.current) return;
       fired = true;
+      pending.current.delete(fire);
       onDone();
     };
     const later = (ms: number, then: () => void) => {
@@ -77,6 +88,7 @@ export function useProgression(): Progression {
         },
       );
     }
+    pending.current.add(fire);
   }, []);
 
   return { arm, cancel };

@@ -17,5 +17,10 @@ export default defineConfig({
     setupFiles: ['./src/playlab/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
     css: false,
+    // Every activity screen is its own lazily loaded chunk (app/routes.tsx). The FIRST test to
+    // touch a chunk pays its import cost in jsdom, which can exceed vitest's 5s default; the
+    // queries in those tests already allow 15s, so give the whole test the same budget.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });

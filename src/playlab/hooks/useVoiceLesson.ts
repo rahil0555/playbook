@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSpeech } from './useAudio';
+import { usePlayLab } from '../app/PlayLabContext';
 import { useVoiceTask, type VoicePhase } from './useVoiceTask';
 import type { RecognizerFactory } from '../services/speechInput/recognizer';
 import { evaluateVoiceTask, FAILURE_COPY, type VoiceTask, type VoiceVerdict } from '../services/speechInput/tasks';
@@ -56,6 +57,7 @@ export interface VoiceLessonOptions {
  */
 export function useVoiceLesson({ steps, start = 0, onAnswer, onFinish, createRecognizer }: VoiceLessonOptions) {
   const { speak, stop: stopSpeech } = useSpeech();
+  const { paused: wallPaused } = usePlayLab();
   const [index, setIndex] = useState(() => Math.min(Math.max(start, 0), Math.max(steps.length - 1, 0)));
   const step = steps[index] as LessonStep;
   const [phase, setPhase] = useState<LessonPhase>('teaching');
@@ -66,14 +68,14 @@ export function useVoiceLesson({ steps, start = 0, onAnswer, onFinish, createRec
 
   /** bumped by every new step, Stop and unmount: a continuation that finds a different number does nothing */
   const run = useRef(0);
-  const latest = useRef({ steps, index, step, phase, tries, unclear, onAnswer, onFinish, speak, voice, micDown });
-  latest.current = { steps, index, step, phase, tries, unclear, onAnswer, onFinish, speak, voice, micDown };
+  const latest = useRef({ steps, index, step, phase, tries, unclear, onAnswer, onFinish, speak, voice, micDown, wallPaused });
+  latest.current = { steps, index, step, phase, tries, unclear, onAnswer, onFinish, speak, voice, micDown, wallPaused };
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
   /** starts listening for this run (never speaks first) */
   const listenFor = useCallback((id: number) => {
-    if (id !== run.current) return;
+    if (id !== run.current || latest.current.wallPaused) return;
     setPhase('listening');
     latest.current.voice.start();
   }, []);
@@ -196,9 +198,17 @@ export function useVoiceLesson({ steps, start = 0, onAnswer, onFinish, createRec
   const speakNow = useCallback(() => {
     stopSpeech();
     const id = ++run.current;
-    if (latest.current.micDown) return;
+    if (latest.current.micDown || latest.current.wallPaused) return;
     listenFor(id);
   }, [listenFor, stopSpeech]);
+
+  useEffect(() => {
+    if (!wallPaused) return;
+    run.current += 1;
+    latest.current.voice.stop();
+    stopSpeech();
+    setPhase('paused');
+  }, [wallPaused, stopSpeech]);
 
   const goTo = useCallback(
     (i: number) => {

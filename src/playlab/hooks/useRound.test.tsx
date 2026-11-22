@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../app/PlayLabContext', () => ({
+  PlayLabPausedContext: { _currentValue: false },
   usePlayLab: () => ({ recordStart: mocks.recordStart, recordAnswer: mocks.recordAnswer, recordCompletion: mocks.recordCompletion, audio: { stop: mocks.audioStop } }),
 }));
 

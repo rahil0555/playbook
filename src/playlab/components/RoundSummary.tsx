@@ -22,7 +22,7 @@ const HEADLINES = { 3: 'Amazing!', 2: 'Great work!', 1: 'You did it!' } as const
 
 /** Round finished: stars, kind message, and clear next steps (play again / next activity / home). */
 export function RoundSummary({ completion, onPlayAgain, extra }: RoundSummaryProps) {
-  const { navigate } = usePlayLab();
+  const { navigate, openActivity } = usePlayLab();
   const { sfx } = useSpeech();
   const { lifetime } = useProgressState();
   // the round that just finished has already been counted, so its sticker is the newest one
@@ -67,7 +67,8 @@ export function RoundSummary({ completion, onPlayAgain, extra }: RoundSummaryPro
         <Button size="lg" accent="brand" icon="refresh" onClick={onPlayAgain}>
           Play again
         </Button>
-        <Button size="lg" variant="secondary" accent={next.accent} iconRight="arrow-right" onClick={() => navigate(next.id)}>
+        {/* through the gate: the next activity may be locked, and it must show the wall, not open anyway */}
+        <Button size="lg" variant="secondary" accent={next.accent} iconRight="arrow-right" onClick={() => openActivity(next.id)}>
           Next: {next.title}
         </Button>
       </motion.div>

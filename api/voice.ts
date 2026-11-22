@@ -5,8 +5,9 @@
  * prefix, so Vite can never inline it into the browser bundle, and the audio is streamed back as plain mp3 - the
  * key never leaves this function.
  *
- * It is a GET so the browser can play it straight from an <audio src>: the app already knows how to fall back from
- * a clip that will not play to the browser's own speech, so a failure here is silent and the app keeps working.
+ * It is a GET so the browser can play it straight from an <audio src>. There is NO browser-speech fallback: if a
+ * line cannot be spoken here, the line is SILENT (see services/audioService.ts), so the robotic browser voice can
+ * never be heard. A failure here therefore costs a line of speech, never the wrong voice.
  *
  * Most lines never reach this endpoint: they are pre-generated into /audio/edu by scripts/generate-voice.ts.
  */

@@ -65,7 +65,7 @@ export function phaseFor(state: SpeechRecognitionState, failure: VoiceFailure | 
  * stops when the question changes and when the tab is hidden, so the microphone is never left on by accident.
  */
 export function useVoiceTask({ task, onVerdict, createRecognizer }: VoiceTaskOptions) {
-  const { content, audio } = usePlayLab();
+  const { content, audio, paused } = usePlayLab();
   const current = useRef(task);
   current.current = task;
   const verdictHandler = useRef(onVerdict);
@@ -120,6 +120,14 @@ export function useVoiceTask({ task, onVerdict, createRecognizer }: VoiceTaskOpt
     setInterim('');
     stopListening();
   }, [task.key, stopListening]);
+
+  useEffect(() => {
+    if (paused) {
+      asked.current = null;
+      setInterim('');
+      stopListening();
+    }
+  }, [paused, stopListening]);
 
   useEffect(() => {
     const hide = () => {

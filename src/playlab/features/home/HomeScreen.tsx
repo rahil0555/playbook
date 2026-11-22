@@ -10,7 +10,8 @@ import { ACTIVITIES } from '../../data/activities';
 import { BADGES } from '../../data/badges';
 import { STICKERS, STICKER_SLOTS, stickerSummary } from '../../data/stickers';
 import { useSpeech } from '../../hooks/useAudio';
-import { letterColor } from '../../lib/accents';
+import { ACCENTS, letterColor } from '../../lib/accents';
+import { evaluateCredits } from '../../lib/credits';
 import { animationFor } from '../../motion/variants';
 import { visitLine } from './visitLine';
 
@@ -31,21 +32,25 @@ function Stat({ icon, value, label, color }: { icon: 'star' | 'check' | 'trophy'
 }
 
 export default function HomeScreen() {
-  const { navigate, learner, content } = usePlayLab();
+  const { navigate, openActivity, learner, content, unlocked, paywall } = usePlayLab();
   const { lifetime, session, hydrated } = useProgressState();
   const { sayLetterName, sfx } = useSpeech();
   const handles = useRef<Record<string, AnimatedLetterHandle | null>>({});
   const featured = ACTIVITIES[2]!;
   const heroLetters = useMemo(() => HERO_WORD.map((id) => content.letters.find((l) => l.id === id)).filter((l) => !!l), [content]);
   const name = learner?.displayName?.trim();
-  const { unlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
+  const { unlocked: stickerUnlocked, extra } = stickerSummary(lifetime.activitiesCompleted);
+  const stickerCount = stickerUnlocked + extra;
   // until the saved progress has loaded, the stats show a placeholder rather than zeros that would change a moment later
   const shown = (value: number | string) => (hydrated ? value : '…');
 
-  const pipSays =
-    lifetime.activitiesCompleted === 0
+  const locked = (id: (typeof ACTIVITIES)[number]['id']) => !unlocked && !evaluateCredits(id, lifetime, paywall).allowed;
+
+  const pipSays = !unlocked && locked(featured.id)
+    ? 'Play any place that is open. Grown-ups can unlock the rest!'
+    : lifetime.activitiesCompleted === 0
       ? 'Hi! I’m Pip. Let’s learn together!'
-      : `${unlocked + extra} sticker${unlocked + extra === 1 ? '' : 's'} so far! Pick a place to play.`;
+      : `${stickerCount} sticker${stickerCount === 1 ? '' : 's'} so far! Pick a place to play.`;
 
   return (
     <div className="space-y-8 sm:space-y-10">
@@ -57,7 +62,9 @@ export default function HomeScreen() {
               {name ? `Hello, ${name}!` : 'Hello, explorer!'}
               <span className="block text-brand-700">Let’s play with letters.</span>
             </h1>
-            <p className="mt-3 max-w-md text-lg text-ink-soft">Tap a letter to hear it, then choose a place to play.</p>
+            <p className="mt-3 max-w-md text-lg text-ink-soft">
+              {unlocked || !locked(featured.id) ? 'Tap a letter to hear it, then choose a place to play.' : 'Tap a letter to hear it. Some places need a grown-up to unlock.'}
+            </p>
             <ul aria-label="Tap a letter to hear it" className="mt-5 flex flex-wrap gap-1.5 min-[360px]:gap-2 sm:gap-3">
               {heroLetters.map((l, i) => (
                 <li key={l.id}>
@@ -81,8 +88,15 @@ export default function HomeScreen() {
               ))}
             </ul>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button size="lg" variant="primary" accent="sun" iconRight="arrow-right" onClick={() => navigate(featured.id)}>
-                {featured.cta}
+              <Button
+                size="lg"
+                variant="primary"
+                accent={locked(featured.id) ? 'sky' : 'sun'}
+                icon={locked(featured.id) ? 'lock' : undefined}
+                iconRight="arrow-right"
+                onClick={() => openActivity(featured.id)}
+              >
+                {locked(featured.id) ? 'Unlock more play' : featured.cta}
               </Button>
               <Button size="lg" variant="secondary" accent="brand" onClick={() => navigate('progress')}>
                 See my stickers
@@ -105,9 +119,9 @@ export default function HomeScreen() {
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat icon="star" value={shown(lifetime.stars)} label="stars collected" color="#d9741c" />
-          <Stat icon="check" value={shown(lifetime.activitiesCompleted)} label="rounds finished" color="#16a286" />
-          <Stat icon="trophy" value={shown(`${lifetime.badges.length} / ${BADGES.length}`)} label="badges" color="#8a5cc7" />
-          <Stat icon="sparkle" value={shown(`${unlocked} / ${STICKER_SLOTS}`)} label="stickers" color="#2f8fd8" />
+          <Stat icon="check" value={shown(lifetime.activitiesCompleted)} label="rounds finished" color={ACCENTS.brand.hex} />
+          <Stat icon="trophy" value={shown(`${lifetime.badges.length} / ${BADGES.length}`)} label="badges" color={ACCENTS.plum.hex} />
+          <Stat icon="sparkle" value={shown(`${stickerUnlocked} / ${STICKER_SLOTS}`)} label="stickers" color={ACCENTS.sky.hex} />
         </div>
         <p className="mt-3 inline-block rounded-[1.4rem] bg-white/85 px-4 py-1.5 text-ink shadow-soft" data-testid="visit-line">
           {visitLine(hydrated, session)}
@@ -121,7 +135,7 @@ export default function HomeScreen() {
         <ul className="pl-board flex flex-wrap items-center justify-center gap-3 rounded-[2rem] p-4 sm:gap-4 sm:p-5" aria-label="Sticker book">
           {STICKERS.map((s, i) => (
             <li key={s.id}>
-              <StickerArt sticker={s} slot={i + 1} locked={i >= unlocked} size="h-14 w-14 sm:h-16 sm:w-16" />
+              <StickerArt sticker={s} slot={i + 1} locked={i >= stickerUnlocked} size="h-14 w-14 sm:h-16 sm:w-16" />
             </li>
           ))}
         </ul>
@@ -134,7 +148,7 @@ export default function HomeScreen() {
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
           {ACTIVITIES.map((a, i) => (
             <li key={a.id} className={i < 3 ? 'lg:col-span-2' : 'lg:col-span-3'}>
-              <ActivityCard activity={a} progress={lifetime.perActivity[a.id]} onOpen={() => navigate(a.id)} index={i} station={i + 1} />
+              <ActivityCard activity={a} progress={lifetime.perActivity[a.id]} onOpen={() => openActivity(a.id)} index={i} station={i + 1} locked={locked(a.id)} />
             </li>
           ))}
         </ul>
@@ -147,7 +161,7 @@ export default function HomeScreen() {
           </h2>
           <div className="flex flex-col items-start gap-4 rounded-[2rem] bg-white/85 p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
             <p className="font-display text-xl font-semibold text-ink">“{content.stories[0]?.sentence}”</p>
-            <Button size="lg" variant="primary" accent="plum" iconRight="arrow-right" onClick={() => navigate('story')}>
+            <Button size="lg" variant="primary" accent="plum" iconRight="arrow-right" onClick={() => openActivity('story')}>
               Spell the story
             </Button>
           </div>

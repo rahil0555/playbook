@@ -1,468 +1,142 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EduVoice } from './eduVoice';
 
 // The global test setup replaces createAudioService with a fake; here we want the real one.
-const { createAudioService, SPEECH_STYLE, VOICE_WAIT_MS } = await vi.importActual<typeof import('./audioService')>('./audioService');
+const { createAudioService } = await vi.importActual<typeof import('./audioService')>('./audioService');
 
-type Handlers = { onstart?: () => void; onend?: () => void; onerror?: (e: { error: string }) => void };
+const tick = (ms = 5) => new Promise((r) => setTimeout(r, ms));
 
-function fakeSynth(behaviour: 'speak' | 'silent' | 'error' | 'throw', errorCode = 'synthesis-failed') {
-  const spoken: string[] = [];
-  const synth = {
-    cancel: vi.fn(),
-    getVoices: () => [{ name: 'Test Voice', lang: 'en-US', localService: true }],
-    speak: (u: Handlers & { text: string }) => {
-      if (behaviour === 'throw') throw new Error('nope');
-      spoken.push(u.text);
-      if (behaviour === 'speak') setTimeout(() => (u.onstart?.(), setTimeout(() => u.onend?.(), 5)), 1);
-      if (behaviour === 'error') setTimeout(() => u.onerror?.({ error: errorCode }), 1);
-    },
-  };
-  class Utterance {
-    text: string;
-    lang = '';
-    rate = 1;
-    pitch = 1;
-    voice: unknown = null;
-    onstart?: () => void;
-    onend?: () => void;
-    onerror?: (e: { error: string }) => void;
-    constructor(text: string) {
-      this.text = text;
-    }
+/** A recording the test starts, ends and fails by hand. */
+class FakeAudio {
+  static made: FakeAudio[] = [];
+  paused = false;
+  loop = false;
+  volume = 1;
+  onended?: () => void;
+  onerror?: () => void;
+  constructor(public src: string) {
+    FakeAudio.made.push(this);
   }
-  return { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance, spoken };
+  play() {
+    return Promise.resolve();
+  }
+  pause() {
+    this.paused = true;
+  }
+  finish() {
+    this.onended?.();
+  }
+  fail() {
+    this.onerror?.();
+  }
 }
 
-describe('audioService', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+/**
+ * Pip's voice, faked: a fixed clip table plus a record of what was marked broken. There is no other voice in the
+ * product, so a line with no clip here is a line that will simply not be said.
+ */
+function fakeVoice(clips: Record<string, string> = {}, opts: { ready?: boolean } = {}) {
+  const broken: string[] = [];
+  const voice: EduVoice & { broken: string[] } = {
+    clipFor: (text) => clips[text],
+    load: () => Promise.resolve(),
+    ready: () => opts.ready ?? true,
+    size: () => Object.keys(clips).length,
+    markBroken: (url) => {
+      broken.push(url);
+    },
+    broken,
+  };
+  return voice;
+}
 
-  it('plays speech through the browser voice and reports status', async () => {
-    const env = fakeSynth('speak');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
-    const p = audio.play({ text: 'ay', lang: 'en-US' });
-    await vi.advanceTimersByTimeAsync(20);
-    await expect(p).resolves.toBe('played');
-    expect(env.spoken).toEqual(['ay']);
-    expect(audio.getSnapshot()).toMatchObject({ unavailable: false, speaking: false, voiceName: 'Test Voice' });
+function env(voice: EduVoice | null = fakeVoice({ Hi: './audio/edu/hi.mp3' })) {
+  return { voice, AudioElement: FakeAudio as unknown as typeof Audio };
+}
+
+describe('audioService: one voice (Pip), and nothing else', () => {
+  beforeEach(() => {
+    FakeAudio.made = [];
   });
 
-  it('reports "unsupported" (and never throws) when speech synthesis does not exist', async () => {
-    const audio = createAudioService({ synth: null });
-    await expect(audio.play({ text: 'x' })).resolves.toBe('unsupported');
+  it("plays a spoken line from Pip's own recording and resolves 'played'", async () => {
+    const audio = createAudioService(env());
+    const p = audio.play({ text: 'Hi', lang: 'en-US' });
+    await tick();
+    expect(FakeAudio.made.at(-1)?.src).toBe('./audio/edu/hi.mp3');
+    FakeAudio.made.at(-1)!.finish();
+    await expect(p).resolves.toBe('played');
+    expect(audio.getSnapshot()).toMatchObject({ speaking: false, unavailable: false });
+  });
+
+  it('stays silent (never robotic) when a line has no recording at all', async () => {
+    const audio = createAudioService(env(fakeVoice({})));
+    await expect(audio.play({ text: 'a line nobody recorded' })).resolves.toBe('silent');
+    expect(FakeAudio.made).toHaveLength(0);
     expect(audio.getSnapshot().unavailable).toBe(true);
+  });
+
+  it('is silent, and marks the clip broken, when a recording will not play', async () => {
+    const voice = fakeVoice({ Hi: './audio/edu/hi.mp3' });
+    const audio = createAudioService(env(voice));
+    const p = audio.play({ text: 'Hi' });
+    await tick();
+    FakeAudio.made.at(-1)!.fail();
+    await expect(p).resolves.toBe('silent');
+    expect(voice.broken).toEqual(['./audio/edu/hi.mp3']);
+    expect(audio.getSnapshot().unavailable).toBe(true);
+  });
+
+  it('is silent when the browser has no voice at all', async () => {
+    const audio = createAudioService({ voice: null, AudioElement: FakeAudio as unknown as typeof Audio });
+    await expect(audio.play({ text: 'Hi' })).resolves.toBe('silent');
+    expect(FakeAudio.made).toHaveLength(0);
+  });
+
+  it("reports 'unsupported' when the browser cannot play recordings, and never throws", async () => {
+    const audio = createAudioService({ voice: fakeVoice({ Hi: 'x.mp3' }) });
+    await expect(audio.play({ text: 'Hi', clipOnly: true })).resolves.toBe('unsupported');
     expect(() => audio.sfx('pop')).not.toThrow(); // no AudioContext either
     expect(() => audio.stop()).not.toThrow();
   });
 
-  it('gives up after a timeout when speech never starts (no installed voice) instead of hanging', async () => {
-    const env = fakeSynth('silent');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance, startTimeoutMs: 500 });
-    const p = audio.play({ text: 'cat' });
-    await vi.advanceTimersByTimeAsync(600);
-    await expect(p).resolves.toBe('unsupported');
-    expect(audio.getSnapshot().unavailable).toBe(true);
-  });
-
-  it('maps speech errors to outcomes', async () => {
-    const blocked = fakeSynth('error', 'not-allowed');
-    const a1 = createAudioService({ synth: blocked.synth, Utterance: blocked.Utterance });
-    const p1 = a1.play({ text: 'a' });
-    await vi.advanceTimersByTimeAsync(10);
-    await expect(p1).resolves.toBe('blocked');
-
-    const broken = fakeSynth('error');
-    const a2 = createAudioService({ synth: broken.synth, Utterance: broken.Utterance });
-    const p2 = a2.play({ text: 'a' });
-    await vi.advanceTimersByTimeAsync(10);
-    await expect(p2).resolves.toBe('error');
-    expect(a2.getSnapshot().unavailable).toBe(true);
-
-    const thrower = fakeSynth('throw');
-    const a3 = createAudioService({ synth: thrower.synth, Utterance: thrower.Utterance });
-    await expect(a3.play({ text: 'a' })).resolves.toBe('error');
-  });
-
-  it('treats an interrupted utterance (replaced by a newer one) as normal', async () => {
-    const env = fakeSynth('error', 'interrupted');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
-    const p = audio.play({ text: 'a' });
-    await vi.advanceTimersByTimeAsync(10);
-    await expect(p).resolves.toBe('played');
-    expect(audio.getSnapshot().unavailable).toBe(false);
-  });
-
   it('does nothing while muted', async () => {
-    const env = fakeSynth('speak');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
+    const audio = createAudioService(env());
     audio.setMuted(true);
-    await expect(audio.play({ text: 'a' })).resolves.toBe('muted');
-    expect(env.spoken).toEqual([]);
+    await expect(audio.play({ text: 'Hi' })).resolves.toBe('muted');
+    expect(FakeAudio.made).toHaveLength(0);
   });
 
-  it('falls back to speech when a recorded clip cannot be played', async () => {
-    const env = fakeSynth('speak');
-    class BadAudio {
-      onerror?: () => void;
-      onended?: () => void;
-      constructor(public src: string) {}
-      play() {
-        return Promise.reject(new Error('404'));
-      }
-      pause() {}
-      addEventListener() {}
-    }
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance, AudioElement: BadAudio as unknown as typeof Audio });
-    const p = audio.play({ text: 'apple', src: '/audio/apple.mp3' });
-    await vi.advanceTimersByTimeAsync(20);
-    await expect(p).resolves.toBe('played');
-    expect(env.spoken).toEqual(['apple']);
-  });
-
-  it('plays a sequence in order and stop() drops the rest', async () => {
-    const env = fakeSynth('speak');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
-    const p = audio.playSequence([{ text: 'ay' }, { text: 'aah' }, { text: 'apple' }]);
-    await vi.advanceTimersByTimeAsync(100);
-    await p;
-    expect(env.spoken).toEqual(['ay', 'aah', 'apple']);
-
-    const p2 = audio.playSequence([{ text: '1' }, { text: '2' }, { text: '3' }]);
-    await vi.advanceTimersByTimeAsync(2);
+  it('stop() stops the recording and releases whoever waits for it', async () => {
+    const audio = createAudioService(env());
+    const p = audio.play({ text: 'Hi' });
+    await tick();
     audio.stop();
-    await vi.advanceTimersByTimeAsync(100);
-    await p2;
-    expect(env.spoken.slice(3)).not.toContain('3');
-  });
-
-  it('a pause before a line waits before it is said, and stop() during the pause drops that line', async () => {
-    const env = fakeSynth('speak');
-    const audio = createAudioService({ synth: env.synth, Utterance: env.Utterance });
-    const p = audio.playSequence([{ text: 'Listen for the sound in' }, { text: 'ball', pauseBeforeMs: 250 }]);
-    await vi.advanceTimersByTimeAsync(100);
-    expect(env.spoken).toEqual(['Listen for the sound in']);
-    await vi.advanceTimersByTimeAsync(400);
-    await p;
-    expect(env.spoken).toEqual(['Listen for the sound in', 'ball']);
-
-    const p2 = audio.playSequence([{ text: 'first' }, { text: 'second', pauseBeforeMs: 500 }]);
-    await vi.advanceTimersByTimeAsync(100);
-    audio.stop();
-    await vi.advanceTimersByTimeAsync(600);
-    await p2;
-    // 'first' had no pause, so it was said before the stop; the line that waited is never said
-    expect(env.spoken.slice(2)).toEqual(['first']);
-  });
-});
-
-/* ---------------------- voice selection (browser voices only) ---------------------- */
-
-type Rec = { text: string; rate: number; pitch: number; voice: { name: string } | null };
-
-function voiceSynth(voices: { name: string; lang: string; voiceURI?: string; localService?: boolean }[]) {
-  const spoken: Rec[] = [];
-  const handlers: Record<string, () => void> = {};
-  let list = voices;
-  const synth = {
-    cancel: vi.fn(),
-    getVoices: () => list,
-    addEventListener: (type: string, fn: () => void) => {
-      handlers[type] = fn;
-    },
-    speak: (u: Rec & { onstart?: () => void; onend?: () => void }) => {
-      spoken.push({ text: u.text, rate: u.rate, pitch: u.pitch, voice: u.voice });
-      setTimeout(() => (u.onstart?.(), u.onend?.()), 1);
-    },
-  };
-  class Utterance {
-    text: string;
-    lang = '';
-    rate = 1;
-    pitch = 1;
-    voice: { name: string } | null = null;
-    onstart?: () => void;
-    onend?: () => void;
-    constructor(text: string) {
-      this.text = text;
-    }
-  }
-  return {
-    env: { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance },
-    spoken,
-    setVoices: (v: typeof voices) => {
-      list = v;
-      handlers.voiceschanged?.();
-    },
-  };
-}
-
-const DEVICE = [
-  { name: 'Local US', lang: 'en-US', voiceURI: 'local-us', localService: true },
-  { name: 'Daisy', lang: 'en_GB', voiceURI: 'daisy', localService: false },
-  { name: 'Español', lang: 'es-ES', voiceURI: 'es', localService: true },
-];
-
-describe('audioService: voice selection', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-  it('exposes English voices only, labelled, and reports speech support', () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    const snap = audio.getSnapshot();
-    expect(snap.speechSupported).toBe(true);
-    expect(snap.voices.map((v) => v.label)).toEqual(['Local US (American English)', 'Daisy (British English, online)']);
-    expect(snap.voiceName).toBe('Local US');
-  });
-
-  it('without speech synthesis: unsupported and no voices', () => {
-    const snap = createAudioService({ synth: null }).getSnapshot();
-    expect(snap.speechSupported).toBe(false);
-    expect(snap.voices).toEqual([]);
-  });
-
-  it('picks up voices that arrive late (voiceschanged), and keeps the snapshot stable when nothing changed', () => {
-    const d = voiceSynth([]);
-    const audio = createAudioService(d.env);
-    expect(audio.getSnapshot().voices).toEqual([]);
-    d.setVoices(DEVICE);
-    const first = audio.getSnapshot();
-    expect(first.voices).toHaveLength(2);
-    d.setVoices(DEVICE); // same list again
-    expect(audio.getSnapshot()).toBe(first); // same object: no pointless re-render
-    audio.refreshVoices();
-    expect(audio.getSnapshot()).toBe(first);
-  });
-
-  it('speaks with the saved voice, and updates the displayed voice name', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    audio.setVoice('daisy');
-    expect(audio.getSnapshot()).toMatchObject({ voiceId: 'daisy', voiceName: 'Daisy' });
-    const p = audio.play({ text: 'hello', lang: 'en-US' });
-    await vi.advanceTimersByTimeAsync(10);
-    await p;
-    expect(d.spoken.at(-1)?.voice?.name).toBe('Daisy');
-  });
-
-  it('a stale saved voice silently falls back to automatic (and nothing breaks)', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    audio.setVoice('voice-from-another-device');
-    const p = audio.play({ text: 'hello', lang: 'en-US' });
-    await vi.advanceTimersByTimeAsync(10);
+    expect(FakeAudio.made.at(-1)!.paused).toBe(true);
     await expect(p).resolves.toBe('played');
-    expect(d.spoken.at(-1)?.voice?.name).toBe('Local US');
-    expect(audio.getSnapshot().unavailable).toBe(false);
   });
 
-  it('a preview override uses that voice for one request and does NOT change the saved voice or displayed name', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    audio.setVoice(null);
-    const p = audio.play({ text: 'preview', lang: 'en-US', voice: 'daisy' });
-    await vi.advanceTimersByTimeAsync(10);
-    await p;
-    expect(d.spoken.at(-1)?.voice?.name).toBe('Daisy');
-    expect(audio.getSnapshot()).toMatchObject({ voiceId: null, voiceName: 'Local US' });
-    const q = audio.play({ text: 'normal', lang: 'en-US' });
-    await vi.advanceTimersByTimeAsync(10);
-    await q;
-    expect(d.spoken.at(-1)?.voice?.name).toBe('Local US');
+  it('later() plays the line unless it is cancelled first', async () => {
+    const audio = createAudioService(env());
+    const scheduled = audio.later({ text: 'Hi' }, 10);
+    await tick(30);
+    expect(FakeAudio.made).toHaveLength(1);
+    FakeAudio.made.at(-1)!.finish();
+    await expect(scheduled.done).resolves.toBe('played');
+
+    const cancelled = audio.later({ text: 'Hi' }, 20);
+    cancelled();
+    await expect(cancelled.done).resolves.toBe('cancelled');
+    await tick(40);
+    expect(FakeAudio.made).toHaveLength(1);
   });
 
-  it('uses the shared speech style by default, and a request can set its own rate', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    const a = audio.play({ text: 'cat' });
-    await vi.advanceTimersByTimeAsync(10);
-    await a;
-    expect(d.spoken.at(-1)).toMatchObject({ rate: SPEECH_STYLE.rate, pitch: SPEECH_STYLE.pitch });
-    const b = audio.play({ text: 'hello', rate: 0.7 });
-    await vi.advanceTimersByTimeAsync(10);
-    await b;
-    expect(d.spoken.at(-1)).toMatchObject({ rate: 0.7, pitch: SPEECH_STYLE.pitch });
-    expect([SPEECH_STYLE.rate, SPEECH_STYLE.pitch]).toEqual([0.85, 1.05]); // a slower, clear pace for young listeners
-  });
-
-  it('tells listeners before a line starts, so the microphone can stop first', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    let spokenWhenTold = -1;
-    const off = audio.onBeforePlay(() => {
-      spokenWhenTold = d.spoken.length;
-    });
-    const p = audio.play({ text: 'bee' });
-    await vi.advanceTimersByTimeAsync(10);
-    await p;
-    expect(spokenWhenTold, 'the listener ran while nothing had been spoken yet').toBe(0);
-    expect(d.spoken.map((r) => r.text)).toEqual(['bee']);
-    off();
-  });
-
-  it('plays no sound effect while the microphone is listening (it could be picked up, and it distracts), and plays them again after', () => {
-    const tones: number[] = [];
-    class FakeAudioContext {
-      currentTime = 0;
-      state = 'running';
-      destination = {};
-      createOscillator() {
-        tones.push(tones.length);
-        return { type: 'sine', frequency: { value: 0 }, connect: () => ({ connect: () => undefined }), start: () => undefined, stop: () => undefined };
-      }
-      createGain() {
-        return { gain: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined }, connect: () => undefined };
-      }
-      resume() {
-        return Promise.resolve();
-      }
-    }
-    const audio = createAudioService({ synth: null, AudioContextCtor: FakeAudioContext as unknown as typeof AudioContext });
-    audio.setListening(true);
-    audio.sfx('pop');
-    expect(tones, 'no tone while listening').toEqual([]);
-    audio.setListening(false);
-    audio.sfx('pop');
-    expect(tones.length, 'the tone plays again once listening has stopped').toBeGreaterThan(0);
-  });
-
-  it('is not told when nothing is played (sound off), and a removed listener is not told', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    let told = 0;
-    const off = audio.onBeforePlay(() => (told += 1));
-    audio.setMuted(true);
-    await audio.play({ text: 'bee' });
-    expect(told).toBe(0);
-    audio.setMuted(false);
-    off();
-    const p = audio.play({ text: 'bee' });
-    await vi.advanceTimersByTimeAsync(10);
-    await p;
-    expect(told).toBe(0);
-  });
-
-  it('mute still wins over a chosen voice', async () => {
-    const d = voiceSynth(DEVICE);
-    const audio = createAudioService(d.env);
-    audio.setVoice('daisy');
-    audio.setMuted(true);
-    await expect(audio.play({ text: 'x' })).resolves.toBe('muted');
-    expect(d.spoken).toEqual([]);
-  });
-});
-
-describe('sound effect timing', () => {
-  it('each sound effect lasts as long as its notes, so speech can wait for the fanfare to finish', async () => {
-    const { sfxDurationMs } = await vi.importActual<typeof import('./audioService')>('./audioService');
-    expect(sfxDurationMs('celebrate')).toBe(600);
-    expect(sfxDurationMs('correct')).toBe(400);
-    expect(sfxDurationMs('chime')).toBe(390);
-  });
-});
-
-describe('speech that waits for a fanfare', () => {
-  // a fake speech synthesiser that records what it was asked to say
-  function fakeSpeech() {
-    const said: string[] = [];
-    const synth = {
-      speak: (u: { text: string }) => said.push(u.text),
-      cancel: () => undefined,
-      getVoices: () => [],
-      addEventListener: () => undefined,
-    };
-    class Utterance {
-      text: string;
-      constructor(text: string) {
-        this.text = text;
-      }
-    }
-    // this fake has no voice list at all: it is not a device waiting for voices, so the wait is off for these timing tests
-    return { said, env: { synth, Utterance, startTimeoutMs: 60_000, voiceWaitMs: 0 } as unknown as Parameters<typeof createAudioService>[0] };
-  }
-
-  it('says a line once its delay has passed, and not before', async () => {
-    vi.useFakeTimers();
-    try {
-      const { said, env } = fakeSpeech();
-      const { createAudioService: create } = await vi.importActual<typeof import('./audioService')>('./audioService');
-      const audio = create(env);
-      audio.later({ text: 'Hooray', lang: 'en-US' }, 720);
-      vi.advanceTimersByTime(719);
-      expect(said).toEqual([]);
-      vi.advanceTimersByTime(1);
-      expect(said).toEqual(['Hooray']);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('a line can be cancelled, and stop() drops every line still waiting', async () => {
-    vi.useFakeTimers();
-    try {
-      const { said, env } = fakeSpeech();
-      const { createAudioService: create } = await vi.importActual<typeof import('./audioService')>('./audioService');
-      const audio = create(env);
-      const replaced = audio.later({ text: 'old line', lang: 'en-US' }, 500);
-      audio.later({ text: 'kept line', lang: 'en-US' }, 500);
-      replaced();
-      audio.later({ text: 'left behind', lang: 'en-US' }, 500);
-      audio.stop();
-      vi.advanceTimersByTime(1000);
-      expect(said).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe('audioService: waiting for the teacher voice', () => {
-  it('a line asked for before the voice list arrives waits for it, then uses the teacher voice', async () => {
-    vi.useFakeTimers();
-    try {
-      const d = voiceSynth([]);
-      const audio = createAudioService(d.env);
-      const pending = audio.play({ text: 'Hi there' });
-      d.setVoices(DEVICE);
-      await vi.advanceTimersByTimeAsync(10);
-      await pending;
-      expect(d.spoken).toHaveLength(1);
-      expect(d.spoken[0]).toMatchObject({ text: 'Hi there', voice: { name: 'Local US' }, rate: SPEECH_STYLE.rate });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('stop() while a line waits for the voice list means that line is never spoken', async () => {
-    vi.useFakeTimers();
-    try {
-      const d = voiceSynth([]);
-      const audio = createAudioService(d.env);
-      const pending = audio.play({ text: 'Too late' });
-      audio.stop();
-      d.setVoices(DEVICE);
-      await vi.advanceTimersByTimeAsync(10);
-      expect(await pending).toBe('cancelled');
-      expect(d.spoken).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('a device that never lists a voice speaks after the short wait, and later lines do not wait again', async () => {
-    vi.useFakeTimers();
-    try {
-      const d = voiceSynth([]);
-      const audio = createAudioService(d.env);
-      const first = audio.play({ text: 'First' });
-      await vi.advanceTimersByTimeAsync(VOICE_WAIT_MS + 10);
-      await first;
-      expect(d.spoken.map((s) => s.text)).toEqual(['First']);
-      const second = audio.play({ text: 'Second' });
-      await vi.advanceTimersByTimeAsync(10);
-      await second;
-      expect(d.spoken.map((s) => s.text)).toEqual(['First', 'Second']);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('playSequence stops as soon as a line cannot be played', async () => {
+    const audio = createAudioService(env(fakeVoice({ A: './audio/edu/a.mp3' })));
+    const p = audio.playSequence([{ text: 'A' }, { text: 'a line nobody recorded' }]);
+    await tick();
+    FakeAudio.made.at(-1)!.finish();
+    await expect(p).resolves.toBe('silent');
+    expect(FakeAudio.made).toHaveLength(1);
   });
 });

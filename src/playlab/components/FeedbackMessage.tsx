@@ -61,11 +61,11 @@ export function FeedbackMessage({ tone, title, children, action, className = '',
       <div className={`relative flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 rounded-[1.6rem] border-[3px] p-3 pr-4 shadow-soft before:absolute before:-left-[0.7rem] before:bottom-6 before:h-4 before:w-4 before:rotate-45 before:rounded-sm before:border-b-[3px] before:border-l-[3px] before:border-inherit before:bg-inherit before:content-[''] ${t.box}`}>
       {/* the text keeps a readable width: on a narrow screen the action wraps underneath instead of squeezing it */}
       <div className="min-w-0 flex-[1_1_9.5rem]">
-        <p className="flex items-center gap-1.5 font-display text-lg font-semibold leading-tight">
+        <div className="flex items-center gap-1.5 font-display text-lg font-semibold leading-tight">
           <Icon name={t.icon} size={20} />
           {title}
-        </p>
-        {children ? <p className="mt-0.5 text-[0.95rem] leading-snug">{children}</p> : null}
+        </div>
+        {children ? <div className="mt-0.5 text-[0.95rem] leading-snug">{children}</div> : null}
       </div>
       {action ? (
         <Button size="md" variant="primary" accent={tone === 'retry' ? 'sun' : 'brand'} icon={action.icon} onClick={action.onClick} className="max-w-full whitespace-normal text-left">

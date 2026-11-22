@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { PlayLabPausedContext } from '../app/PlayLabContext';
 import { usePlayLab } from '../app/PlayLabContext';
 import { starsForScore } from '../services/progressService';
 import type { ActivityCompletion, ActivityId, AnswerResult } from '../types/learning';
@@ -48,6 +49,7 @@ export function useRound<T extends { id: string }>(
   variant?: string,
 ): Round<T> {
   const { recordStart, recordAnswer, recordCompletion, audio } = usePlayLab();
+  const paused = useContext(PlayLabPausedContext);
   const [items, setItems] = useState<T[]>(buildItems);
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<Record<string, QuestionResult>>({});
@@ -115,6 +117,7 @@ export function useRound<T extends { id: string }>(
 
   /** the countdown is over: the next question, or after the last one the summary of the round */
   const advance = useCallback(() => {
+    if (paused) return;
     const i = indexRef.current;
     if (i + 1 < itemsRef.current.length) {
       indexRef.current = i + 1;
@@ -123,7 +126,7 @@ export function useRound<T extends { id: string }>(
     }
     finishRound();
     setSummary(completion.current);
-  }, [finishRound]);
+  }, [finishRound, paused]);
 
   const celebrate = useCallback(
     (hold?: PromiseLike<unknown> | null) => {

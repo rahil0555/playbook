@@ -69,12 +69,28 @@ export function allVoiceLines(): VoiceLine[] {
   // the instruction read aloud by "Hear instructions" at the top of each activity
   ACTIVITIES.forEach((a) => add('activity', a.instruction));
   add('activity', SOUND_LEAD_IN);
+  // instructions an activity overrides on its own header. These mirror the strings in the feature files (the screens own
+  // the wording); listing them here only means they can be pre-generated.
+  add('activity', 'Pick a letter. Hear its name, then hear its sound. They are different!');
+  add('activity', 'Listen to the sound. Then tap the letter that makes it.');
+  add('activity', 'Pick a game. Each one is a quick round of five.');
+  add('activity', 'Tap a letter, then tap its picture. You can drag letters, too.');
+  add('activity', 'Tap a speaker to hear a sound. Then tap the letter that makes it.');
+  add('activity', 'Look at the picture. Which letter is missing from the word?');
+  add('activity', 'Spell each underlined word in the sentence. Tap any word to hear it.');
+  add('activity', 'Drag each letter onto its glowing outline to spell the word. You can also tap a letter, then tap a spot.');
+  add('activity', 'Great reading! Play again or try the next activity.');
+  add('activity', 'Which word finishes the sentence? Tap it (or drag it) into the gap.');
+  add('activity', 'Put the words in order to make a sentence. It starts with a capital letter.');
+  add('activity', 'This language does not have a story yet.');
 
   // letters: the name, the example word, and every line the two guided lessons say about the letter
   englishLetters.forEach((letter) => {
     add('letter', letter.nameSpeech);
     add('letter', letter.sound.speech);
     add('letter', letter.word.text);
+    // the line Sound Discovery says for a right answer: the letter, then its example word ("T. tree")
+    add('letter', `${letter.upper}. ${letter.word.text}`);
     add('lesson-step', `Say ${letter.upper} for ${letter.word.text}!`);
     add('lesson-step', `${letter.upper} is for ${letter.word.text}. Let's learn it together!`);
     add('lesson-step', `${letter.upper} is for ${letter.word.text}. Let\u2019s learn it together!`);

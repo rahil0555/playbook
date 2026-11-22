@@ -24,7 +24,9 @@ afterEach(() => {
   Reflect.deleteProperty(window, 'SpeechRecognition');
 });
 
-const instruction = () => screen.findByTestId('lesson-instruction');
+// The activity is a lazily-loaded route chunk, so its first paint can take longer than Testing Library's 1 s default
+// (the sibling assertions in this file already budget 4 s for the same reason).
+const instruction = () => screen.findByTestId('lesson-instruction', {}, { timeout: 5000 });
 const status = () => screen.getByTestId('lesson-status');
 const stop = () => screen.getByRole('button', { name: 'Stop listening' });
 const speak = () => screen.getByRole('button', { name: 'Speak' });
@@ -166,20 +168,18 @@ describe('Letter Playground: the guided lesson', () => {
     expect(said).toContain('apple');
   });
 
-  it('reaching Z celebrates the whole alphabet and offers to start again', async () => {
+  it('pauses after the 12th explored letter and shows the paywall', async () => {
     renderPlayLab({ initialActivity: 'alphabet' });
-    for (const letter of englishLetters) {
-      const lineIndex = englishLetters.indexOf(letter);
+    for (let lineIndex = 0; lineIndex < 12; lineIndex += 1) {
+      const letter = englishLetters[lineIndex]!;
       await waitFor(() => expect(fake.latest()?.started).toBe(true), { timeout: 3000 });
       expect(await instruction()).toHaveTextContent(`Say ${letter.upper} for ${letter.word.text}!`);
       hear(`${letter.upper} for ${letter.word.text}`);
-      if (lineIndex < englishLetters.length - 1) {
-        await screen.findByText(`Say ${englishLetters[lineIndex + 1]!.upper} for ${englishLetters[lineIndex + 1]!.word.text}!`, {}, { timeout: 4000 });
+      if (lineIndex < 11) {
+        await screen.findByText(`Say ${englishLetters[lineIndex + 1]!.upper} for ${englishLetters[lineIndex + 1]!.word.text}!`, {}, { timeout: 5000 });
       }
     }
-    expect(await screen.findByText('You know the whole alphabet!', {}, { timeout: 4000 })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Start again' }).click();
-    expect(await instruction()).toHaveTextContent('Say A for apple!');
+    expect(await screen.findByRole('dialog', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByText('Say M for moon!')).toBeNull();
   }, 90_000);
 });

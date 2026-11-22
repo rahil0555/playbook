@@ -7,10 +7,16 @@ import { createMemoryAdapter, createEmptySnapshot } from '../services/progressSe
 import type { PlayLabView, ProgressAdapter } from '../types/learning';
 import { renderPlayLab } from '../test/utils';
 
+/**
+ * Each screen is its own lazily loaded chunk (app/routes.tsx). The FIRST test to touch a given
+ * chunk pays its import cost in jsdom, which can exceed the 1s default of the async queries.
+ */
+const SETTLED = { timeout: 15_000 } as const;
+
 describe('Navigation', () => {
   it('opens every activity from home and returns home from each', async () => {
     const { user } = renderPlayLab();
-    expect(await screen.findByRole('heading', { level: 1, name: /Hello, explorer/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Hello, explorer/ }, SETTLED)).toBeInTheDocument();
     const cases: [string, RegExp][] = [
       ['Letter Playground', /Letter Playground/],
       ['Sound Discovery', /Sound Discovery/],
@@ -19,20 +25,22 @@ describe('Navigation', () => {
       ['Match & Play', /Match & Play/],
     ];
     for (const [title, heading] of cases) {
-      await user.click((await screen.findByText(title, { selector: 'span' })).closest('button')!);
-      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+      // each destination is a lazily loaded chunk: the first visit to one pays its import cost
+      await user.click((await screen.findByText(title, { selector: 'span' }, SETTLED)).closest('button')!);
+      expect(await screen.findByRole('heading', { level: 1, name: heading }, SETTLED)).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Back to home' }));
-      expect(await screen.findByRole('heading', { level: 1, name: /Hello, explorer/ })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: /Hello, explorer/ }, SETTLED)).toBeInTheDocument();
     }
   });
 
   it('has a working My Stars screen and header navigation', async () => {
     const { user } = renderPlayLab();
     await user.click(await screen.findByRole('button', { name: 'My Stars' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'My Stars' })).toBeInTheDocument();
+    // My Stars is its own lazy chunk too: the first visit pays the import cost, which can exceed the 1s default
+    expect(await screen.findByRole('heading', { level: 1, name: 'My Stars' }, SETTLED)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'My Stars' })).toHaveAttribute('aria-current', 'page');
     await user.click(screen.getByRole('button', { name: 'Edurance PlayLab, go to home' }));
-    expect(await screen.findByRole('heading', { level: 1, name: /Hello/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Hello/ }, SETTLED)).toBeInTheDocument();
   });
 
   it('opens straight to initialActivity', async () => {

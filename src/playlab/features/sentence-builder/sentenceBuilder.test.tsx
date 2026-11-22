@@ -68,11 +68,10 @@ describe('Sentence builder', () => {
     expect(screen.getByLabelText('I like apples.')).toBeInTheDocument();
   });
 
-  it('every sentence is completed by itself and the round summary appears with progress recorded', async () => {
-    const onActivityComplete = vi.fn();
-    const { user, adapter } = renderPlayLab({ initialActivity: 'sentences', onActivityComplete });
-    const script: Record<string, string[]> = { s1: ['The', 'cat', 'is', 'sleeping'], s3: ['The', 'sun', 'is', 'bright'], s5: ['The', 'pig', 'is', 'big'] };
-    const order = ['s1', 's2', 's3', 's4', 's5'];
+  it('pauses on the paywall immediately after four sentences have been built', async () => {
+    const { user, adapter } = renderPlayLab({ initialActivity: 'sentences' });
+    const script: Record<string, string[]> = { s1: ['The', 'cat', 'is', 'sleeping'], s3: ['The', 'sun', 'is', 'bright'] };
+    const order = ['s1', 's2', 's3', 's4'];
     for (const id of order) {
       if (script[id]) {
         await screen.findByText(ARRANGE, {}, { timeout: 5000 });
@@ -81,14 +80,11 @@ describe('Sentence builder', () => {
         await screen.findByText(FILL, {}, { timeout: 5000 });
         await user.click(document.querySelector<HTMLElement>(id === 's2' ? '[data-option="apples"]' : '[data-option="run"]')!);
       }
-      // no Next or Finish button: the round moves on by itself, and the last sentence ends in the summary
       expect(screen.queryByRole('button', { name: /^(Next sentence|Finish)$/ })).toBeNull();
     }
-    expect(await screen.findByRole('region', { name: 'Amazing!' }, { timeout: 5000 })).toBeInTheDocument();
-    expect(onActivityComplete).toHaveBeenCalledWith(expect.objectContaining({ activityId: 'sentences', score: 5, total: 5 }));
-    expect((adapter.load() as { perActivity: { sentences: { correct: number } } }).perActivity.sentences.correct).toBe(5);
-    await user.click(screen.getByRole('button', { name: 'Play again' }));
-    expect(await screen.findByText(ARRANGE)).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Free play pause' })).toBeInTheDocument();
+    expect((adapter.load() as { perActivity: { sentences: { correct: number } } }).perActivity.sentences.correct).toBe(4);
+    expect(screen.queryByText(ARRANGE)).toBeNull();
   }, 30000);
 
   it('a sentence is judged once per completion: taking a word out is not an answer, filling the sentence again is', async () => {

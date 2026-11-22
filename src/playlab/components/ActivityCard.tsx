@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { Illustration } from '../illustrations/Illustration';
+import { ACCENTS } from '../lib/accents';
 import { springs } from '../motion/variants';
 import type { ActivityDefinition, ActivityProgress } from '../types/learning';
 import { Icon } from './Icon';
@@ -13,19 +14,25 @@ interface ActivityCardProps {
   index?: number;
   /** the station number on the adventure trail (1-based) */
   station?: number;
+  /** gated by the paywall: the card still opens the wall, and says so */
+  locked?: boolean;
 }
 
-/** Each activity has its own little world on its card: a coloured sky with a glowing picture frame. */
+/**
+ * Each activity has its own little world on its card: a coloured sky with a glowing picture frame.
+ * The gem colour is the accent's own colour (lib/accents.ts is the single source of truth), so a
+ * re-branded or re-tuned accent reaches the cards instead of drifting from a copy of the hex.
+ */
 const WORLD: Record<string, { sky: string; gem: string }> = {
-  coral: { sky: 'linear-gradient(180deg,#ffd9cf,#ffb9a6)', gem: '#e8573f' },
-  sky: { sky: 'linear-gradient(180deg,#cfe9ff,#9fd0f7)', gem: '#2f8fd8' },
-  brand: { sky: 'linear-gradient(180deg,#c9f2e4,#8fe0c6)', gem: '#16a286' },
+  coral: { sky: 'linear-gradient(180deg,#ffd9cf,#ffb9a6)', gem: ACCENTS.coral.hex },
+  sky: { sky: 'linear-gradient(180deg,#cfe9ff,#9fd0f7)', gem: ACCENTS.sky.hex },
+  brand: { sky: 'linear-gradient(180deg,#c9f2e4,#8fe0c6)', gem: ACCENTS.brand.hex },
   sun: { sky: 'linear-gradient(180deg,#fff0bd,#ffd66b)', gem: '#d9741c' },
-  plum: { sky: 'linear-gradient(180deg,#e4d6ff,#c3a8f2)', gem: '#8a5cc7' },
+  plum: { sky: 'linear-gradient(180deg,#e4d6ff,#c3a8f2)', gem: ACCENTS.plum.hex },
 };
 
 /** A real button: the whole card opens the activity. */
-export function ActivityCard({ activity, progress, onOpen, index = 0, station }: ActivityCardProps) {
+export function ActivityCard({ activity, progress, onOpen, index = 0, station, locked = false }: ActivityCardProps) {
   const w = WORLD[activity.accent] ?? WORLD.brand!;
   const played = progress.started > 0;
   return (
@@ -38,8 +45,22 @@ export function ActivityCard({ activity, progress, onOpen, index = 0, station }:
       whileHover={{ y: -6 }}
       whileTap={{ scale: 0.97 }}
       data-activity={activity.id}
-      className="pl-paper group flex h-full w-full flex-col overflow-hidden rounded-[2rem] text-left"
+      data-locked={locked ? 'true' : undefined}
+      aria-label={locked ? `${activity.title}. Locked. Grown-ups can unlock it.` : undefined}
+      className={`pl-paper group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] text-left ${
+        locked ? 'grayscale-[0.35]' : ''
+      }`}
     >
+      {locked ? (
+        <span
+          role="img"
+          className="pointer-events-none absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 font-display text-sm font-bold text-ink shadow-soft"
+          aria-label="Locked"
+        >
+          <Icon name="lock" size={16} className="text-ink-soft" />
+          Locked
+        </span>
+      ) : null}
       <span className="relative flex h-36 items-center justify-center" style={{ background: w.sky }}>
         {station ? (
           <span aria-hidden="true" className="absolute left-3 top-3 grid h-10 w-10 place-items-center rounded-full border-[3px] border-sun-500 bg-white font-display text-xl font-bold text-ink shadow-soft">
@@ -64,10 +85,15 @@ export function ActivityCard({ activity, progress, onOpen, index = 0, station }:
         <span className="block font-display text-2xl font-bold leading-tight text-ink">{activity.title}</span>
         <span className="mt-1 block text-[0.98rem] leading-snug text-ink-soft">{activity.tagline}</span>
         <span className="mt-auto flex items-center justify-between gap-2 pt-4">
-          <span className="text-sm font-semibold text-ink-soft">{played ? `Played ${progress.started} time${progress.started === 1 ? '' : 's'}` : 'New!'}</span>
-          <span className="pl-gem inline-flex min-h-[2.9rem] items-center gap-1.5 rounded-full px-5 font-display text-base font-semibold" style={{ '--gem': w.gem } as CSSProperties}>
-            {activity.cta}
-            <Icon name="arrow-right" size={18} className="transition-transform group-hover:translate-x-0.5" />
+          <span className="text-sm font-semibold text-ink-soft">
+            {locked ? 'Grown-ups only' : played ? `Played ${progress.started} time${progress.started === 1 ? '' : 's'}` : 'New!'}
+          </span>
+          <span
+            className="pl-gem inline-flex min-h-[2.9rem] items-center gap-1.5 rounded-full px-5 font-display text-base font-semibold"
+            style={{ '--gem': locked ? '#5b6b69' : w.gem } as CSSProperties}
+          >
+            {locked ? 'Unlock' : activity.cta}
+            <Icon name={locked ? 'lock' : 'arrow-right'} size={18} className="transition-transform group-hover:translate-x-0.5" />
           </span>
         </span>
       </span>

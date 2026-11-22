@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { usePlayLab } from '../app/PlayLabContext';
-import { SPEECH_STYLE, type PlayRequest, type Scheduled, type SfxName, type SpeakOutcome } from '../services/audioService';
+import { type PlayRequest, type Scheduled, type SfxName, type SpeakOutcome } from '../services/audioService';
 import { phonicLoopRequest, phonicRequest } from '../services/phonics';
 import { SOUND_LEAD_IN } from '../lib/lessonLines';
 import type { AudioClipSet, LetterEntry, PhonemeId } from '../types/learning';
@@ -52,12 +52,12 @@ export { SOUND_LEAD_IN } from '../lib/lessonLines';
 
 /**
  * The requests that play a letter's sound. A recording is used when there is one. Otherwise the sound is heard in its example
- * word, after a short breath, because browser speech cannot say an isolated sound and an invented respelling is not the sound.
+ * word, after a short breath: Pip's voice cannot say an isolated sound, and an invented respelling is not the sound.
  */
 export function soundRequests(letter: LetterEntry, lang: string): PlayRequest[] {
-  if (letter.audio?.sound) return [{ text: letter.sound.speech, lang, src: letter.audio.sound, rate: SPEECH_STYLE.rate }];
+  if (letter.audio?.sound) return [{ text: letter.sound.speech, lang, src: letter.audio.sound }];
   return [
-    { text: SOUND_LEAD_IN, lang, rate: SPEECH_STYLE.rate },
-    { text: letter.sound.speech, lang, rate: SPEECH_STYLE.rate, pauseBeforeMs: 250 },
+    { text: SOUND_LEAD_IN, lang },
+    { text: letter.sound.speech, lang, pauseBeforeMs: 250 },
   ];
 }

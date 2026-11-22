@@ -1,4 +1,5 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
+import type { CreditsPolicy } from '../lib/credits';
 import type { AudioService } from '../services/audioService';
 import type { ProgressStore } from '../services/progressStore';
 import type {
@@ -30,6 +31,23 @@ export interface PlayLabContextValue {
   learner?: PlayLabLearner;
   canExit: boolean;
   exit: () => void;
+  /** Per-activity free credit limits. */
+  paywall: CreditsPolicy;
+  /** true once everything is unlocked (host `unlocked` prop, or the demo unlock) */
+  unlocked: boolean;
+  /**
+   * Tries to open a screen. When the screen is gated and the free allowance is spent, the wall is
+   * shown instead and this returns false. Use it for every activity entry point.
+   */
+  openActivity: (view: PlayLabView) => boolean;
+  /** Resumes the pending activity after the demo parent check succeeds. */
+  resumeBlockedActivity: () => void;
+  /** the wall's state: which activity was blocked, or null when the wall is closed */
+  blockedActivity: ActivityId | null;
+  paused: boolean;
+  closeWall: () => void;
+  /** the demonstration unlock (parent check passed) */
+  unlock: () => void;
   recordStart: (activityId: ActivityId) => void;
   recordAnswer: (answer: Omit<AnswerResult, 'timestamp'>) => AnswerResult;
   recordCompletion: (completion: Omit<ActivityCompletion, 'timestamp' | 'level'>) => ActivityCompletion;
@@ -40,6 +58,7 @@ export interface PlayLabContextValue {
 }
 
 export const PlayLabContext = createContext<PlayLabContextValue | null>(null);
+export const PlayLabPausedContext = createContext(false);
 
 export function usePlayLab(): PlayLabContextValue {
   const ctx = useContext(PlayLabContext);

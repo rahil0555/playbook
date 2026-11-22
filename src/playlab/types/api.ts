@@ -1,3 +1,4 @@
+import type { CreditsPolicy } from '../lib/credits';
 import type {
   ActivityCompletion,
   AnswerResult,
@@ -6,6 +7,21 @@ import type {
   PlayLabView,
   ProgressAdapter,
 } from './learning';
+
+export type { CreditsPolicy };
+
+/**
+ * Fired when the child meets the wall. The host can use it for analytics, or to open its own
+ * checkout. The wall is closed by PlayLab either way; nothing here performs a purchase.
+ */
+export interface UpgradeRequest {
+  /** activity where free credits ran out */
+  view: PlayLabView;
+  used: number;
+  free: number;
+  unit: string;
+  timestamp: number;
+}
 
 export interface PlayLabTheme {
   /** Main brand color. Default Edurance teal '#16a286'. Must be a 6-digit hex value. */
@@ -53,6 +69,20 @@ export interface PlayLabProps {
    * prop is provided.
    */
   onExit?: () => void;
+  /**
+   * Per-activity free credit overrides. Omitted activities use the demo limits in lib/credits.
+   */
+  paywall?: CreditsPolicy;
+  /**
+   * Skip the local demo gate (e.g. the child's subscription is active in the host app).
+   * Default: PlayLab's own local demo gate. See `onUpgradeRequest`.
+   */
+  unlocked?: boolean;
+  /**
+   * Called when the wall appears, so the host can open its own checkout or count the funnel.
+   * PlayLab never performs a purchase itself.
+   */
+  onUpgradeRequest?: (request: UpgradeRequest) => void;
   /** Extra class names for the root element (layout only, e.g. height). */
   className?: string;
 }

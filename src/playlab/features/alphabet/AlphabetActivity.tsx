@@ -35,7 +35,7 @@ function HighlightedWord({ word, color }: { word: string; color: string }) {
 }
 
 export default function AlphabetActivity() {
-  const { content, store, recordStart, recordAnswer, recordCompletion, exploreLetter, navigate } = usePlayLab();
+  const { content, store, recordStart, recordAnswer, recordCompletion, exploreLetter, openActivity } = usePlayLab();
   const { lifetime } = useProgressState();
   const { sayLetterFully, sfx } = useSpeech();
   const letters = content.letters;
@@ -232,7 +232,8 @@ export default function AlphabetActivity() {
                 <FeedbackMessage tone="success" title={goalRewarded ? `${GOAL} letters found! 3 stars!` : `${GOAL} letters found again!`} action={{ label: 'Keep exploring', onClick: keepExploring, icon: 'sparkle' }}>
                   {/* the goal is a finished round, so it earns a sticker: shown only the first time, when it is actually earned */}
                   {goalRewarded ? <StickerReveal rounds={lifetime.activitiesCompleted} className="mb-3" /> : null}
-                  <Button variant="ghost" accent="coral" iconRight="arrow-right" onClick={() => navigate(next.id)} className="-ml-4">
+                  {/* the free playground's "next" is a gated activity, so it must go through the gate like every other entry point */}
+                  <Button variant="ghost" accent="coral" iconRight="arrow-right" onClick={() => openActivity(next.id)} className="-ml-4">
                     Next: {next.title}
                   </Button>
                 </FeedbackMessage>
